@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ValioValue · Agent console</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --ink: #1d2330; --muted: #6b7385; --line: #e4e7ec;
+    --blue: #1f5eff; --blue-soft: #eaf0ff; --green: #127a46; --green-soft: #e6f6ed;
+    --amber: #a15c00; --amber-soft: #fff4e0; --red: #b42318; --red-soft: #fdecea;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; color: var(--ink); background: var(--bg); }
+  header { display: flex; align-items: center; gap: 12px; padding: 14px 24px; background: var(--card); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 2; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 650; }
+  header .sub { color: var(--muted); }
+  .pill { font-size: 12px; padding: 3px 9px; border-radius: 99px; background: var(--line); color: var(--muted); }
+  .pill.ok { background: var(--green-soft); color: var(--green); }
+  .pill.bad { background: var(--red-soft); color: var(--red); }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; padding: 20px 24px; max-width: 1500px; margin: 0 auto; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+  textarea { width: 100%; min-height: 64px; resize: vertical; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+  button.primary { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 600; }
+  button.approve { background: var(--green); border-color: var(--green); color: #fff; font-weight: 600; }
+  button.reject { color: var(--red); border-color: #f2c4c0; }
+  button:disabled { opacity: .5; cursor: default; }
+  .chip { font-size: 12px; padding: 4px 10px; border-radius: 99px; background: var(--blue-soft); color: var(--blue); border: 0; }
+  select, input[type=text] { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  .muted { color: var(--muted); }
+  #timeline { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+  .ev { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; align-items: start; }
+  .ev > div { min-width: 0; }
+  .ev .ic { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; background: var(--line); }
+  .ev .t { font-size: 12px; color: var(--muted); white-space: nowrap; padding-top: 4px; }
+  .ev.user .ic { background: var(--ink); color: #fff; }
+  .ev.agent .ic { background: var(--blue-soft); color: var(--blue); }
+  .ev.step .ic { background: #f0f1f4; }
+  .ev.step.done .ic { background: var(--green-soft); color: var(--green); }
+  .ev.step.fail .ic { background: var(--red-soft); color: var(--red); }
+  .bubble { padding: 9px 12px; border-radius: 10px; background: #fff; border: 1px solid var(--line); }
+  .ev.user .bubble { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .step-text b { font-weight: 600; }
+  .step-text .res { color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  tr.reco td { background: var(--green-soft); }
+  tr.nope td { color: var(--muted); }
+  .rank { font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: var(--green-soft); color: var(--green); }
+  .tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: #f0f1f4; color: var(--muted); margin-right: 3px; }
+  .issue { color: var(--red); font-size: 12px; }
+  .box { border-radius: 10px; padding: 14px; border: 1px solid; }
+  .box.wait { background: var(--amber-soft); border-color: #f5d9a8; }
+  .box.ok { background: var(--green-soft); border-color: #b9e3c9; }
+  .box.err { background: var(--red-soft); border-color: #f2c4c0; color: var(--red); }
+  .box h3 { margin: 0 0 6px; font-size: 15px; }
+  .checks { list-style: none; padding: 0; margin: 8px 0; }
+  .checks li { padding: 3px 0; }
+  .checks .p { color: var(--green); font-weight: 700; margin-right: 6px; }
+  .checks .f { color: var(--red); font-weight: 700; margin-right: 6px; }
+  .kv { display: grid; grid-template-columns: 120px 1fr; gap: 4px 12px; margin: 8px 0; }
+  .kv div:nth-child(odd) { color: var(--muted); }
+  aside { display: flex; flex-direction: column; gap: 20px; position: sticky; top: 70px; align-self: start; max-height: calc(100vh - 90px); overflow: auto; }
+  .appr { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  .audit { list-style: none; margin: 0; padding: 0; position: relative; }
+  .audit li { padding: 0 0 12px 22px; position: relative; }
+  .audit li::before { content: ""; position: absolute; left: 6px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--actor, var(--muted)); }
+  .audit li::after { content: ""; position: absolute; left: 9.5px; top: 16px; bottom: 0; width: 1px; background: var(--line); }
+  .audit li:last-child::after { display: none; }
+  .audit .who { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--actor, var(--muted)); }
+  .audit .why { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .empty { color: var(--muted); font-style: italic; }
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>ValioValue</h1><span class="sub">Agent console</span>
+  <span style="flex:1"></span>
+  <span id="health" class="pill">checking…</span>
+</header>
+
+<main>
+  <section>
+    <div class="card">
+      <h2>Ask the purchasing agent</h2>
+      <textarea id="msg" placeholder="e.g. I need 1,000 litres of lactose-free milk by Monday"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="chip" data-ex="I need 1,000 litres of lactose-free milk by Monday">1,000 L lactose-free milk by Monday</button>
+        <button class="chip" data-ex="We need 60 litres of lactose-free milk by Monday">60 L milk (under limit)</button>
+        <button class="chip" data-ex="20 kg of lactose free butter by Wednesday">20 kg butter by Wednesday</button>
+        <button class="chip" data-ex="200 litres of oat drink tomorrow">200 L oat drink tomorrow</button>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <label class="muted">Buyer</label>
+        <select id="buyer"><option>hotel-chain-helsinki</option><option>default</option></select>
+        <label class="muted"><input type="checkbox" id="newsession" checked> new conversation</label>
+        <span style="flex:1"></span>
+        <button id="send" class="primary">Send</button>
+      </div>
+      <div id="timeline"></div>
+    </div>
+  </section>
+
+  <aside>
+    <div class="card">
+      <h2>Waiting for your approval</h2>
+      <div class="row" style="margin-bottom:10px">
+        <label class="muted">Approve as</label>
+        <input type="text" id="approver" value="chef.anna" style="flex:1">
+      </div>
+      <div id="approvals"><p class="empty">Nothing pending.</p></div>
+    </div>
+    <div class="card">
+      <div class="row"><h2 style="margin:0">Audit trail</h2><span style="flex:1"></span>
+        <input type="text" id="orderid" placeholder="order id" style="width:140px">
+        <button id="loadaudit">Load</button></div>
+      <div id="audit" style="margin-top:12px"><p class="empty">Appears once an order is placed.</p></div>
+    </div>
+  </aside>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}):\d{2}(?:[+-]\d{2}:\d{2}|Z)?/g, "$1 $2").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const md = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
+const money = (v, c = "EUR") => v == null ? "–" : `${Number(v).toLocaleString("en", {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${c}`;
+const num = (v) => v == null ? "–" : Number(v).toLocaleString("en", {maximumFractionDigits: 2});
+const time = (iso) => iso ? new Date(iso).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"}) : "";
+const RULES = {quote_valid: "Price quote still valid", order_cutoff: "Ordered before the cut-off", availability: "Full quantity available on time", spend_limit: "Within the agent's spend limit"};
+const ACTORS = {buyer_agent: ["Buyer agent", "#1f5eff"], valio_mcp: ["Valio Aimo", "#127a46"], policy_engine: ["Policy engine", "#a15c00"], human: ["Human", "#1d2330"]};
+
+let sessionId = null, source = null;
+const steps = {};
+
+async function health() {
+  try {
+    const h = await (await fetch("/health")).json();
+    $("#health").textContent = `backend ok · LLM: ${h.llm_provider}`;
+    $("#health").className = "pill ok";
+  } catch { $("#health").textContent = "backend not reachable"; $("#health").className = "pill bad"; }
+}
+
+function add(kind, icon, html, ts) {
+  const el = document.createElement("div");
+  el.className = `ev ${kind}`;
+  el.innerHTML = `<div class="ic">${icon}</div><div>${html}</div><div class="t">${time(ts)}</div>`;
+  $("#timeline").appendChild(el);
+  el.scrollIntoView({behavior: "smooth", block: "nearest"});
+  return el;
+}
+
+function offersTable(e) {
+  const rows = (e.offers || []).map((o) => {
+    const avail = o.available_amount >= 999999 ? "no limit" : `${num(o.available_amount)} ${esc(o.sales_unit)}`;
+    const issues = (o.fulfil_issues || []).map((i) => `<div class="issue">✗ ${esc(i)}</div>`).join("");
+    const pack = o.content_per_sales_unit ? `<span class="tag">${num(o.content_per_sales_unit)} ${esc(o.comparison_unit || "")}/${esc(o.sales_unit)}</span>` : "";
+    const certs = (o.certificates || []).filter((c) => !/temperature/i.test(c))
+      .map((c) => `<span class="tag">${esc(c.replace(/_/g, " ").toLowerCase().replace(/^\w/, (x) => x.toUpperCase()))}</span>`).join("");
+    return `<tr class="${o.product_id === e.recommended_product_id ? "reco" : ""} ${o.can_fulfil ? "" : "nope"}">
+      <td>${o.rank ? `<span class="rank">${o.rank}</span>` : ""}</td>
+      <td><div>${esc(o.name)}</div><div class="muted" style="font-size:12px">#${esc(o.product_id)} ${pack} <span class="tag">${esc(o.logistic_model || "")}</span>${certs}</div>${issues}</td>
+      <td class="num">${num(o.quantity)} ${esc(o.sales_unit)}</td>
+      <td class="num">${o.comparison_price != null ? money(o.comparison_price) + "/" + esc(o.comparison_unit) : money(o.unit_price)}</td>
+      <td class="num"><b>${money(o.total_price, o.currency)}</b></td>
+      <td class="num">${esc(o.available_date || "–")}<div class="muted" style="font-size:12px">${avail}</div></td>
+      <td class="num">${o.delivery_reliability != null ? Math.round(o.delivery_reliability * 100) + "%" : "–"}</td>
+      <td class="num">${o.co2_kg_per_kg != null ? num(o.co2_kg_per_kg) : "–"}</td>
+    </tr>`;
+  }).join("");
+  return `<div class="bubble" style="padding:12px"><b>Offers for ${esc(e.request_summary)}</b> <span class="muted">(green = agent's recommendation, grey = cannot deliver in full on time)</span>
+    <div style="overflow-x:auto;margin-top:8px"><table>
+    <tr><th></th><th>Product</th><th class="num">Quantity</th><th class="num">Price</th><th class="num">Total (net)</th><th class="num">Delivery</th><th class="num">Reliability</th><th class="num">kg CO₂e/kg</th></tr>
+    ${rows}</table></div></div>`;
+}
+
+function checksList(checks) {
+  return `<ul class="checks">${(checks || []).map((c) =>
+    `<li><span class="${c.passed ? "p" : "f"}">${c.passed ? "✓" : "✗"}</span><b>${esc(RULES[c.rule] || c.rule)}</b> <span class="muted">· ${esc(c.detail)}</span></li>`).join("")}</ul>`;
+}
+
+function approvalCard(a, inline) {
+  const l = (a.lines || [])[0] || {};
+  return `<div class="${inline ? "box wait" : "appr"}">
+    ${inline ? `<h3>⏸ Needs human approval</h3>` : `<b>${esc(a.order_id)}</b> <span class="muted">· ${time(a.created_at)}</span>`}
+    <div class="kv">
+      <div>Product</div><div>${esc(l.name)}</div>
+      <div>Quantity</div><div>${num(l.quantity)} ${esc(l.sales_unit)}</div>
+      <div>Total</div><div><b>${money(a.total_price, a.currency)}</b> net</div>
+      <div>Delivery</div><div>${esc(l.requested_date)}</div>
+      <div>Agent's reason</div><div>${esc(a.agent_rationale)}</div>
+    </div>
+    ${checksList(a.policy_checks)}
+    <div class="row" data-appr="${esc(a.approval_id)}">
+      <button class="approve" onclick="decide('${esc(a.approval_id)}','approve',this)">Approve</button>
+      <button class="reject" onclick="decide('${esc(a.approval_id)}','reject',this)">Reject</button>
+    </div>
+  </div>`;
+}
+
+function handle(e) {
+  switch (e.type) {
+    case "message":
+      add("agent", "A", `<div class="bubble">${md(e.text)}</div>`, e.timestamp); break;
+    case "tool_call":
+      steps[e.call_id] = add("step", '<span class="spinner"></span>', `<div class="step-text"><b>${esc(e.label)}</b></div>`, e.timestamp); break;
+    case "tool_result": {
+      const el = steps[e.call_id];
+      if (el) {
+        el.classList.add(e.ok ? "done" : "fail");
+        el.querySelector(".ic").textContent = e.ok ? "✓" : "✗";
+        el.querySelector(".step-text").innerHTML += ` <span class="res">→ ${esc(e.summary)}</span>`;
+      }
+      break;
+    }
+    case "offers":
+      add("step done", "€", offersTable(e), e.timestamp); break;
+    case "approval_required":
+      add("step", "⏸", approvalCard(e.approval, true), e.timestamp); loadApprovals(); break;
+    case "order_confirmed": {
+      const l = (e.lines || [])[0] || {};
+      add("step done", "✓", `<div class="box ok"><h3>Order ${esc(e.order_id)} confirmed</h3>
+        <div class="kv"><div>Product</div><div>${esc(l.name)}</div>
+        <div>Quantity</div><div>${num(l.quantity)} ${esc(l.sales_unit)}</div>
+        <div>Total</div><div><b>${money(e.total_price, e.currency)}</b> net</div>
+        <div>Delivery</div><div>${esc(e.delivery_date)}</div>
+        <div>Approved by</div><div>${e.approved_by ? esc(e.approved_by) : "nobody needed: within the agent's mandate"}</div></div></div>`, e.timestamp);
+      $("#orderid").value = e.order_id; loadAudit(); loadApprovals(); break;
+    }
+    case "error":
+      add("step fail", "!", `<div class="box err"><b>Error</b><br>${esc(e.message)}</div>`, e.timestamp); break;
+    case "done":
+      $("#send").disabled = false; break;
+  }
+}
+
+function listen(id) {
+  if (source) source.close();
+  source = new EventSource(`/chat/${id}/stream`);
+  ["message", "tool_call", "tool_result", "offers", "approval_required", "order_confirmed", "error", "done"]
+    .forEach((t) => source.addEventListener(t, (m) => handle(JSON.parse(m.data))));
+}
+
+async function send() {
+  const message = $("#msg").value.trim();
+  if (!message) return;
+  if ($("#newsession").checked) { sessionId = null; $("#timeline").innerHTML = ""; }
+  $("#send").disabled = true;
+  add("user", "You", `<div class="bubble">${esc(message)}</div>`, new Date().toISOString());
+  const r = await fetch("/chat", {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({message, session_id: sessionId, buyer_id: $("#buyer").value})});
+  const {session_id} = await r.json();
+  if (session_id !== sessionId) { sessionId = session_id; listen(sessionId); }
+  $("#msg").value = "";
+  $("#newsession").checked = false;
+}
+
+async function decide(id, decision, btn) {
+  document.querySelectorAll(`[data-appr="${id}"] button`).forEach((b) => b.disabled = true);
+  const r = await fetch(`/approvals/${id}`, {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({decision, decided_by: $("#approver").value || "buyer.human"})});
+  const a = await r.json();
+  document.querySelectorAll(`[data-appr="${id}"]`).forEach((row) => row.innerHTML =
+    `<b style="color:${decision === "approve" ? "var(--green)" : "var(--red)"}">${esc(a.status || a.detail?.error || "done")} by ${esc(a.decided_by || "")}</b>`);
+  $("#orderid").value = a.order_id || $("#orderid").value;
+  loadApprovals(); loadAudit();
+}
+
+async function loadApprovals() {
+  try {
+    const list = await (await fetch("/approvals?status=pending")).json();
+    $("#approvals").innerHTML = list.length ? list.map((a) => approvalCard(a, false)).join("") : '<p class="empty">Nothing pending.</p>';
+  } catch { $("#approvals").innerHTML = '<p class="empty">Cannot reach the backend.</p>'; }
+}
+
+async function loadAudit() {
+  const id = $("#orderid").value.trim();
+  if (!id) return;
+  const r = await fetch(`/orders/${encodeURIComponent(id)}/audit`);
+  if (!r.ok) { $("#audit").innerHTML = '<p class="empty">Order not found.</p>'; return; }
+  const list = await r.json();
+  $("#audit").innerHTML = `<ul class="audit">${list.map((a) => {
+    const [who, color] = ACTORS[a.actor] || [a.actor, "#6b7385"];
+    return `<li style="--actor:${color}"><div class="who">${esc(who)} <span class="muted" style="font-weight:400;text-transform:none">· ${time(a.timestamp)}</span></div>
+      <div>${esc(a.summary)}</div>${a.reason ? `<div class="why">Reason: ${esc(a.reason)}</div>` : ""}</li>`;
+  }).join("")}</ul>`;
+}
+
+document.querySelectorAll("[data-ex]").forEach((b) => b.onclick = () => { $("#msg").value = b.dataset.ex; $("#msg").focus(); });
+$("#send").onclick = send;
+$("#msg").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send(); });
+$("#loadaudit").onclick = loadAudit;
+health(); loadApprovals(); setInterval(loadApprovals, 5000);
+</script>
+</body>
+</html>

@@ -9,7 +9,9 @@ import httpx
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from pathlib import Path
+
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 
 from . import agent, config
@@ -43,6 +45,17 @@ def _passthrough(r: httpx.Response):
     if r.status_code >= 400:
         raise HTTPException(r.status_code, r.json() if r.headers.get("content-type", "").startswith("application/json") else r.text)
     return r.json()
+
+
+@app.get("/", include_in_schema=False)
+async def root():
+    return RedirectResponse("/console")
+
+
+@app.get("/console", include_in_schema=False)
+async def console():
+    """Plain debug UI: what the agent does, offers, approvals, audit trail."""
+    return FileResponse(Path(__file__).parent / "static" / "console.html")
 
 
 @app.get("/health")

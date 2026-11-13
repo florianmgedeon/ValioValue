@@ -44,6 +44,8 @@ scripts/dev.sh                        # mcp-server :8001 + backend :8000
 .venv/bin/python scripts/demo_e2e.py  # 1,000 L lactose-free milk -> approval -> confirmed -> audit
 ```
 
+Open **http://localhost:8000/console** for a plain debug UI: agent steps, offers, approvals, audit trail. It is served by the backend, no build step, and separate from `frontend/`.
+
 No LLM key: `LLM_PROVIDER=scripted` runs a deterministic agent through the same MCP flow.
 No network to the Valio API: `FAKE_VALIO=1 scripts/dev.sh` with `VALIO_API_BASE=http://127.0.0.1:8099`.
 
