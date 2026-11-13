@@ -1,0 +1,68 @@
+[
+  {
+    "approval_id": "appr_01",
+    "order_id": "ord_01",
+    "status": "pending",
+    "reason": "Order total 1,290.00 EUR exceeds the autonomous spend limit of 500.00 EUR",
+    "policy_checks": [
+      {
+        "rule": "spend_limit",
+        "passed": false,
+        "detail": "1,290.00 EUR > 500.00 EUR autonomous limit"
+      },
+      {
+        "rule": "allowed_category",
+        "passed": true,
+        "detail": "Dairy is an allowed category"
+      },
+      {
+        "rule": "allergen_rules",
+        "passed": true,
+        "detail": "No forbidden allergens for this buyer"
+      },
+      {
+        "rule": "substitution",
+        "passed": true,
+        "detail": "Exact requested product type, no substitution"
+      }
+    ],
+    "lines": [
+      {
+        "product_id": "DEMO-1001",
+        "name": "Lactose-free milk drink 1.5% 1 L (demo)",
+        "rank": "best",
+        "is_substitute": false,
+        "substitute_reason": null,
+        "sales_unit": "L",
+        "quantity": 1000,
+        "unit_price": 1.29,
+        "total_price": 1290.0,
+        "currency": "EUR",
+        "comparison_price": 1.29,
+        "comparison_unit": "L",
+        "available_amount": 1400,
+        "available_date": "2026-11-16",
+        "requested_date": "2026-11-16",
+        "closing_time": "2026-11-14T15:00:00+02:00",
+        "logistic_model": "stock",
+        "delivery_reliability": 0.98,
+        "co2_kg_per_kg": 1.3,
+        "certificates": [
+          "Hyvää Suomesta"
+        ],
+        "allergens": [
+          "milk"
+        ],
+        "quote_id": "q_7f3a",
+        "quote_expires_at": "2026-11-14T15:00:00+02:00"
+      }
+    ],
+    "total_price": 1290.0,
+    "currency": "EUR",
+    "agent_rationale": "Only option that covers the full 1,000 L for Monday from stock, with the highest delivery reliability (98%). 'Better' option is 50 EUR cheaper but only 600 L are available.",
+    "created_at": "2026-11-14T10:00:12+02:00",
+    "decided_by": null,
+    "decided_at": null,
+    "comment": null
+  }
+]

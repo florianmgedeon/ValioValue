@@ -1,0 +1,257 @@
+[
+  {
+    "type": "message",
+    "session_id": "sess_demo",
+    "timestamp": "2026-11-14T10:00:01+02:00",
+    "role": "assistant",
+    "text": "Looking for **1,000 L lactose-free milk** for delivery on **Monday 16 Nov**."
+  },
+  {
+    "type": "tool_call",
+    "session_id": "sess_demo",
+    "timestamp": "2026-11-14T10:00:02+02:00",
+    "call_id": "c1",
+    "tool": "search_products",
+    "label": "Searching the catalog for lactose-free milk",
+    "args": {
+      "query": "lactose-free milk",
+      "filters": {
+        "lactose_free": true,
+        "category": "dairy"
+      }
+    }
+  },
+  {
+    "type": "tool_result",
+    "session_id": "sess_demo",
+    "timestamp": "2026-11-14T10:00:04+02:00",
+    "call_id": "c1",
+    "tool": "search_products",
+    "ok": true,
+    "summary": "Found 7 matching products, shortlisted 3"
+  },
+  {
+    "type": "tool_call",
+    "session_id": "sess_demo",
+    "timestamp": "2026-11-14T10:00:05+02:00",
+    "call_id": "c2",
+    "tool": "check_offer",
+    "label": "Checking price and availability for 3 products for Mon 16 Nov",
+    "args": {
+      "product_ids": [
+        "DEMO-1001",
+        "DEMO-1002",
+        "DEMO-1003"
+      ],
+      "requested_date": "2026-11-16",
+      "quantity": 1000
+    }
+  },
+  {
+    "type": "tool_result",
+    "session_id": "sess_demo",
+    "timestamp": "2026-11-14T10:00:08+02:00",
+    "call_id": "c2",
+    "tool": "check_offer",
+    "ok": true,
+    "summary": "2 of 3 can deliver the full quantity on Monday"
+  },
+  {
+    "type": "offers",
+    "session_id": "sess_demo",
+    "timestamp": "2026-11-14T10:00:09+02:00",
+    "request_summary": "1,000 L lactose-free milk, delivery Mon 16 Nov",
+    "offers": [
+      {
+        "product_id": "DEMO-1001",
+        "name": "Lactose-free milk drink 1.5% 1 L (demo)",
+        "rank": "best",
+        "is_substitute": false,
+        "substitute_reason": null,
+        "sales_unit": "L",
+        "quantity": 1000,
+        "unit_price": 1.29,
+        "total_price": 1290.0,
+        "currency": "EUR",
+        "comparison_price": 1.29,
+        "comparison_unit": "L",
+        "available_amount": 1400,
+        "available_date": "2026-11-16",
+        "requested_date": "2026-11-16",
+        "closing_time": "2026-11-14T15:00:00+02:00",
+        "logistic_model": "stock",
+        "delivery_reliability": 0.98,
+        "co2_kg_per_kg": 1.3,
+        "certificates": [
+          "Hyvää Suomesta"
+        ],
+        "allergens": [
+          "milk"
+        ],
+        "quote_id": "q_7f3a",
+        "quote_expires_at": "2026-11-14T15:00:00+02:00"
+      },
+      {
+        "product_id": "DEMO-1002",
+        "name": "Lactose-free milk drink 0.5% 1 L (demo)",
+        "rank": "better",
+        "is_substitute": false,
+        "substitute_reason": null,
+        "sales_unit": "L",
+        "quantity": 1000,
+        "unit_price": 1.24,
+        "total_price": 1240.0,
+        "currency": "EUR",
+        "comparison_price": 1.24,
+        "comparison_unit": "L",
+        "available_amount": 600,
+        "available_date": "2026-11-16",
+        "requested_date": "2026-11-16",
+        "closing_time": "2026-11-14T15:00:00+02:00",
+        "logistic_model": "stock",
+        "delivery_reliability": 0.91,
+        "co2_kg_per_kg": 1.3,
+        "certificates": [],
+        "allergens": [
+          "milk"
+        ],
+        "quote_id": "q_7f3b",
+        "quote_expires_at": "2026-11-14T15:00:00+02:00"
+      },
+      {
+        "product_id": "DEMO-1003",
+        "name": "Lactose-free oat-milk blend 1 L (demo)",
+        "rank": "good",
+        "is_substitute": true,
+        "substitute_reason": "Not the requested product type. Lactose-free, but plant-based blend",
+        "sales_unit": "L",
+        "quantity": 1000,
+        "unit_price": 1.49,
+        "total_price": 1490.0,
+        "currency": "EUR",
+        "comparison_price": 1.49,
+        "comparison_unit": "L",
+        "available_amount": 999999,
+        "available_date": "2026-11-16",
+        "requested_date": "2026-11-16",
+        "closing_time": "2026-11-14T15:00:00+02:00",
+        "logistic_model": "terminal",
+        "delivery_reliability": 0.85,
+        "co2_kg_per_kg": 0.4,
+        "certificates": [
+          "Hyvää Suomesta"
+        ],
+        "allergens": [
+          "oats"
+        ],
+        "quote_id": "q_7f3c",
+        "quote_expires_at": "2026-11-14T15:00:00+02:00"
+      }
+    ],
+    "recommended_product_id": "DEMO-1001"
+  },
+  {
+    "type": "message",
+    "session_id": "sess_demo",
+    "timestamp": "2026-11-14T10:00:10+02:00",
+    "role": "assistant",
+    "text": "Recommended: **DEMO-1001** at 1.29 EUR/L. Full quantity from stock, 98% delivery reliability. The cheaper option only has 600 L available."
+  },
+  {
+    "type": "tool_call",
+    "session_id": "sess_demo",
+    "timestamp": "2026-11-14T10:00:11+02:00",
+    "call_id": "c3",
+    "tool": "place_order",
+    "label": "Placing order with quote q_7f3a",
+    "args": {
+      "quote_id": "q_7f3a",
+      "reason": "Full quantity, best reliability"
+    }
+  },
+  {
+    "type": "tool_result",
+    "session_id": "sess_demo",
+    "timestamp": "2026-11-14T10:00:12+02:00",
+    "call_id": "c3",
+    "tool": "place_order",
+    "ok": true,
+    "summary": "Order needs human approval: exceeds spend limit"
+  },
+  {
+    "type": "approval_required",
+    "session_id": "sess_demo",
+    "timestamp": "2026-11-14T10:00:12+02:00",
+    "approval": {
+      "approval_id": "appr_01",
+      "order_id": "ord_01",
+      "status": "pending",
+      "reason": "Order total 1,290.00 EUR exceeds the autonomous spend limit of 500.00 EUR",
+      "policy_checks": [
+        {
+          "rule": "spend_limit",
+          "passed": false,
+          "detail": "1,290.00 EUR > 500.00 EUR autonomous limit"
+        },
+        {
+          "rule": "allowed_category",
+          "passed": true,
+          "detail": "Dairy is an allowed category"
+        },
+        {
+          "rule": "allergen_rules",
+          "passed": true,
+          "detail": "No forbidden allergens for this buyer"
+        },
+        {
+          "rule": "substitution",
+          "passed": true,
+          "detail": "Exact requested product type, no substitution"
+        }
+      ],
+      "lines": [
+        {
+          "product_id": "DEMO-1001",
+          "name": "Lactose-free milk drink 1.5% 1 L (demo)",
+          "rank": "best",
+          "is_substitute": false,
+          "substitute_reason": null,
+          "sales_unit": "L",
+          "quantity": 1000,
+          "unit_price": 1.29,
+          "total_price": 1290.0,
+          "currency": "EUR",
+          "comparison_price": 1.29,
+          "comparison_unit": "L",
+          "available_amount": 1400,
+          "available_date": "2026-11-16",
+          "requested_date": "2026-11-16",
+          "closing_time": "2026-11-14T15:00:00+02:00",
+          "logistic_model": "stock",
+          "delivery_reliability": 0.98,
+          "co2_kg_per_kg": 1.3,
+          "certificates": [
+            "Hyvää Suomesta"
+          ],
+          "allergens": [
+            "milk"
+          ],
+          "quote_id": "q_7f3a",
+          "quote_expires_at": "2026-11-14T15:00:00+02:00"
+        }
+      ],
+      "total_price": 1290.0,
+      "currency": "EUR",
+      "agent_rationale": "Only option that covers the full 1,000 L for Monday from stock, with the highest delivery reliability (98%). 'Better' option is 50 EUR cheaper but only 600 L are available.",
+      "created_at": "2026-11-14T10:00:12+02:00",
+      "decided_by": null,
+      "decided_at": null,
+      "comment": null
+    }
+  },
+  {
+    "type": "done",
+    "session_id": "sess_demo",
+    "timestamp": "2026-11-14T10:00:13+02:00"
+  }
+]

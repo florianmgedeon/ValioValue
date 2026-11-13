@@ -1,0 +1,56 @@
+[
+  {
+    "type": "order_confirmed",
+    "session_id": "sess_demo",
+    "timestamp": "2026-11-14T10:02:31+02:00",
+    "order_id": "ord_01",
+    "status": "confirmed",
+    "lines": [
+      {
+        "product_id": "DEMO-1001",
+        "name": "Lactose-free milk drink 1.5% 1 L (demo)",
+        "rank": "best",
+        "is_substitute": false,
+        "substitute_reason": null,
+        "sales_unit": "L",
+        "quantity": 1000,
+        "unit_price": 1.29,
+        "total_price": 1290.0,
+        "currency": "EUR",
+        "comparison_price": 1.29,
+        "comparison_unit": "L",
+        "available_amount": 1400,
+        "available_date": "2026-11-16",
+        "requested_date": "2026-11-16",
+        "closing_time": "2026-11-14T15:00:00+02:00",
+        "logistic_model": "stock",
+        "delivery_reliability": 0.98,
+        "co2_kg_per_kg": 1.3,
+        "certificates": [
+          "Hyvää Suomesta"
+        ],
+        "allergens": [
+          "milk"
+        ],
+        "quote_id": "q_7f3a",
+        "quote_expires_at": "2026-11-14T15:00:00+02:00"
+      }
+    ],
+    "total_price": 1290.0,
+    "currency": "EUR",
+    "delivery_date": "2026-11-16",
+    "approved_by": "chef.anna"
+  },
+  {
+    "type": "message",
+    "session_id": "sess_demo",
+    "timestamp": "2026-11-14T10:02:32+02:00",
+    "role": "assistant",
+    "text": "Order **ord_01** confirmed for Monday 16 Nov. Approved by chef.anna."
+  },
+  {
+    "type": "done",
+    "session_id": "sess_demo",
+    "timestamp": "2026-11-14T10:02:33+02:00"
+  }
+]

@@ -1,0 +1,307 @@
+openapi: 3.1.0
+info:
+  title: ValioValue Buyer Agent API
+  version: 0.1.0
+  description: |
+    Contract between the frontend and the buyer-side backend.
+    The frontend talks ONLY to this API. It never talks to the MCP server directly.
+
+    Flow:
+      1. POST /chat           -> returns session_id
+      2. GET  /chat/{id}/stream (SSE) -> agent progress as typed events
+      3. If an `approval_required` event arrives, the human decides via POST /approvals/{id}
+      4. GET  /orders/{id}/audit -> human-readable decision log
+
+    Event payloads are defined in components/schemas/*Event and have example
+    files in contracts/fixtures/events/.
+servers:
+  - url: http://localhost:8000
+    description: Local backend (or mock-backend for frontend dev)
+
+paths:
+  /health:
+    get:
+      summary: Liveness check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+
+  /chat:
+    post:
+      summary: Send a user message to the buyer agent
+      description: Starts a new session, or continues one if session_id is given.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatRequest" }
+      responses:
+        "200":
+          description: Accepted. Subscribe to the stream for the agent's work.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatResponse" }
+
+  /chat/{session_id}/stream:
+    get:
+      summary: Server-sent events stream of the agent's progress
+      description: |
+        `text/event-stream`. Each SSE message has `event: <type>` and `data: <json>`.
+        Types: message, tool_call, tool_result, offers, approval_required,
+        order_confirmed, error, done.
+      parameters:
+        - in: path
+          name: session_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Event stream
+          content:
+            text/event-stream:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/MessageEvent"
+                  - $ref: "#/components/schemas/ToolCallEvent"
+                  - $ref: "#/components/schemas/ToolResultEvent"
+                  - $ref: "#/components/schemas/OffersEvent"
+                  - $ref: "#/components/schemas/ApprovalRequiredEvent"
+                  - $ref: "#/components/schemas/OrderConfirmedEvent"
+                  - $ref: "#/components/schemas/ErrorEvent"
+                  - $ref: "#/components/schemas/DoneEvent"
+
+  /approvals:
+    get:
+      summary: List approval requests
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [pending, approved, rejected] }
+      responses:
+        "200":
+          description: Approval requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Approval" }
+
+  /approvals/{approval_id}:
+    post:
+      summary: Approve or reject (human only, never exposed to the agent)
+      parameters:
+        - in: path
+          name: approval_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApprovalDecision" }
+      responses:
+        "200":
+          description: Updated approval
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Approval" }
+
+  /orders/{order_id}/audit:
+    get:
+      summary: Human-readable audit trail for one order
+      parameters:
+        - in: path
+          name: order_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Audit log
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AuditEntry" }
+
+components:
+  schemas:
+    ChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string, example: "I need 1,000 litres of lactose-free milk by Monday." }
+        session_id: { type: string, nullable: true }
+        buyer_id: { type: string, example: "hotel-chain-helsinki", description: "Which buyer mandate/policy applies" }
+
+    ChatResponse:
+      type: object
+      required: [session_id]
+      properties:
+        session_id: { type: string, example: "sess_01" }
+
+    # ---------- shared objects ----------
+    Offer:
+      type: object
+      required: [product_id, name, unit_price, currency, quantity, total_price, available_amount, available_date]
+      properties:
+        product_id: { type: string, example: "6409100" }
+        name: { type: string, example: "Valio Eila lactose-free milk drink 1.5% 1 L" }
+        rank: { type: string, enum: [best, better, good], nullable: true, description: "Substitution ranking" }
+        is_substitute: { type: boolean, default: false }
+        substitute_reason: { type: string, nullable: true }
+        sales_unit: { type: string, example: "L" }
+        quantity: { type: number, example: 1000 }
+        unit_price: { type: number, example: 1.29 }
+        total_price: { type: number, example: 1290.0 }
+        currency: { type: string, example: "EUR" }
+        comparison_price: { type: number, nullable: true }
+        comparison_unit: { type: string, enum: [KG, L], nullable: true }
+        available_amount: { type: number, description: "999999 means terminal product, quantity unknown" }
+        available_date: { type: string, format: date }
+        requested_date: { type: string, format: date }
+        closing_time: { type: string, format: date-time, description: "Order cut-off" }
+        logistic_model: { type: string, enum: [stock, terminal] }
+        delivery_reliability: { type: number, nullable: true, minimum: 0, maximum: 1 }
+        co2_kg_per_kg: { type: number, nullable: true, description: "Category average, not product measurement" }
+        certificates: { type: array, items: { type: string } }
+        allergens: { type: array, items: { type: string } }
+        quote_id: { type: string, description: "Binds the order to this fixed price" }
+        quote_expires_at: { type: string, format: date-time }
+
+    PolicyCheck:
+      type: object
+      properties:
+        rule: { type: string, example: "spend_limit" }
+        passed: { type: boolean }
+        detail: { type: string, example: "Order total 1,290.00 EUR exceeds autonomous limit of 500.00 EUR" }
+
+    Approval:
+      type: object
+      required: [approval_id, order_id, status, reason, total_price, currency, lines]
+      properties:
+        approval_id: { type: string }
+        order_id: { type: string }
+        status: { type: string, enum: [pending, approved, rejected] }
+        reason: { type: string }
+        policy_checks: { type: array, items: { $ref: "#/components/schemas/PolicyCheck" } }
+        lines: { type: array, items: { $ref: "#/components/schemas/Offer" } }
+        total_price: { type: number }
+        currency: { type: string }
+        agent_rationale: { type: string }
+        created_at: { type: string, format: date-time }
+        decided_by: { type: string, nullable: true }
+        decided_at: { type: string, format: date-time, nullable: true }
+        comment: { type: string, nullable: true }
+
+    ApprovalDecision:
+      type: object
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [approve, reject] }
+        comment: { type: string }
+        decided_by: { type: string, example: "chef.anna" }
+
+    AuditEntry:
+      type: object
+      required: [timestamp, actor, action, summary]
+      properties:
+        timestamp: { type: string, format: date-time }
+        actor: { type: string, enum: [buyer_agent, valio_mcp, human, policy_engine] }
+        action: { type: string, example: "check_offer" }
+        summary: { type: string, example: "Checked price and availability for 3 lactose-free milk products for 2026-11-16" }
+        reason: { type: string, nullable: true }
+        data: { type: object, additionalProperties: true }
+
+    # ---------- SSE events ----------
+    EventBase:
+      type: object
+      required: [type, session_id, timestamp]
+      properties:
+        type: { type: string }
+        session_id: { type: string }
+        timestamp: { type: string, format: date-time }
+
+    MessageEvent:
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { const: message }
+            role: { type: string, enum: [assistant] }
+            text: { type: string, description: "Markdown allowed" }
+
+    ToolCallEvent:
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { const: tool_call }
+            call_id: { type: string }
+            tool: { type: string, example: "check_offer" }
+            label: { type: string, description: "Human-readable, show this in the UI", example: "Checking price and availability for 3 products" }
+            args: { type: object, additionalProperties: true }
+
+    ToolResultEvent:
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { const: tool_result }
+            call_id: { type: string }
+            tool: { type: string }
+            ok: { type: boolean }
+            summary: { type: string }
+
+    OffersEvent:
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { const: offers }
+            request_summary: { type: string }
+            offers: { type: array, items: { $ref: "#/components/schemas/Offer" } }
+            recommended_product_id: { type: string, nullable: true }
+
+    ApprovalRequiredEvent:
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { const: approval_required }
+            approval: { $ref: "#/components/schemas/Approval" }
+
+    OrderConfirmedEvent:
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { const: order_confirmed }
+            order_id: { type: string }
+            status: { type: string, enum: [confirmed] }
+            lines: { type: array, items: { $ref: "#/components/schemas/Offer" } }
+            total_price: { type: number }
+            currency: { type: string }
+            delivery_date: { type: string, format: date }
+            approved_by: { type: string, nullable: true, description: "null if placed autonomously" }
+
+    ErrorEvent:
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { const: error }
+            message: { type: string }
+            recoverable: { type: boolean }
+
+    DoneEvent:
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { const: done }

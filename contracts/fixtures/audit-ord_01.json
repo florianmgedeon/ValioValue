@@ -1,0 +1,66 @@
+[
+  {
+    "timestamp": "2026-11-14T10:00:02+02:00",
+    "actor": "buyer_agent",
+    "action": "search_products",
+    "summary": "Searched catalog for lactose-free dairy milk",
+    "reason": "Buyer asked for 1,000 L lactose-free milk by Monday",
+    "data": {
+      "results": 7,
+      "shortlisted": 3
+    }
+  },
+  {
+    "timestamp": "2026-11-14T10:00:05+02:00",
+    "actor": "valio_mcp",
+    "action": "check_offer",
+    "summary": "Priced and checked availability for 3 products for 2026-11-16",
+    "reason": null,
+    "data": {
+      "quotes": [
+        "q_7f3a",
+        "q_7f3b",
+        "q_7f3c"
+      ]
+    }
+  },
+  {
+    "timestamp": "2026-11-14T10:00:11+02:00",
+    "actor": "buyer_agent",
+    "action": "place_order",
+    "summary": "Requested order for 1,000 L of DEMO-1001 at 1.29 EUR/L",
+    "reason": "Full quantity from stock, highest reliability",
+    "data": {
+      "quote_id": "q_7f3a"
+    }
+  },
+  {
+    "timestamp": "2026-11-14T10:00:12+02:00",
+    "actor": "policy_engine",
+    "action": "policy_check",
+    "summary": "Spend limit exceeded (1,290 > 500 EUR). Sent to human approval",
+    "reason": null,
+    "data": {
+      "approval_id": "appr_01"
+    }
+  },
+  {
+    "timestamp": "2026-11-14T10:02:30+02:00",
+    "actor": "human",
+    "action": "approve",
+    "summary": "chef.anna approved the order",
+    "reason": "OK, go ahead",
+    "data": {}
+  },
+  {
+    "timestamp": "2026-11-14T10:02:31+02:00",
+    "actor": "valio_mcp",
+    "action": "order_confirmed",
+    "summary": "Order ord_01 confirmed for delivery 2026-11-16",
+    "reason": null,
+    "data": {
+      "total_price": 1290.0,
+      "currency": "EUR"
+    }
+  }
+]
