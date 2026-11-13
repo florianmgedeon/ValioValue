@@ -66,7 +66,12 @@ Keep a running list here. Judges score visibility of assumptions.
 * Prices returned by `check_offer` are treated as fixed for the quote's lifetime: until the order cut-off (`closingTime`) or 30 minutes, whichever comes first.
 * Spend limits compare net prices (`catalogPrice.value`, VAT excluded). B2B buyers think in net.
 * Litres or kilos per sales unit are derived from the price API (`catalogPrice / comparisonPrice`), so no unit code translation table is needed. Order quantity is rounded up to `allowedLotSize`.
-* An offer "can fulfil" only if not sales-blocked, `availableAmount >= quantity` and `availableDate <= requestedDate`. Terminal products (999999) count as available.
+* An offer "can fulfil" only if not sales-blocked, `availableAmount >= quantity`, `availableDate <= requestedDate` and the order cut-off (`closingTime`) has not passed. Terminal products (999999) count as available.
+* The real API returns `availableDate` = requested date even when `closingTime` is already over (seen for terminal products: cut-off Thursday 15:00 for Monday). We treat a passed cut-off as "cannot deliver on that date", and `place_order` rejects it (`order_cutoff` rule).
+* `allowedLotSize` is 0.01 for 96% of products. We read that as whole sales units, except for goods sold by KG.
+* Litres per sales unit come from `catalogPrice / comparisonPrice`, snapped to the nearest 0.05 when within 1% (prices are rounded to cents).
+* Search ranking uses a category signal learned from the catalog (share of a category's products whose name contains the term) and ignores negations like "milk free" or "maidoton", so "milk" finds milk, not milk-free wafers.
+* Lactose-free = nutritional claim `FREE_FROM_LACTOSE`, `nonAllergen ML FREE_FROM`, or the name. `LOW_LACTOSE` does not count.
 * Lactose-free detection: product name (laktoositon, laktosfri, lactose free), a nutritional claim containing LACTOSE, or lactose marked FREE_FROM.
 * Approval is a REST call protected by a token the LLM never sees. The agent can request, never approve.
 * The agent's identity is the MCP session headers `X-Agent-Session` and `X-Buyer-Id`. Production would replace these with OAuth client credentials or verifiable credentials.

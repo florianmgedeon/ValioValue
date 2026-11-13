@@ -68,9 +68,20 @@ def _date(value: str | None) -> str | None:
     return value[:10] if value else None
 
 
-def _round_lot(qty: float, lot: float) -> float:
+def _snap(content: float) -> float:
+    """Comparison prices are rounded to cents, so 10.97 / 2.19 gives 5.009 L instead of 5 L.
+    Snap to the nearest 0.05 when that is within 1 percent."""
+    nice = round(content * 20) / 20
+    return nice if nice and abs(nice - content) / content < 0.01 else round(content, 4)
+
+
+def _round_lot(qty: float, lot: float, sales_unit: str) -> float:
+    """Round up to the lot size. Most products list 0.01, which we read as 'whole units' except for
+    goods sold by weight (KG), where fractions are real."""
     lot = lot or 1
-    return math.ceil(round(qty / lot, 6)) * lot
+    if sales_unit != "KG":
+        lot = max(lot, 1.0)
+    return round(math.ceil(round(qty / lot, 6)) * lot, 2)
 
 
 # --------------------------------------------------------------------------- tools
@@ -135,11 +146,11 @@ async def check_offer(
         lot = prod.lot_size if prod else 1.0
 
         # Content per sales unit derived from the price API itself: catalog / comparison price.
-        content = round(unit_price / cmp_price, 4) if cmp_price else None
+        content = _snap(unit_price / cmp_price) if cmp_price else None
         if quantity_unit == "SALES_UNIT":
-            qty = _round_lot(quantity, lot)
+            qty = _round_lot(quantity, lot, sales_unit)
         elif cmp_unit == quantity_unit and content:
-            qty = _round_lot(quantity / content, lot)
+            qty = _round_lot(quantity / content, lot, sales_unit)
         else:
             skipped.append({"product_id": pid, "reason": f"cannot convert {quantity_unit} to {sales_unit}"})
             continue
@@ -149,10 +160,20 @@ async def check_offer(
         available_amount = float(sl.get("availableAmount", 0) or 0)
         available_date = _date(sl.get("availableDate"))
         sales_block = bool((av or {}).get("salesBlock") or sl.get("salesBlock"))
-        can_fulfil = (not sales_block and bool(sl) and available_amount >= qty
-                      and available_date is not None and available_date <= requested_date)
-
         closing = _parse_ts((av or {}).get("closingTime"))
+        cutoff_passed = bool(closing and closing <= now())
+        issues = []
+        if sales_block:
+            issues.append("sales blocked")
+        if not sl:
+            issues.append("no delivery date available")
+        elif available_amount < qty:
+            issues.append(f"only {available_amount:g} {sales_unit} available")
+        if available_date and available_date > requested_date:
+            issues.append(f"earliest delivery {available_date}")
+        if cutoff_passed:
+            issues.append(f"order cut-off {closing.isoformat()} has passed")
+        can_fulfil = not issues
         ttl = now() + timedelta(minutes=config.QUOTE_TTL_MINUTES)
         expires = min(closing, ttl) if closing and closing > now() else ttl
         quote_id = new_id("q")
@@ -168,6 +189,7 @@ async def check_offer(
             "requested_unit": quantity_unit,
             "content_per_sales_unit": content,
             "unit_price": unit_price,
+            "list_price": (pr.get("listPrice") or {}).get("value"),
             "total_price": round(unit_price * qty, 2),
             "currency": pr.get("_currency") or pr["catalogPrice"].get("currency") or "EUR",
             "comparison_price": cmp_price,
@@ -180,6 +202,8 @@ async def check_offer(
             "logistic_model": ((av or {}).get("logisticModel") or "").lower() or None,
             "sales_block": sales_block,
             "can_fulfil": can_fulfil,
+            "fulfil_issues": issues,
+            "order_cutoff_passed": cutoff_passed,
             "delivery_reliability": prod.delivery_reliability if prod else None,
             "co2_kg_per_kg": prod.co2_kg_per_kg if prod else None,
             "certificates": prod.labels if prod else [],
@@ -187,13 +211,14 @@ async def check_offer(
             "quote_id": quote_id,
             "quote_expires_at": iso(expires),
         }
-        store().save_quote(quote_id, session, buyer_id, offer, iso(expires))
         offers.append(offer)
 
     # Best first: can deliver in full on time, then cheapest total, then most reliable.
     offers.sort(key=lambda o: (not o["can_fulfil"], o["total_price"], -(o["delivery_reliability"] or 0)))
     for o, rank in zip([o for o in offers if o["can_fulfil"]], ["best", "better", "good"]):
         o["rank"] = rank
+    for o in offers:
+        store().save_quote(o["quote_id"], session, buyer_id, o, o["quote_expires_at"])
     recommended = next((o["product_id"] for o in offers if o["can_fulfil"]), None)
     n_full = sum(o["can_fulfil"] for o in offers)
 
@@ -204,8 +229,9 @@ async def check_offer(
                   data={"quotes": [o["quote_id"] for o in offers], "recommended": recommended, "skipped": skipped})
     return {"requested_date": requested_date, "requested_quantity": quantity, "requested_unit": quantity_unit,
             "offers": offers, "recommended_product_id": recommended, "skipped": skipped,
-            "note": "unit_price and total_price are net of VAT. available_amount 999999 means a terminal "
-                    "(supplier warehouse) product with unknown stock."}
+                "note": "unit_price and total_price are net of VAT. available_amount 999999 or more means stock is "
+                    "not limited or unknown (terminal = supplier warehouse). fulfil_issues explains why an offer "
+                    "cannot deliver in full on time."}
 
 
 @mcp.tool()

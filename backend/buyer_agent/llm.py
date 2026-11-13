@@ -209,9 +209,9 @@ class ScriptedProvider:
             return AssistantTurn(
                 f"Looking for **{req['quantity']:g} {req['unit'].replace('SALES_UNIT', 'units')} {req['query']}** "
                 f"for delivery on **{req['date']}**.",
-                [ToolCall(cid, "search_products", {"query": req["query"], "limit": 8})])
+                [ToolCall(cid, "search_products", {"query": req["query"], "limit": 12})])
         if "check_offer" not in results:
-            ids = [p["product_id"] for p in results["search_products"].get("products", [])][:5]
+            ids = [p["product_id"] for p in results["search_products"].get("products", [])][:10]
             if not ids:
                 return AssistantTurn(f"I found nothing in the Valio Aimo catalog for '{req['query']}'.")
             return AssistantTurn(None, [ToolCall(cid, "check_offer", {

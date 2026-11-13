@@ -42,6 +42,9 @@ SYNONYMS: dict[str, list[str]] = {
 }
 
 LACTOSE_FREE_WORDS = ("laktoositon", "laktosfri", "lactose free", "lactose-free")
+# Negations that are themselves what the buyer asks for (handled by filters), so keep them in the text.
+KEEP_NEGATION = ("lactose", "laktoositon", "laktos", "gluten", "gluteeniton")
+
 # Words that only describe filters, not the product itself.
 STOPWORDS = {"i", "need", "a", "an", "the", "of", "by", "for", "litres", "liters", "litre", "liter",
              "l", "kg", "kilos", "some", "and", "with", "free", "lactose", "lactose-free"}
@@ -57,11 +60,19 @@ def _text(items: list[dict] | None, prefer: tuple[str, ...] = ("en", "fi", "sv")
     return next(iter(by_lang.values()), None)
 
 
+# Words that turn a product into something else ("milk" vs "milk chocolate").
+# If the buyer did not ask for them, matching products are pushed down.
+MODIFIERS = {"chocolate", "cocoa", "coffee", "latte", "cappuccino", "powder", "quark", "pudding", "skyr",
+             "condensed", "praline", "cold", "brew", "ice", "cream", "yoghurt", "yogurt", "cheese", "butter",
+             "portion", "sour", "buttermilk", "fermented", "kefir", "vanilla", "strawberry", "flavoured", "drink mix", "protein", "baby", "infant"}
+
+
 @dataclass
 class Product:
     id: str
     name: str
     names_all: str
+    name_en: str
     brand: str | None
     vendor: str | None
     category: str
@@ -117,17 +128,18 @@ def _parse(raw: dict) -> Product:
             elif gname == "packagingMarkedLabel":
                 labels.append(code)
             elif gname == "nutritionalClaim":
-                claims.append(code)
+                claims.append(v.get("id") or code)  # id is specific (FREE_FROM_LACTOSE vs LOW_LACTOSE)
     names_all = " | ".join(n.get("value", "") for n in names).lower()
     lactose_free = (
         any(w in names_all for w in LACTOSE_FREE_WORDS)
-        or any("LACTOSE" in c.upper() for c in claims)
+        or "FREE_FROM_LACTOSE" in claims
         or "lactose" in free_from
     )
     return Product(
         id=str(raw["id"]),
         name=name,
         names_all=names_all,
+        name_en=(_text(names, ("en",)) or "").lower(),
         brand=sd.get("brand"),
         vendor=raw.get("vendorName"),
         category=str(raw.get("category", "")),
@@ -175,6 +187,23 @@ class Catalog:
         self.source = products_path.name
         log.info("catalog loaded: %d products from %s", len(self.products), products_path)
 
+        self._affinity: dict[str, dict[str, float]] = {}
+        self._cat_size: dict[str, int] = {}
+        for p in self.products.values():
+            self._cat_size[p.category] = self._cat_size.get(p.category, 0) + 1
+
+    def affinity(self, alts: tuple[str, ...]) -> dict[str, float]:
+        """Share of each category's products whose name contains the term. Learned from the catalog,
+        so 'milk' points to the milk category, not to 'milk-free wafers'."""
+        if alts not in self._affinity:
+            counts: dict[str, int] = {}
+            pats = [re.compile(rf"\b{re.escape(a)}") for a in alts]
+            for p in self.products.values():
+                if any(pt.search(p.names_all) for pt in pats):
+                    counts[p.category] = counts.get(p.category, 0) + 1
+            self._affinity[alts] = {c: n / self._cat_size[c] for c, n in counts.items() if self._cat_size[c] >= 3}
+        return self._affinity[alts]
+
     def get(self, product_id: str) -> Product | None:
         return self.products.get(str(product_id))
 
@@ -217,11 +246,19 @@ class Catalog:
             if exclude and exclude & set(p.allergens_contains):
                 continue
             hay = f"{p.names_all} {(p.brand or '').lower()}"
+            # "milk free", "maidoton", "no milk" mean the opposite of a match
+            hay = re.sub(r"\b[\w-]+?[ -](?:free|vapaa)\b|\bno [\w-]+|\b\w+(?:ton|tön)\b",
+                         lambda m: m.group(0) if any(w in m.group(0) for w in KEEP_NEGATION) else " ", hay)
+            name_en = re.sub(r"\b[\w-]+?[ -]free\b|\bno [\w-]+", lambda m: m.group(0)
+                             if any(w in m.group(0) for w in KEEP_NEGATION) else " ", p.name_en)
             score = 0.0
             for alts in terms:
                 best = 0.0
+                score += 4.0 * self.affinity(tuple(alts)).get(p.category, 0.0)
                 for a in alts:
-                    if re.search(rf"\b{re.escape(a)}\b", hay):
+                    if re.search(rf"\b{re.escape(a)}\b", name_en):
+                        best = max(best, 3.0)
+                    elif re.search(rf"\b{re.escape(a)}\b", hay):
                         best = max(best, 2.0)
                     elif a in hay:
                         best = max(best, 1.0)
@@ -231,6 +268,9 @@ class Catalog:
                 score += best
             if terms and score <= 0:
                 continue
+            q = query.lower()
+            extra = {m for m in MODIFIERS if re.search(rf"\b{m}\b", p.name_en) and m not in q}
+            score -= 2.5 * len(extra)
             if p.delivery_reliability is not None:
                 score += p.delivery_reliability * 0.5
             scored.append((score, p))

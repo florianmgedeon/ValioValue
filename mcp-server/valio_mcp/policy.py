@@ -41,12 +41,21 @@ def evaluate(quote: dict, buyer_id: str | None) -> list[dict]:
         else f"Quote {quote['quote_id']} expired at {quote['expires_at']}, request a new offer",
     })
 
-    ok = bool(line.get("can_fulfil"))
+    closing = line.get("closing_time")
+    cutoff_ok = not closing or now() < datetime.fromisoformat(closing)
+    checks.append({
+        "rule": "order_cutoff", "passed": cutoff_ok, "on_fail": HARD,
+        "detail": f"Ordered before cut-off {closing}" if cutoff_ok
+        else f"Order cut-off {closing} has passed, delivery on {line['requested_date']} is not possible",
+    })
+
+    ok = bool(line.get("can_fulfil")) or (not cutoff_ok and not [i for i in line.get("fulfil_issues", [])
+                                                                 if "cut-off" not in i])
     checks.append({
         "rule": "availability", "passed": ok, "on_fail": SOFT,
         "detail": f"{_fmt(line['quantity'])} {line['sales_unit']} available by {line['requested_date']}" if ok
-        else f"Only {line.get('available_amount')} {line['sales_unit']} from {line.get('available_date')} "
-             f"for requested {line['requested_date']}",
+        else "; ".join(line.get("fulfil_issues") or [f"Only {line.get('available_amount')} {line['sales_unit']} "
+                                                     f"from {line.get('available_date')}"]),
     })
 
     limit = float(pol["spend_limit"])
