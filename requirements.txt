@@ -1,0 +1,2 @@
+-r mcp-server/requirements.txt
+-r backend/requirements.txt

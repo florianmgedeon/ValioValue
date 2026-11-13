@@ -34,6 +34,19 @@ More detail in [`docs/architecture.md`](docs/architecture.md).
 | `mcp-server/` | Florian | Valio Aimo's agent interface |
 | `docs/` | both | Architecture, assumptions, demo script |
 
+## Run the real stack
+
+```bash
+cp .env.example .env                  # add VALIO_API_KEY, optionally an LLM key
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+scripts/fetch_data.sh                 # downloads the full product catalog into data/raw/
+scripts/dev.sh                        # mcp-server :8001 + backend :8000
+.venv/bin/python scripts/demo_e2e.py  # 1,000 L lactose-free milk -> approval -> confirmed -> audit
+```
+
+No LLM key: `LLM_PROVIDER=scripted` runs a deterministic agent through the same MCP flow.
+No network to the Valio API: `FAKE_VALIO=1 scripts/dev.sh` with `VALIO_API_BASE=http://127.0.0.1:8099`.
+
 ## Quick start for frontend work
 
 ```bash

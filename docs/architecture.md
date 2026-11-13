@@ -63,4 +63,10 @@ Policies live in a JSON or YAML file per buyer.
 Keep a running list here. Judges score visibility of assumptions.
 
 * Orders are simulated in our MCP server because the mock API has no order endpoint.
-* Prices returned by `check_offer` are treated as fixed for the quote's lifetime.
+* Prices returned by `check_offer` are treated as fixed for the quote's lifetime: until the order cut-off (`closingTime`) or 30 minutes, whichever comes first.
+* Spend limits compare net prices (`catalogPrice.value`, VAT excluded). B2B buyers think in net.
+* Litres or kilos per sales unit are derived from the price API (`catalogPrice / comparisonPrice`), so no unit code translation table is needed. Order quantity is rounded up to `allowedLotSize`.
+* An offer "can fulfil" only if not sales-blocked, `availableAmount >= quantity` and `availableDate <= requestedDate`. Terminal products (999999) count as available.
+* Lactose-free detection: product name (laktoositon, laktosfri, lactose free), a nutritional claim containing LACTOSE, or lactose marked FREE_FROM.
+* Approval is a REST call protected by a token the LLM never sees. The agent can request, never approve.
+* The agent's identity is the MCP session headers `X-Agent-Session` and `X-Buyer-Id`. Production would replace these with OAuth client credentials or verifiable credentials.

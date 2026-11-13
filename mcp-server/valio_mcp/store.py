@@ -5,9 +5,10 @@ import json
 import secrets
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from . import config
 
@@ -27,7 +28,7 @@ CREATE TABLE IF NOT EXISTS audit (
 
 
 def now() -> datetime:
-    return datetime.now(timezone.utc).astimezone()
+    return datetime.now(ZoneInfo("Europe/Helsinki"))
 
 
 def iso(dt: datetime | None = None) -> str:
