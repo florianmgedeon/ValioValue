@@ -5,6 +5,7 @@ import asyncio
 import json
 import logging
 import secrets
+import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -117,14 +118,14 @@ def unit_word(unit: str) -> str:
 def system_prompt(session: Session) -> str:
     today = datetime.now(TZ)
     return f"""You are the purchasing agent of buyer '{session.buyer_id}', ordering from Valio Aimo, a Finnish foodservice wholesaler, through its MCP tools.
-Today is {today:%A %Y-%m-%d} ({config.TIMEZONE}). "By Monday" means the next Monday after today, as YYYY-MM-DD.
+Now is {today:%A %Y-%m-%d %H:%M} ({config.TIMEZONE}). Quote expiry and order cut-off times are in the same time zone. "By Monday" means the next Monday after today, as YYYY-MM-DD.
 
 How to work:
 1. search_products with a short product query in English (e.g. "lactose-free milk") and filters that reflect hard requirements (lactose-free, allergens, origin).
 2. check_offer with ALL search results that match the request (up to 10 product ids, different pack sizes included, since price per litre differs), the delivery date, and the quantity in the unit the buyer used (L or KG are converted to sales units by Valio). Leave out only products that clearly are something else.
 3. Pick the offer that exactly matches the request and can deliver in full on time (can_fulfil=true). Default preference: lowest total price, then higher delivery reliability. Offers come sorted best first, rank 'best' is usually right. Never pick a product that violates a stated requirement. Only call something cheapest if it is cheapest among the offers you checked.
 4. place_order with that single quote_id and a one-sentence reason a human approver can understand.
-5. If place_order returns pending_approval, tell the buyer it is waiting for their approval and stop. You cannot approve orders and must not re-order to get around a limit.
+5. After place_order, do not call any more tools. Tell the buyer the outcome in 1 to 3 sentences: product, quantity, total, delivery date, and if pending_approval, why it waits for their approval. You cannot approve orders and must not re-order to get around a limit.
 If nothing can deliver in full, explain the best options (partial, later date) and ask; do not order.
 Keep messages short, use markdown, mention price, quantity in sales units and delivery date."""
 
@@ -144,12 +145,25 @@ async def run_turn(session: Session, user_text: str) -> None:
 
 async def _loop(session: Session) -> None:
     provider = make_provider(datetime.now(TZ).date())
+    system = system_prompt(session)
     async with mcp_session(session) as mcp:
         tools = [ToolSpec(t.name, t.description or "", simplify_schema(t.inputSchema))
                  for t in (await mcp.list_tools()).tools]
+        step = 0
+
+        async def think() -> AssistantTurn:
+            nonlocal step
+            step += 1
+            t0 = time.perf_counter()
+            turn = await provider.complete(system, session.history, tools)
+            session.emit("reasoning", step=step, model=turn.model or provider.name, text=turn.reasoning,
+                         tool_calls=[c.name for c in turn.tool_calls], usage=_usage(turn.usage),
+                         duration_ms=round((time.perf_counter() - t0) * 1000))
+            return turn
+
         for _ in range(config.LLM_MAX_STEPS):
-            turn: AssistantTurn = await provider.complete(system_prompt(session), session.history, tools)
-            session.history.append({"role": "assistant", "text": turn.text,
+            turn = await think()
+            session.history.append({"role": "assistant", "text": turn.text, "raw": turn.raw,
                                     "tool_calls": [{"id": c.id, "name": c.name, "args": c.args} for c in turn.tool_calls]})
             if turn.text:
                 session.emit("message", role="assistant", text=turn.text)
@@ -159,26 +173,53 @@ async def _loop(session: Session) -> None:
             for call in turn.tool_calls:
                 if stop:  # an order is already in flight, refuse anything after it in this turn
                     res = {"error": "skipped: an order was already placed in this turn"}
+                    session.emit("tool_call", call_id=call.id, tool=call.name, step=step, args=call.args,
+                                 label=f"Blocked {call.name}: an order was already placed")
+                    session.emit("tool_result", call_id=call.id, tool=call.name, ok=False, summary=res["error"],
+                                 result=res, duration_ms=0)
                 else:
-                    session.emit("tool_call", call_id=call.id, tool=call.name, label=label(call.name, call.args),
-                                 args=call.args)
+                    session.emit("tool_call", call_id=call.id, tool=call.name, step=step,
+                                 label=label(call.name, call.args), args=call.args)
+                    t0 = time.perf_counter()
                     try:
                         res = tool_payload(await mcp.call_tool(call.name, call.args))
                     except Exception as e:
                         res = {"error": f"{type(e).__name__}: {e}"}
                     ok = not res.get("error") and res.get("status") != "rejected"
-                    session.emit("tool_result", call_id=call.id, tool=call.name, ok=ok, summary=summary(call.name, res))
+                    session.emit("tool_result", call_id=call.id, tool=call.name, ok=ok, summary=summary(call.name, res),
+                                 result=res, duration_ms=round((time.perf_counter() - t0) * 1000))
                     stop = _side_events(session, call.name, call.args, res)
                     if stop:
                         order_res = res
                 session.history.append({"role": "tool", "tool_call_id": call.id, "name": call.name,
                                         "content": json.dumps(res, ensure_ascii=False)[:15000]})
             if stop:
-                text = _order_message(order_res)
-                session.history.append({"role": "assistant", "text": text, "tool_calls": []})
-                session.emit("message", role="assistant", text=text)
+                await _wrap_up(session, provider, think, order_res)
                 return
         session.emit("message", role="assistant", text="I stopped after too many steps. Please refine the request.")
+
+
+async def _wrap_up(session: Session, provider, think, order_res: dict) -> None:
+    """One last LLM call so the agent explains the outcome in its own words (and its reasoning is visible).
+    Any further tool call is ignored: an order is in flight. Falls back to a fixed text."""
+    text = None
+    if provider.name != "scripted":
+        try:
+            turn = await think()
+            text = turn.text
+        except Exception:
+            log.exception("wrap-up call failed")
+    text = text or _order_message(order_res)
+    session.history.append({"role": "assistant", "text": text, "tool_calls": []})
+    session.emit("message", role="assistant", text=text)
+
+
+def _usage(u: dict | None) -> dict | None:
+    if not u:
+        return None
+    return {"input_tokens": u.get("input_tokens") or u.get("prompt_tokens"),
+            "output_tokens": u.get("output_tokens") or u.get("completion_tokens"),
+            "thinking_tokens": (u.get("output_tokens_details") or {}).get("thinking_tokens")}
 
 
 def _side_events(session: Session, tool: str, args: dict, res: dict) -> bool:

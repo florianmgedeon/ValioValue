@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 
 from . import agent, config
-from .llm import make_provider
+from .llm import make_provider, simplify_schema
 
 app = FastAPI(title="ValioValue buyer agent")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -98,6 +98,20 @@ async def stream(session_id: str):
 
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+_tools_cache: list | None = None
+
+
+@app.get("/tools")
+async def list_tools():
+    """The MCP tools the agent sees, with their documentation and input schema."""
+    global _tools_cache
+    if _tools_cache is None:
+        async with agent.mcp_session(agent.Session("tools-listing", config.DEFAULT_BUYER_ID)) as mcp:
+            _tools_cache = [{"name": t.name, "description": t.description, "input_schema": simplify_schema(t.inputSchema)}
+                            for t in (await mcp.list_tools()).tools]
+    return _tools_cache
 
 
 @app.get("/approvals")

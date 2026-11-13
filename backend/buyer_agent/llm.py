@@ -32,6 +32,10 @@ class ToolCall:
 class AssistantTurn:
     text: str | None
     tool_calls: list[ToolCall] = field(default_factory=list)
+    reasoning: str | None = None          # model's own (summarized) thinking, if the provider exposes it
+    raw: list[dict] | None = None         # provider blocks to replay verbatim (Anthropic thinking signatures)
+    usage: dict[str, Any] | None = None
+    model: str | None = None
 
 
 @dataclass
@@ -87,9 +91,12 @@ class AnthropicProvider:
                 blocks = [{"type": "text", "text": m["text"]}]
                 role = "user"
             elif m["role"] == "assistant":
-                blocks = ([{"type": "text", "text": m["text"]}] if m.get("text") else []) + [
-                    {"type": "tool_use", "id": c["id"], "name": c["name"], "input": c["args"]}
-                    for c in m.get("tool_calls", [])]
+                if m.get("raw"):
+                    blocks = list(m["raw"])
+                else:
+                    blocks = ([{"type": "text", "text": m["text"]}] if m.get("text") else []) + [
+                        {"type": "tool_use", "id": c["id"], "name": c["name"], "input": c["args"]}
+                        for c in m.get("tool_calls", [])]
                 role = "assistant"
             else:
                 blocks = [{"type": "tool_result", "tool_use_id": m["tool_call_id"], "content": m["content"]}]
@@ -102,19 +109,38 @@ class AnthropicProvider:
                 out.append({"role": role, "content": blocks})
         return out
 
-    async def complete(self, system, history, tools):
-        body = {"model": self.model, "max_tokens": 2048, "system": system,
-                "messages": self._messages(history),
-                "tools": [{"name": t.name, "description": t.description, "input_schema": t.schema} for t in tools]}
-        async with httpx.AsyncClient(timeout=120) as c:
-            r = await c.post(self.url, json=body, headers={
+    thinking = config.LLM_THINKING
+
+    async def _post(self, body: dict) -> httpx.Response:
+        async with httpx.AsyncClient(timeout=180) as c:
+            return await c.post(self.url, json=body, headers={
                 "x-api-key": self.api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"})
+
+    async def complete(self, system, history, tools):
+        body: dict[str, Any] = {
+            "model": self.model, "max_tokens": 8000, "system": system, "messages": self._messages(history),
+            "tools": [{"name": t.name, "description": t.description, "input_schema": t.schema} for t in tools]}
+        if self.thinking:
+            body |= {"thinking": {"type": "adaptive", "display": "summarized"},
+                     "output_config": {"effort": config.LLM_EFFORT}}
+        r = await self._post(body)
+        if r.status_code == 400 and self.thinking and "thinking" in r.text:
+            # model without adaptive thinking: keep going without reasoning display
+            self.thinking = False
+            body.pop("thinking", None), body.pop("output_config", None)
+            r = await self._post(body)
         if r.status_code != 200:
             raise RuntimeError(f"Anthropic HTTP {r.status_code}: {r.text[:400]}")
         data = r.json()
-        text = "\n".join(b["text"] for b in data["content"] if b["type"] == "text").strip() or None
-        calls = [ToolCall(b["id"], b["name"], b.get("input") or {}) for b in data["content"] if b["type"] == "tool_use"]
-        return AssistantTurn(text, calls)
+        content = data["content"]
+        text = "\n".join(b["text"] for b in content if b["type"] == "text").strip() or None
+        calls = [ToolCall(b["id"], b["name"], b.get("input") or {}) for b in content if b["type"] == "tool_use"]
+        reasoning = "\n".join(b.get("thinking", "") for b in content if b["type"] == "thinking").strip() or None
+        keep = {"thinking": ("type", "thinking", "signature"), "redacted_thinking": ("type", "data"),
+                "text": ("type", "text"), "tool_use": ("type", "id", "name", "input")}
+        raw = [{k: b[k] for k in keep[b["type"]] if k in b} for b in content if b["type"] in keep]
+        return AssistantTurn(text, calls, reasoning=reasoning, raw=raw, usage=data.get("usage"),
+                             model=data.get("model", self.model))
 
 
 # --------------------------------------------------------------------------- OpenAI compatible (OpenAI, Gemini, OpenRouter, Mistral, local)
@@ -155,7 +181,10 @@ class OpenAICompatibleProvider:
             args = tc["function"].get("arguments") or "{}"
             calls.append(ToolCall(tc.get("id") or f"call_{uuid.uuid4().hex[:8]}", tc["function"]["name"],
                                   json.loads(args) if isinstance(args, str) else args))
-        return AssistantTurn((msg.get("content") or "").strip() or None, calls)
+        data = r.json()
+        return AssistantTurn((msg.get("content") or "").strip() or None, calls,
+                             reasoning=(msg.get("reasoning_content") or msg.get("reasoning") or None),
+                             usage=data.get("usage"), model=data.get("model", self.model))
 
 
 # --------------------------------------------------------------------------- Scripted fallback (no key needed)

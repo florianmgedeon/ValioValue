@@ -78,6 +78,24 @@
   .empty { color: var(--muted); font-style: italic; }
   .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .ev.think .ic { background: #f3eefe; color: #6941c6; }
+  .thought { border-left: 3px solid #d9ccfb; padding: 2px 0 2px 12px; }
+  .thought .meta { font-size: 12px; color: var(--muted); }
+  .thought .meta b { color: #6941c6; font-weight: 600; }
+  .thought .txt { font-style: italic; color: #3d3550; white-space: pre-wrap; margin-top: 3px; }
+  code.tool { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: #f0f1f4; padding: 2px 6px; border-radius: 5px; color: var(--ink); }
+  .toolrow { cursor: pointer; user-select: none; }
+  .toolrow .chev { display: inline-block; transition: transform .15s; color: var(--muted); margin-right: 4px; }
+  .toolrow.open .chev { transform: rotate(90deg); }
+  .details { display: none; margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+  .details.open { display: block; }
+  .details section { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .details section:last-child { border-bottom: 0; }
+  .details h4 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .details .doc { white-space: pre-wrap; }
+  .details table td, .details table th { padding: 4px 6px; font-size: 12px; }
+  pre.json { margin: 0; max-height: 360px; overflow: auto; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; background: #fbfbfc; padding: 8px; border-radius: 6px; }
+  .req { color: var(--red); font-weight: 700; }
   @media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -106,6 +124,7 @@
         <span style="flex:1"></span>
         <button id="send" class="primary">Send</button>
       </div>
+      <p class="muted" style="margin:12px 0 0;font-size:12px">💭 = the model's own reasoning before each decision. Click any tool call to see its documentation, the exact input and the full output.</p>
       <div id="timeline"></div>
     </div>
   </section>
@@ -140,6 +159,27 @@ const ACTORS = {buyer_agent: ["Buyer agent", "#1f5eff"], valio_mcp: ["Valio Aimo
 
 let sessionId = null, source = null;
 const steps = {};
+let TOOLS = {};
+fetch("/tools").then((r) => r.json()).then((l) => l.forEach((t) => TOOLS[t.name] = t)).catch(() => {});
+
+function params(schema, prefix = "") {
+  const req = new Set(schema?.required || []);
+  return Object.entries(schema?.properties || {}).flatMap(([k, v]) => {
+    const name = prefix + k;
+    const type = v.type === "array" ? `${v.items?.type || "any"}[]` : (v.enum ? v.enum.map((x) => `"${x}"`).join(" | ") : v.type || "");
+    const row = `<tr><td><code>${esc(name)}</code>${req.has(k) ? ' <span class="req" title="required">*</span>' : ""}</td><td class="muted">${esc(type)}</td><td>${esc(v.description || "")}${v.default != null ? ` <span class="muted">(default ${esc(JSON.stringify(v.default))})</span>` : ""}</td></tr>`;
+    return v.type === "object" && v.properties ? [row, ...params(v, name + ".")] : [row];
+  });
+}
+
+function toolDocs(name) {
+  const t = TOOLS[name];
+  if (!t) return '<p class="empty">No documentation loaded.</p>';
+  return `<div class="doc">${esc(t.description)}</div>
+    <table style="margin-top:8px"><tr><th>Parameter</th><th>Type</th><th>Description</th></tr>${params(t.input_schema).join("")}</table>`;
+}
+
+const pretty = (o) => `<pre class="json">${esc(JSON.stringify(o, null, 2))}</pre>`;
 
 async function health() {
   try {
@@ -210,14 +250,32 @@ function handle(e) {
   switch (e.type) {
     case "message":
       add("agent", "A", `<div class="bubble">${md(e.text)}</div>`, e.timestamp); break;
-    case "tool_call":
-      steps[e.call_id] = add("step", '<span class="spinner"></span>', `<div class="step-text"><b>${esc(e.label)}</b></div>`, e.timestamp); break;
+    case "reasoning": {
+      const u = e.usage || {};
+      const meta = [`<b>${esc(e.model)}</b>`, `LLM call #${e.step}`, e.duration_ms != null ? `${(e.duration_ms / 1000).toFixed(1)} s` : "",
+        u.input_tokens != null ? `${u.input_tokens.toLocaleString()} in / ${u.output_tokens.toLocaleString()} out tokens` + (u.thinking_tokens ? ` (${u.thinking_tokens} thinking)` : "") : "",
+        e.tool_calls?.length ? `decides to call ${e.tool_calls.map((n) => `<code class="tool">${esc(n)}</code>`).join(" ")}` : "decides to answer"].filter(Boolean).join(" · ");
+      add("think", "💭", `<div class="thought"><div class="meta">${meta}</div>${e.text ? `<div class="txt">${esc(e.text)}</div>` : '<div class="txt muted">(no extended thinking for this step, the model decided directly)</div>'}</div>`, e.timestamp);
+      break;
+    }
+    case "tool_call": {
+      const el = add("step", '<span class="spinner"></span>',
+        `<div class="toolrow"><span class="chev">▸</span><code class="tool">${esc(e.tool)}</code> <span class="step-text"><b>${esc(e.label)}</b></span></div>
+         <div class="details">
+           <section><h4>Tool documentation (what the LLM sees)</h4>${toolDocs(e.tool)}</section>
+           <section><h4>Input sent by the LLM</h4>${pretty(e.args)}</section>
+           <section class="out"><h4>Output from Valio Aimo MCP</h4><p class="empty">waiting…</p></section>
+         </div>`, e.timestamp);
+      el.querySelector(".toolrow").onclick = () => { el.querySelector(".toolrow").classList.toggle("open"); el.querySelector(".details").classList.toggle("open"); };
+      steps[e.call_id] = el; break;
+    }
     case "tool_result": {
       const el = steps[e.call_id];
       if (el) {
         el.classList.add(e.ok ? "done" : "fail");
         el.querySelector(".ic").textContent = e.ok ? "✓" : "✗";
         el.querySelector(".step-text").innerHTML += ` <span class="res">→ ${esc(e.summary)}</span>`;
+        el.querySelector(".out").innerHTML = `<h4>Output from Valio Aimo MCP${e.duration_ms != null ? ` · ${e.duration_ms} ms` : ""}</h4>${pretty(e.result ?? {summary: e.summary})}`;
       }
       break;
     }
@@ -245,7 +303,7 @@ function handle(e) {
 function listen(id) {
   if (source) source.close();
   source = new EventSource(`/chat/${id}/stream`);
-  ["message", "tool_call", "tool_result", "offers", "approval_required", "order_confirmed", "error", "done"]
+  ["reasoning", "message", "tool_call", "tool_result", "offers", "approval_required", "order_confirmed", "error", "done"]
     .forEach((t) => source.addEventListener(t, (m) => handle(JSON.parse(m.data))));
 }
 
