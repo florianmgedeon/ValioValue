@@ -16,7 +16,7 @@ Set `LLM_PROVIDER` in `.env`. All adapters are plain HTTP in `buyer_agent/llm.py
 
 | `LLM_PROVIDER` | Default model | Notes |
 |---|---|---|
-| `anthropic` | `claude-sonnet-4-5` | Messages API with tool use |
+| `anthropic` | `claude-sonnet-4-5` | Messages API with tool use. Tested with `LLM_MODEL=claude-haiku-5-5` |
 | `openai` | `gpt-4.1-mini` | Chat Completions tools |
 | `gemini` | `gemini-2.5-flash` | Gemini's OpenAI-compatible endpoint |
 | `openai_compatible` | `LLM_MODEL` | Any endpoint via `LLM_BASE_URL` |

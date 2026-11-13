@@ -121,8 +121,8 @@ Today is {today:%A %Y-%m-%d} ({config.TIMEZONE}). "By Monday" means the next Mon
 
 How to work:
 1. search_products with a short product query in English (e.g. "lactose-free milk") and filters that reflect hard requirements (lactose-free, allergens, origin).
-2. check_offer with the most relevant 3 to 8 product ids, the delivery date, and the quantity in the unit the buyer used (L or KG are converted to sales units by Valio).
-3. Pick the offer that exactly matches the request and can deliver in full on time (can_fulfil=true). Default preference: lowest total price, then higher delivery reliability. Never pick a product that violates a stated requirement.
+2. check_offer with ALL search results that match the request (up to 10 product ids, different pack sizes included, since price per litre differs), the delivery date, and the quantity in the unit the buyer used (L or KG are converted to sales units by Valio). Leave out only products that clearly are something else.
+3. Pick the offer that exactly matches the request and can deliver in full on time (can_fulfil=true). Default preference: lowest total price, then higher delivery reliability. Offers come sorted best first, rank 'best' is usually right. Never pick a product that violates a stated requirement. Only call something cheapest if it is cheapest among the offers you checked.
 4. place_order with that single quote_id and a one-sentence reason a human approver can understand.
 5. If place_order returns pending_approval, tell the buyer it is waiting for their approval and stop. You cannot approve orders and must not re-order to get around a limit.
 If nothing can deliver in full, explain the best options (partial, later date) and ask; do not order.
@@ -155,7 +155,7 @@ async def _loop(session: Session) -> None:
                 session.emit("message", role="assistant", text=turn.text)
             if not turn.tool_calls:
                 return
-            stop = False
+            stop, order_res = False, None
             for call in turn.tool_calls:
                 if stop:  # an order is already in flight, refuse anything after it in this turn
                     res = {"error": "skipped: an order was already placed in this turn"}
@@ -169,10 +169,12 @@ async def _loop(session: Session) -> None:
                     ok = not res.get("error") and res.get("status") != "rejected"
                     session.emit("tool_result", call_id=call.id, tool=call.name, ok=ok, summary=summary(call.name, res))
                     stop = _side_events(session, call.name, call.args, res)
+                    if stop:
+                        order_res = res
                 session.history.append({"role": "tool", "tool_call_id": call.id, "name": call.name,
                                         "content": json.dumps(res, ensure_ascii=False)[:15000]})
             if stop:
-                text = _order_message(session.history[-1])
+                text = _order_message(order_res)
                 session.history.append({"role": "assistant", "text": text, "tool_calls": []})
                 session.emit("message", role="assistant", text=text)
                 return
@@ -199,8 +201,7 @@ def _side_events(session: Session, tool: str, args: dict, res: dict) -> bool:
     return False
 
 
-def _order_message(tool_msg: dict) -> str:
-    res = json.loads(tool_msg["content"])
+def _order_message(res: dict) -> str:
     line = (res.get("lines") or [{}])[0]
     what = f"{line.get('quantity', 0):,.0f} {line.get('sales_unit', '')} of {line.get('name', '')}"
     money = f"{res.get('total_price', 0):,.2f} {res.get('currency', 'EUR')}"

@@ -40,6 +40,7 @@ mcp = FastMCP(
     ),
     host=config.MCP_HOST,
     port=config.MCP_PORT,
+    stateless_http=True,  # every request carries its own identity headers, scales horizontally
 )
 
 
