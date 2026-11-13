@@ -53,8 +53,8 @@ paths:
       summary: Server-sent events stream of the agent's progress
       description: |
         `text/event-stream`. Each SSE message has `event: <type>` and `data: <json>`.
-        Types: message, tool_call, tool_result, offers, approval_required,
-        order_confirmed, error, done.
+        Types: reasoning, message, tool_call, tool_result, offers, approval_required,
+        order_confirmed, error, done. Ignore unknown types.
       parameters:
         - in: path
           name: session_id
@@ -67,6 +67,7 @@ paths:
             text/event-stream:
               schema:
                 oneOf:
+                  - $ref: "#/components/schemas/ReasoningEvent"
                   - $ref: "#/components/schemas/MessageEvent"
                   - $ref: "#/components/schemas/ToolCallEvent"
                   - $ref: "#/components/schemas/ToolResultEvent"
@@ -75,6 +76,23 @@ paths:
                   - $ref: "#/components/schemas/OrderConfirmedEvent"
                   - $ref: "#/components/schemas/ErrorEvent"
                   - $ref: "#/components/schemas/DoneEvent"
+
+  /tools:
+    get:
+      summary: MCP tools the agent can use, with documentation and input schema
+      responses:
+        "200":
+          description: Tool list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name: { type: string }
+                    description: { type: string }
+                    input_schema: { type: object }
 
   /approvals:
     get:
@@ -227,6 +245,20 @@ components:
         session_id: { type: string }
         timestamp: { type: string, format: date-time }
 
+    ReasoningEvent:
+      description: One LLM call. Emitted before the message / tool calls that this call produced.
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { const: reasoning }
+            step: { type: integer, description: "LLM call number within this turn" }
+            model: { type: string }
+            text: { type: string, nullable: true, description: "Model's summarized thinking, null if none" }
+            tool_calls: { type: array, items: { type: string }, description: "Tools the model decided to call" }
+            usage: { type: object, additionalProperties: true }
+            duration_ms: { type: integer }
+
     MessageEvent:
       allOf:
         - $ref: "#/components/schemas/EventBase"
@@ -243,6 +275,7 @@ components:
           properties:
             type: { const: tool_call }
             call_id: { type: string }
+            step: { type: integer, description: "LLM call that requested this tool" }
             tool: { type: string, example: "check_offer" }
             label: { type: string, description: "Human-readable, show this in the UI", example: "Checking price and availability for 3 products" }
             args: { type: object, additionalProperties: true }
@@ -257,6 +290,8 @@ components:
             tool: { type: string }
             ok: { type: boolean }
             summary: { type: string }
+            result: { type: object, additionalProperties: true, description: "Full tool output" }
+            duration_ms: { type: integer }
 
     OffersEvent:
       allOf:
