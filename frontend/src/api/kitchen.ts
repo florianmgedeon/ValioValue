@@ -12,6 +12,25 @@ export function patchKitchenProfile(
   return apiRequest<KitchenProfile>("/kitchen", { method: "PATCH", json: patch });
 }
 
+export interface KitchenCatalogProduct {
+  product_id: string;
+  name: string;
+  brand?: string | null;
+  category?: string | null;
+  sales_unit?: string | null;
+  country_of_origin?: string | null;
+}
+
+export function searchKitchenProducts(
+  q: string,
+  limit = 8,
+  buyerId?: string,
+): Promise<{ query: string; products: KitchenCatalogProduct[] }> {
+  const params = new URLSearchParams({ q, limit: String(limit) });
+  if (buyerId) params.set("buyer_id", buyerId);
+  return apiRequest<{ query: string; products: KitchenCatalogProduct[] }>(`/kitchen/products?${params.toString()}`);
+}
+
 export function getKitchenHistory(
   buyerId?: string,
 ): Promise<Record<string, unknown>> {

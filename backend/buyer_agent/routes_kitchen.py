@@ -53,6 +53,17 @@ async def kitchen_history(buyer_id: str | None = None):
     return {"buyer_id": p["buyer_id"], "version": p["version"], "history": list(reversed(p.get("history") or []))}
 
 
+@router.get("/kitchen/products")
+async def kitchen_products(q: str = "", limit: int = 8, buyer_id: str | None = None):
+    """Search the Valio Aimo catalog for choosing usual products or fixed substitutes in the Kitchen tab."""
+    bid = _bid(buyer_id)
+    query = q.strip()
+    if not query:
+        return {"query": "", "products": []}
+    lim = max(1, min(limit, 25))
+    return {"query": query, "products": await ingest.search_products(bid, query, lim)}
+
+
 class UsualPatch(BaseModel):
     add: list[dict] = []
     update: list[dict] = []
@@ -71,13 +82,19 @@ async def patch_kitchen(body: KitchenPatch):
     """Edit About and the usual products directly (no suggestion needed: the human is typing it)."""
     bid = _bid(body.buyer_id)
     by = body.by or "buyer.human"
+    for entry in (body.usual.add if body.usual else []) + (body.usual.update if body.usual else []):
+        if entry.get("fallback_mode") is not None and entry["fallback_mode"] not in kitchen.FALLBACK_MODES:
+            raise HTTPException(422, f"fallback_mode must be one of {', '.join(kitchen.FALLBACK_MODES)}")
     resolved_add = [await ingest.resolve_usual(bid, u) for u in (body.usual.add if body.usual else [])]
     resolved_upd = []
     for u in body.usual.update if body.usual else []:
         if not u.get("id"):
             raise HTTPException(422, "usual.update entries need an id")
+        u = dict(u)
         if ("product_query" in u or "word" in u) and not u.get("product_id"):
             u = await ingest.resolve_usual(bid, u)
+        elif "substitutes" in u:
+            u["substitutes"] = await ingest.resolve_substitutes(bid, u.get("substitutes"))
         resolved_upd.append(u)
     parts: list[str] = []
 
@@ -95,6 +112,13 @@ async def patch_kitchen(body: KitchenPatch):
                 raise HTTPException(404, f"unknown usual product {u['id']}")
             cur.update({k: v for k, v in u.items() if k in ("word", "aliases", "product_id", "product_name",
                                                             "typical_qty", "unit", "per", "status")})
+            if "substitutes" in u:
+                cur["substitutes"] = kitchen.normalise_substitutes(u.get("substitutes"), cur.get("product_id"))
+                if "fallback_mode" not in u and cur["substitutes"] and cur.get("fallback_mode", "ask_any") == "ask_any":
+                    cur["fallback_mode"] = "only_listed"
+            if "fallback_mode" in u:
+                cur["fallback_mode"] = kitchen.normalise_fallback_mode(u.get("fallback_mode"),
+                                                                       bool(cur.get("substitutes")))
             parts.append(f'Usual "{cur["word"]}" edited')
         for uid in body.usual.remove if body.usual else []:
             cur = next((x for x in p["usual"] if x["id"] == uid), None)
@@ -191,7 +215,10 @@ async def accept(body: AcceptIn):
     saved_mandate = None
     if signed:
         current = await valio.mandate(bid)
-        usual = kitchen.usual_ids(profile) + [p["product_id"] for p in usual_payloads.values() if p.get("product_id")]
+        extra_ids = [p["product_id"] for p in usual_payloads.values() if p.get("product_id")] + [
+            s["product_id"] for p in usual_payloads.values() if p.get("fallback_mode") != "none"
+            for s in (p.get("substitutes") or []) if s.get("product_id")]
+        usual = kitchen.usual_ids(profile) + extra_ids
         new, diff = ingest.mandate_with(current, signed, profile, usual=list(dict.fromkeys(usual)))
         saved_mandate = await valio.change(bid, new, diff, body.mandate_hash, by)
 

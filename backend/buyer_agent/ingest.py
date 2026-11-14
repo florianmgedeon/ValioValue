@@ -73,29 +73,52 @@ async def search_products(buyer_id: str, query: str, limit: int = 5) -> list[dic
     return res.get("products") or []
 
 
-async def resolve_usual(buyer_id: str, payload: dict) -> dict:
-    """Fill product_id and product_name. Top hit if its name matches closely (token overlap ≥ 0.6), else
-    product_id None and up to 3 candidates for the UI to choose."""
+async def resolve_substitutes(buyer_id: str, subs: list | None) -> list[dict]:
+    """Resolve each substitute entry (product_id/product_name or product_query) against the catalog."""
+    out: list[dict] = []
+    for raw in subs or []:
+        item = {"product_id": raw} if isinstance(raw, str) else dict(raw or {})
+        if item.get("product_id") and item.get("product_name"):
+            out.append({"product_id": str(item["product_id"]), "product_name": item["product_name"]})
+            continue
+        q = item.get("product_query") or item.get("product_name") or item.get("product_id") or ""
+        resolved = await _resolve_product_entry(buyer_id, dict(item, product_query=q))
+        out.append(resolved)
+    return out
+
+
+async def _resolve_product_entry(buyer_id: str, payload: dict) -> dict:
     out = dict(payload)
     if out.get("product_id") and out.get("product_name"):
         return out
-    query = out.get("product_query") or out.get("product_name") or out.get("word") or ""
+    query = out.get("product_query") or out.get("product_name") or out.get("word") or out.get("product_id") or ""
     try:
-        hits = await search_products(buyer_id, query, 5)
+        hits = await search_products(buyer_id, str(query), 5)
     except Exception:  # noqa: BLE001 - keep the suggestion, the buyer chooses later
         log.exception("product search failed for %r", query)
         hits = []
     if out.get("product_id"):
-        hit = next((h for h in hits if h["product_id"] == out["product_id"]), None)
+        pid = str(out["product_id"])
+        hit = next((h for h in hits if h["product_id"] == pid), None)
+        out["product_id"] = pid
         out["product_name"] = out.get("product_name") or (hit or {}).get("name")
         return out
     best = hits[0] if hits else None
-    if best and overlap(query, best["name"]) >= 0.6:
+    if best and overlap(str(query), best["name"]) >= 0.6:
         out |= {"product_id": best["product_id"], "product_name": best["name"]}
         out.pop("candidates", None)
     else:
         out |= {"product_id": None, "product_name": None,
                 "candidates": [{"product_id": h["product_id"], "name": h["name"]} for h in hits[:3]]}
+    return out
+
+
+async def resolve_usual(buyer_id: str, payload: dict) -> dict:
+    """Fill product_id and product_name (plus substitutes if given). Top hit if its name matches closely
+    (token overlap ≥ 0.6), else product_id None and up to 3 candidates for the UI to choose."""
+    out = await _resolve_product_entry(buyer_id, payload)
+    if "substitutes" in out:
+        out["substitutes"] = await resolve_substitutes(buyer_id, out.get("substitutes"))
     return out
 
 

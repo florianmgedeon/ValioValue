@@ -49,6 +49,8 @@ def _search_why(line: dict, item: dict | None, optimise: str | None) -> str:
     usual = (item or {}).get("usual") or {}
     if line.get("usual") or (usual.get("product_id") and usual["product_id"] == line.get("product_id")):
         parts.append("Your usual.")
+    elif line.get("approved_substitute"):
+        parts.append("Your approved substitute.")
     musts = [e for e in line.get("evidence") or [] if e.get("verdict") == "safe"]
     if musts:
         parts.append(f"Passes your {len(musts)} must{'s' * (len(musts) != 1)}." if len(musts) > 1 else "Passes your must.")
