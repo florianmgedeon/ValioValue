@@ -1,6 +1,7 @@
 import type { Suggestion } from "../../api/types";
 import { KindTag, SignedTag, SIGNED_KINDS, YesNo, type Kind } from "../../ui";
 
+
 /** Backend suggestion kinds → UI kinds (`autonomy` is `auto` in the UI). */
 export function suggestionKind(s: Suggestion): Kind {
   return s.kind === "autonomy" ? "auto" : (s.kind ?? "about");

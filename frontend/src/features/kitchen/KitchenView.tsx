@@ -291,8 +291,8 @@ export default function KitchenView({ view: viewParam }: { view?: string }) {
       <Suggestions items={proposed} sources={profile.sources ?? []} onAccept={(s) => void accept(s)} onReject={(s) => void reject(s)} busy={busy} />
 
       <div className="views" role="tablist" aria-label="Kitchen">
-        <button role="tab" aria-selected={tab === "know"} onClick={() => navigate("kitchen")}>What I know <span className="sub">learned, no signature</span></button>
-        <button role="tab" aria-selected={tab === "may"} onClick={() => navigate("kitchen", "may")}><Icon name="lock" size={15} />What I may do <span className="sub">signed</span></button>
+        <button role="tab" data-tour="kitchen-know" aria-selected={tab === "know"} onClick={() => navigate("kitchen")}>What I know <span className="sub">learned, no signature</span></button>
+        <button role="tab" data-tour="kitchen-may" aria-selected={tab === "may"} onClick={() => navigate("kitchen", "may")}><Icon name="lock" size={15} />What I may do <span className="sub">signed</span></button>
       </div>
 
       {tab === "know" && (
