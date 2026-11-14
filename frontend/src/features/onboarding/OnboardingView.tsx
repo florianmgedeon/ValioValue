@@ -155,15 +155,19 @@ export function OnboardingView() {
   // Photos from the phone modal (or the composer-less file picker) land here.
   useEffect(() => camera.onPhoto("onboard", (u) => addUpload(u)), [camera, addUpload]);
 
+  /** The text field: before reading it starts reading everything, afterwards it adds one more thing to read. */
   const readMyKitchen = async () => {
     const t = tell.trim();
+    let key: string | undefined;
     if (t) {
-      const doc: Doc = { key: newKey(), title: "What you told me", sub: "typed", preview: { kind: "text", text: t }, status: "ready", text: t };
+      key = newKey();
+      const doc: Doc = { key, title: "What you told me", sub: "typed", preview: { kind: "text", text: t }, status: "ready", text: t };
       setDocs((ds) => [...ds, doc]);
       docsRef.current = [...docsRef.current, doc];
       setTell("");
     }
-    await readAll();
+    if (stageRef.current === "drop") return readAll();
+    if (key) await readDoc(key).then(() => setStage("review"));
   };
 
   const loadExample = async () => {
@@ -193,7 +197,7 @@ export function OnboardingView() {
   const signedCount = keep.filter((l) => l.s.kind === "must" || l.s.kind === "autonomy").length;
   const needsMandate = keep.some((l) => MANDATE_KINDS.has(l.s.kind ?? ""));
   const busyReading = docs.some((d) => d.status === "reading" || d.status === "uploading");
-  const canRead = docs.some((d) => d.status === "ready") || !!tell.trim();
+  const canRead = stage === "drop" ? docs.some((d) => d.status === "ready") || !!tell.trim() : !!tell.trim();
 
   const adopt = async () => {
     setAdopting(true);
@@ -264,28 +268,27 @@ export function OnboardingView() {
         </div>
       </div>
 
+      {/* Typing stays possible while documents upload or are read, and after. */}
+      <form
+        className="mx-auto mt-[22px] flex max-w-[640px] items-center gap-2 rounded-full bg-surface py-1.5 pr-1.5 pl-[18px]"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (canRead) void readMyKitchen();
+        }}
+      >
+        <input
+          className="h-9 min-w-0 flex-1 bg-transparent outline-none"
+          placeholder={stage === "drop" ? "Or tell me in one sentence: We're a school canteen in Espoo, nut-free…" : "Anything else? e.g. We cook for 120 kids, no pork…"}
+          aria-label="Describe your kitchen"
+          value={tell}
+          onChange={(e) => setTell(e.target.value)}
+        />
+        <Button small variant="primary" type="submit" disabled={!canRead}>{stage === "drop" ? "Read my kitchen" : "Tell me"}</Button>
+      </form>
       {stage === "drop" && (
-        <>
-          <form
-            className="mx-auto mt-[22px] flex max-w-[640px] items-center gap-2 rounded-full bg-surface py-1.5 pr-1.5 pl-[18px]"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (canRead) void readMyKitchen();
-            }}
-          >
-            <input
-              className="h-9 min-w-0 flex-1 bg-transparent outline-none"
-              placeholder="Or tell me in one sentence: We're a school canteen in Espoo, nut-free…"
-              aria-label="Describe your kitchen"
-              value={tell}
-              onChange={(e) => setTell(e.target.value)}
-            />
-            <Button small variant="primary" type="submit" disabled={!canRead || busyReading}>Read my kitchen</Button>
-          </form>
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Button onClick={() => void loadExample()}>Skip, use example kitchen</Button>
-          </div>
-        </>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Button onClick={() => void loadExample()}>Skip, use example kitchen</Button>
+        </div>
       )}
 
       {stage !== "drop" && !busyReading && docs.some((d) => d.status === "error" && (d.upload || d.text)) && (
