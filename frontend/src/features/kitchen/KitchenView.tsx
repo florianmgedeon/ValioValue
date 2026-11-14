@@ -13,6 +13,7 @@ import { Button, Drawer, Icon, Typing, useToast } from "../../ui";
 import { AutonomySection, LEVELS } from "./Autonomy";
 import "./kitchen.css";
 import { applyOps, nextId, plural, ruleLabel, upsert, type Grant, type HardRule, type LevelChange, type Op, type Preference, type RuleGroup } from "./model";
+import { UsualCard } from "../order/UsualCard";
 import { About, Sources, Suggestions, TeachCard, Usual } from "./Profile";
 import { errText, MustSection, PreferSection, type RowFlags } from "./Rules";
 
@@ -284,6 +285,7 @@ export default function KitchenView() {
       <div className="k-grid">
         <div className="grid gap-5">
           <About profile={profile} onSave={saveAbout} />
+          <UsualCard />
           <Usual profile={profile} />
           <Sources profile={profile} orders={orders.data?.length ?? null} />
         </div>

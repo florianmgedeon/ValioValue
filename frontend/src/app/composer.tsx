@@ -9,6 +9,8 @@ export interface ComposerConfig {
   hints?: string[];
   /** Where a photo from the camera button goes. Default "order". */
   camera?: CameraTarget;
+  /** Bigger bar with a label, for a start screen where the chat is one of the two main ways in. */
+  prominent?: boolean;
 }
 
 interface ComposerApi {
@@ -40,6 +42,7 @@ export function useComposer(config: ComposerConfig | null) {
   const hintsKey = config?.hints?.join("|");
   const placeholder = config?.placeholder;
   const camera = config?.camera;
+  const prominent = config?.prominent;
   const enabled = config !== null;
   useEffect(() => {
     if (!enabled) {
@@ -51,9 +54,10 @@ export function useComposer(config: ComposerConfig | null) {
       placeholder,
       hints: hintsKey ? hintsKey.split("|") : [],
       camera,
+      prominent,
     });
     return () => setConfig(null);
-  }, [setConfig, enabled, hintsKey, placeholder, camera]);
+  }, [setConfig, enabled, hintsKey, placeholder, camera, prominent]);
 }
 
 /** Prefill the composer (e.g. "the usual, but ") and focus it. */
@@ -102,6 +106,8 @@ export function Composer() {
     setListening(true);
     r.start();
   };
+  const big = !!config.prominent;
+  const btn = big ? "size-12" : "size-10";
 
   return (
     <div
@@ -113,8 +119,13 @@ export function Composer() {
         background: "linear-gradient(to top, var(--bg) 60%, transparent)",
       }}
     >
+      {big && (
+        <div className="mx-auto mb-2 max-w-[880px] px-2 text-[15px] font-bold text-ink">
+          Type or speak your order
+        </div>
+      )}
       {!!config.hints?.length && (
-        <div className="mx-auto mb-2.5 flex max-w-[880px] flex-wrap justify-center gap-2">
+        <div className={`mx-auto mb-2.5 flex max-w-[880px] flex-wrap gap-2 ${big ? "justify-start px-1" : "justify-center"}`}>
           {config.hints.map((h) => (
             <button key={h} type="button" className="rounded-full bg-surface px-3 py-1.5 text-[13px] font-medium text-ink2 hover:bg-surface2 hover:text-ink" onClick={() => send(h)}>
               “{h.length > 40 ? h.slice(0, 38) + "…" : h}”
@@ -123,21 +134,23 @@ export function Composer() {
         </div>
       )}
       <form
-        className="mx-auto flex max-w-[880px] items-center gap-1.5 rounded-[26px] border border-line bg-bg p-2 shadow-float"
+        className={`mx-auto flex max-w-[880px] items-center gap-1.5 border bg-bg shadow-float ${big ? "rounded-[30px] border-2 border-ink p-2.5" : "rounded-[26px] border-line p-2"}`}
         onSubmit={(e) => {
           e.preventDefault();
           send(text);
         }}
       >
-        <button type="button" className="grid size-10 flex-none place-items-center rounded-full bg-ink text-bg" aria-label="Take a photo" onClick={() => camera.open(config.camera ?? "order")}>
-          <Icon name="cam" />
-        </button>
+        {!big && (
+          <button type="button" className="grid size-10 flex-none place-items-center rounded-full bg-ink text-bg" aria-label="Take a photo" onClick={() => camera.open(config.camera ?? "order")}>
+            <Icon name="cam" />
+          </button>
+        )}
         <button type="button" className="grid size-10 flex-none place-items-center rounded-full text-ink2 hover:bg-surface" aria-label="Attach a file" onClick={() => camera.upload(config.camera ?? "order")}>
           <Icon name="clip" />
         </button>
         <input
           id="composer-input"
-          className="h-10 min-w-0 flex-1 bg-transparent px-1.5 text-base outline-none"
+          className={`min-w-0 flex-1 bg-transparent px-1.5 outline-none ${big ? "h-12 text-lg" : "h-10 text-base"}`}
           autoComplete="off"
           aria-label="Message"
           placeholder={listening ? "Listening…" : config.placeholder ?? "What do you need?"}
@@ -145,11 +158,11 @@ export function Composer() {
           onChange={(e) => setText(e.target.value)}
         />
         {Speech && (
-          <button type="button" className={`grid size-10 flex-none place-items-center rounded-full ${listening ? "animate-pulse-soft bg-must text-white" : "text-ink2 hover:bg-surface"}`} aria-label="Speak" onClick={listen}>
+          <button type="button" className={`grid ${btn} flex-none place-items-center rounded-full ${listening ? "animate-pulse-soft bg-must text-white" : "text-ink2 hover:bg-surface"}`} aria-label="Speak" onClick={listen}>
             <Icon name="mic" />
           </button>
         )}
-        <button type="submit" className="grid size-10 flex-none place-items-center rounded-full bg-accent text-white" aria-label="Send">
+        <button type="submit" className={`grid ${btn} flex-none place-items-center rounded-full bg-accent text-white`} aria-label="Send">
           <Icon name="up" />
         </button>
       </form>
