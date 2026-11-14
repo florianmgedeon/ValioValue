@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mcp-server",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd mcp-server && exec /Users/moritzkraus/Documents/Coding/ValioValue/.venv/bin/python -m valio_mcp.server"],
+      "env": { "MCP_PORT": "8021", "MCP_PUBLIC_BASE_URL": "http://localhost:8021", "MCP_DB_PATH": "/private/tmp/claude-501/-Users-moritzkraus-Documents-Coding-ValioValue--claude-worktrees-order-history-ui-proposal-ad4a6c/e57d3cbb-92b3-4508-acd2-804d8898107a/scratchpad/run/valio.db", "KEYS_DIR": "/private/tmp/claude-501/-Users-moritzkraus-Documents-Coding-ValioValue--claude-worktrees-order-history-ui-proposal-ad4a6c/e57d3cbb-92b3-4508-acd2-804d8898107a/scratchpad/run/keys" },
+      "port": 8021,
+      "autoPort": false
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd backend && exec /Users/moritzkraus/Documents/Coding/ValioValue/.venv/bin/python -m buyer_agent.app"],
+      "env": { "BACKEND_PORT": "8020", "PUBLIC_BASE_URL": "http://localhost:8020", "MCP_SERVER_URL": "http://localhost:8021/mcp", "KEYS_DIR": "/private/tmp/claude-501/-Users-moritzkraus-Documents-Coding-ValioValue--claude-worktrees-order-history-ui-proposal-ad4a6c/e57d3cbb-92b3-4508-acd2-804d8898107a/scratchpad/run/keys", "KITCHEN_DIR": "/private/tmp/claude-501/-Users-moritzkraus-Documents-Coding-ValioValue--claude-worktrees-order-history-ui-proposal-ad4a6c/e57d3cbb-92b3-4508-acd2-804d8898107a/scratchpad/run/kitchen", "UPLOADS_DIR": "/private/tmp/claude-501/-Users-moritzkraus-Documents-Coding-ValioValue--claude-worktrees-order-history-ui-proposal-ad4a6c/e57d3cbb-92b3-4508-acd2-804d8898107a/scratchpad/run/uploads", "DEFAULT_BUYER_ID": "school-kitchen-espoo" },
+      "port": 8020,
+      "autoPort": false
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "frontend", "run", "dev", "--", "--port", "5190", "--strictPort"],
+      "env": { "VITE_BACKEND_URL": "http://localhost:8020", "VITE_MOCK": "0" },
+      "port": 5190,
+      "autoPort": false
+    }
+  ]
+}
