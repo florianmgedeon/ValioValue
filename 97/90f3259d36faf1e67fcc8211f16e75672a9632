@@ -1,0 +1,35 @@
+frontend/src/ui/Chip.tsx
+  s_d34ffbf12ef855::t_242b8cdc9c7f97 6
+frontend/src/features/kitchen/Rules.tsx
+  s_d34ffbf12ef855::t_300a525834ef70 3,5-6,125,140
+  s_d34ffbf12ef855::t_26a3a8395f8ed1 35-37,48,50-51,53,55,61-62,96-97,99,102,104-106,149,159,176
+frontend/src/features/kitchen/Autonomy.tsx
+  s_d34ffbf12ef855::t_19c5362978f00e 5-6,9-18,36,39,44-45,49,51,55-58,63,67-70,72-77,80-92,94-101,105-122,124-128,130-137,139-141,144-145,148,150-151
+  s_d34ffbf12ef855::t_b94be222023ce2 71
+frontend/src/features/kitchen/KitchenView.tsx
+  s_d34ffbf12ef855::t_845f405cb9eda3 5,7,16,21-22,117,124,162,245,251,254,257,277-285
+frontend/src/features/order/panels.tsx
+  s_d34ffbf12ef855::t_4ae0bcf5069c36 85
+frontend/src/app/Header.tsx
+  s_d34ffbf12ef855::t_c1db65a344627a 21-26,56,63-64
+frontend/src/features/kitchen/Profile.tsx
+  s_d34ffbf12ef855::t_0e4fde5241a952 4-7,126,129,171-175,178-180,182,184-185,187,198-208,225
+frontend/src/features/kitchen/kitchen.css
+  s_d34ffbf12ef855::t_c2fbad788e0489 66-82,85-88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9790f3259d36faf1e67fcc8211f16e75672a9632",
+  "prompts": {},
+  "sessions": {
+    "s_d34ffbf12ef855": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ccf5fe61-b83d-4acd-bf29-4a1ee24d3ce4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
