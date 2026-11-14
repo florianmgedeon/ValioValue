@@ -212,6 +212,21 @@ export default function KitchenView() {
     }
   };
 
+  const saveUsual = async (update: { id: string; substitutes: { product_id: string; product_name: string }[]; fallback_mode: "ask_any" | "only_listed" | "none" }) => {
+    try {
+      const p = await patchKitchenProfile({ usual: { update: [update] }, by: SIGNER_NAME });
+      queryClient.setQueryData(keys.kitchen, (old: KitchenProfile | undefined) => ({ ...old, ...p }));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.kitchen }),
+        queryClient.invalidateQueries({ queryKey: keys.autonomy }),
+      ]);
+      toast("Saved fallback rules to your kitchen profile");
+    } catch (e) {
+      toast(errText(e));
+      throw e;
+    }
+  };
+
   // ---- review & sign
   const pendingCount = ops.length + (levelChange ? 1 : 0);
   const review = async () => {
@@ -278,7 +293,7 @@ export default function KitchenView() {
         <PreferSection rules={view.preferences} flags={flags} onToggle={toggleRule("prefer")} onWeight={weightRule} onAdd={addRule("prefer")} />
       </div>
 
-      <UsualSection profile={profile} />
+      <UsualSection profile={profile} onSaveUsual={saveUsual} />
 
       <div className="k-grid">
         <About profile={profile} onSave={saveAbout} />

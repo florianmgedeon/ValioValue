@@ -215,3 +215,56 @@ async def test_patch_kitchen(client):
     hist = (await client.get("/kitchen/history", params={"buyer_id": buyer})).json()
     assert hist["history"][0]["summary"].startswith('Usual "butter" removed')
     assert (await client.patch("/kitchen", json={"buyer_id": buyer})).status_code == 422
+
+
+async def test_kitchen_products_and_usual_substitutes_patch(client):
+    buyer = "subs-patch-test"
+    search_res = await client.get("/kitchen/products", params={"buyer_id": buyer, "q": "kaurajuoma", "limit": 5})
+    assert search_res.status_code == 200, search_res.text
+    prods = search_res.json()["products"]
+    assert any(p["product_id"] == "DEMO-1005" for p in prods)
+
+    # Add a usual product with ordered substitutes (resolved via product_query and explicit ID)
+    r = await client.patch("/kitchen", json={
+        "buyer_id": buyer,
+        "by": "Anna",
+        "usual": {"add": [{
+            "word": "oat drink",
+            "aliases": ["kaurajuoma"],
+            "product_id": "DEMO-2007",
+            "product_name": "Oat drink barista 1 l (DEV SAMPLE)",
+            "typical_qty": 36,
+            "unit": "L",
+            "substitutes": [{"product_query": "Kaurajuoma 1 l (DEV SAMPLE)"}],
+        }]},
+    })
+    assert r.status_code == 200, r.text
+    u = r.json()["usual"][0]
+    assert u["fallback_mode"] == "only_listed"
+    assert [s["product_id"] for s in u["substitutes"]] == ["DEMO-1005"]
+    block = kitchen.prompt_block(buyer)
+    assert "fallback ONLY: Kaurajuoma 1 l (DEV SAMPLE) (product DEMO-1005) (allow_other_substitutes=false)" in block
+
+    # Update fallback_mode to 'none' -> usual_ids excludes substitutes
+    r2 = await client.patch("/kitchen", json={
+        "buyer_id": buyer,
+        "usual": {"update": [{"id": u["id"], "fallback_mode": "none"}]},
+    })
+    assert r2.status_code == 200
+    assert r2.json()["usual"][0]["fallback_mode"] == "none"
+    assert kitchen.usual_ids(kitchen.load(buyer)) == ["DEMO-2007"]
+    assert "no substitutes allowed (allow_other_substitutes=false)" in kitchen.prompt_block(buyer)
+
+    # Switch back to 'only_listed' -> usual_ids includes DEMO-1005 for Level-1 autonomy
+    await client.patch("/kitchen", json={
+        "buyer_id": buyer,
+        "usual": {"update": [{"id": u["id"], "fallback_mode": "only_listed"}]},
+    })
+    assert kitchen.usual_ids(kitchen.load(buyer)) == ["DEMO-2007", "DEMO-1005"]
+
+    # Invalid fallback_mode rejected with 422
+    bad = await client.patch("/kitchen", json={
+        "buyer_id": buyer,
+        "usual": {"update": [{"id": u["id"], "fallback_mode": "anything_goes"}]},
+    })
+    assert bad.status_code == 422

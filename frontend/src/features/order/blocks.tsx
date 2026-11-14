@@ -178,23 +178,35 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
       <CardHeader title="Here's what I understood">
         <span className="text-[13px] text-ink3">from your {it.items.some((i) => i.note === "from your photo") ? "photo" : "message"}</span>
       </CardHeader>
-      {it.items.map((i) => (
-        <div key={i.item_id} className="order-item">
-          <div className="min-w-0">
-            <div className="ask">
-              <span className="q">{i.quantity?.amount} {unitLabel(i.quantity?.unit)}</span>
-              <span className="n">{i.product?.query}</span>
+      {it.items.map((i) => {
+        const subs = i.substitutes ?? [];
+        const lockedSubs = i.product?.allow_other_substitutes === false;
+        return (
+          <div key={i.item_id} className="order-item">
+            <div className="min-w-0">
+              <div className="ask">
+                <span className="q">{i.quantity?.amount} {unitLabel(i.quantity?.unit)}</span>
+                <span className="n">{i.product?.query}</span>
+              </div>
+              {i.usual?.name && <div className="nm">Your usual: {i.usual.name}</div>}
+              {subs.length > 0 && (
+                <div className="nm">
+                  If out of stock, {lockedSubs ? "only" : "first"}: {subs.map((s, idx) => `#${idx + 1} ${s.name ?? s.product_id}`).join(" → ")}
+                </div>
+              )}
+              {subs.length === 0 && lockedSubs && <div className="nm">No substitutes allowed if out of stock</div>}
+              {sameSlack === null && i.quantity?.max_over_pct ? <div className="nm">Rounding up to whole packs, at most +{i.quantity.max_over_pct} %</div> : null}
             </div>
-            {i.usual?.name && <div className="nm">Your usual: {i.usual.name}</div>}
-            {sameSlack === null && i.quantity?.max_over_pct ? <div className="nm">Rounding up to whole packs, at most +{i.quantity.max_over_pct} %</div> : null}
+            {((i.hard_rules ?? []).length > 0 || lockedSubs) && (
+              <div className="chips">
+                {subs.length > 0 && lockedSubs && <Chip kind="usual" icon="lock">Only approved substitutes ({subs.length})</Chip>}
+                {subs.length === 0 && lockedSubs && <Chip kind="must" icon="lock">No substitutes allowed</Chip>}
+                {(i.hard_rules ?? []).map((r, n) => <Chip key={n} kind="must" icon="check">{r.label ?? `${r.attr} ${r.op} ${String(r.value)}`}</Chip>)}
+              </div>
+            )}
           </div>
-          {(i.hard_rules ?? []).length > 0 && (
-            <div className="chips">
-              {(i.hard_rules ?? []).map((r, n) => <Chip key={n} kind="must" icon="check">{r.label ?? `${r.attr} ${r.op} ${String(r.value)}`}</Chip>)}
-            </div>
-          )}
-        </div>
-      ))}
+        );
+      })}
       {hint && <div className="items-hint">{hint}</div>}
       <div className="paramchips">
         <span className="pchip">Deliver by <b>{fmtDay(it.deliver_by)}</b></span>
@@ -461,6 +473,12 @@ function Receipt({ b, ctx }: { b: BlockOf<"receipt">; ctx: BlockCtx }) {
           <div key={l.quote_id ?? `${l.product_id}-${i}`} className="rline">
             <span className="nm">{l.name} × {l.quantity}{l.sales_unit ? ` ${l.sales_unit.toLowerCase()}` : ""}</span>
             <span className="px">{eur(l.total_price)}</span>
+            {l.approved_substitute && (
+              <span className="why">
+                <Chip kind="usual">Fallback #{l.substitute_rank ?? 1}</Chip>{" "}
+                {l.substitute_reason ?? "your usual was out of stock, ordered your approved substitute"}
+              </span>
+            )}
             {dev && <span className="why">You decided: {dev.detail ?? "a change you approved"}</span>}
           </div>
         );

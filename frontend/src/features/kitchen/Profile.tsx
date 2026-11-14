@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiUrl } from "../../api/client";
+import { searchKitchenProducts, type KitchenCatalogProduct } from "../../api/kitchen";
 import type { KitchenProfile, Schema } from "../../api/types";
 import { useComposerText } from "../../app/composer";
 import { navigate } from "../../app/route";
@@ -8,6 +9,9 @@ import { useKitchenContext, useUsualOrder } from "../order/data";
 
 type Suggestion = Schema["Suggestion"];
 type Source = Schema["Source"];
+type UsualProduct = Schema["UsualProduct"];
+type FallbackMode = NonNullable<UsualProduct["fallback_mode"]>;
+type SubstituteEntry = { product_id: string; product_name: string };
 
 /** Backend suggestion kinds → the UI's kind colours. */
 export const KIND_OF: Record<NonNullable<Suggestion["kind"]>, Kind> = { about: "about", usual: "usual", must: "must", prefer: "prefer", autonomy: "auto" };
@@ -168,8 +172,29 @@ export function unitText(u?: string) {
   return u === "KG" ? "kg" : u === "SALES_UNIT" ? "packs" : u ?? "";
 }
 
-/** The usual products and amounts in one block, with "Order the usual" (opens `#order/usual` in the Order tab). */
-export function UsualSection({ profile }: { profile: KitchenProfile }) {
+const FALLBACK_LABELS: Record<FallbackMode, { short: string; desc: string }> = {
+  only_listed: {
+    short: "Only take these substitutes",
+    desc: "If #1 is out of stock, I try your substitutes in order and never fall back to any other product.",
+  },
+  ask_any: {
+    short: "Ask me before other products",
+    desc: "I try your substitutes first; if none are in stock, I ask you before picking another product.",
+  },
+  none: {
+    short: "Never substitute",
+    desc: "Only your primary product may be ordered. If it's out of stock, I leave it open.",
+  },
+};
+
+/** The usual products and amounts in one block, with inline substitute & fallback rules and "Order the usual". */
+export function UsualSection({
+  profile,
+  onSaveUsual,
+}: {
+  profile: KitchenProfile;
+  onSaveUsual?: (update: { id: string; substitutes: SubstituteEntry[]; fallback_mode: FallbackMode }) => Promise<void>;
+}) {
   const setText = useComposerText();
   const usual = useUsualOrder();
   const k = useKitchenContext();
@@ -178,6 +203,77 @@ export function UsualSection({ profile }: { profile: KitchenProfile }) {
   const est = usual.data?.estimate_total ?? null;
   const fits = est !== null && k.limit !== null ? est <= k.limit : null;
   const canOrder = items.some((u) => u.typical_qty != null);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [subs, setSubs] = useState<SubstituteEntry[]>([]);
+  const [mode, setMode] = useState<FallbackMode>("ask_any");
+  const [query, setQuery] = useState("");
+  const [hits, setHits] = useState<KitchenCatalogProduct[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const openEditor = (u: UsualProduct) => {
+    if (editingId === u.id) {
+      setEditingId(null);
+      return;
+    }
+    const currentSubs = (u.substitutes ?? [])
+      .filter((s): s is { product_id: string; product_name?: string | null } => !!s.product_id)
+      .map((s) => ({ product_id: s.product_id, product_name: s.product_name ?? s.product_id }));
+    setEditingId(u.id ?? null);
+    setSubs(currentSubs);
+    setMode(u.fallback_mode ?? (currentSubs.length > 0 ? "only_listed" : "ask_any"));
+    setQuery(u.word ?? "");
+    setHits([]);
+  };
+
+  useEffect(() => {
+    if (!editingId || !query.trim()) {
+      setHits([]);
+      return;
+    }
+    let cancelled = false;
+    setSearching(true);
+    const t = setTimeout(() => {
+      void searchKitchenProducts(query.trim(), 6)
+        .then((res) => {
+          if (!cancelled) setHits(res.products ?? []);
+        })
+        .catch(() => {
+          if (!cancelled) setHits([]);
+        })
+        .finally(() => {
+          if (!cancelled) setSearching(false);
+        });
+    }, 180);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [editingId, query]);
+
+  const addSub = (p: KitchenCatalogProduct, primaryId?: string | null) => {
+    if (p.product_id === primaryId || subs.some((s) => s.product_id === p.product_id)) return;
+    const next = [...subs, { product_id: p.product_id, product_name: p.name }];
+    setSubs(next);
+    if (mode === "ask_any" && subs.length === 0) setMode("only_listed");
+  };
+
+  const moveSub = (idx: number, dir: -1 | 1) => {
+    const target = idx + dir;
+    if (target < 0 || target >= subs.length) return;
+    const copy = [...subs];
+    const [item] = copy.splice(idx, 1);
+    copy.splice(target, 0, item!);
+    setSubs(copy);
+  };
+
+  const removeSub = (pid: string) => {
+    const next = subs.filter((s) => s.product_id !== pid);
+    setSubs(next);
+    if (next.length === 0 && mode === "only_listed") setMode("ask_any");
+  };
+
   return (
     <section className="sec usual-sec">
       <div className="sec-h">
@@ -185,16 +281,137 @@ export function UsualSection({ profile }: { profile: KitchenProfile }) {
         <p>When you say the word, I pick this product. With the usual amounts they make your usual order.</p>
       </div>
       {items.length === 0 && <div className="rule"><span className="muted text-sm">Nothing yet. Show me an invoice or a delivery note and I'll learn them.</span></div>}
-      {items.map((u) => (
-        <div key={u.id} className="usual">
-          <span className="w">{u.word}</span>
-          <div>
-            <div className="p">{u.product_name || <span className="muted">no product yet</span>}</div>
-            {src(u.source_id) && <div className="m">from {src(u.source_id)}</div>}
+      {items.map((u) => {
+        const uSubs = (u.substitutes ?? []).filter((s) => !!s.product_id);
+        const uMode: FallbackMode = u.fallback_mode ?? (uSubs.length > 0 ? "only_listed" : "ask_any");
+        const isEditing = editingId === u.id;
+        const fallbackSentence =
+          uMode === "none"
+            ? "If out of stock: never substitute"
+            : uSubs.length > 0
+              ? `If out of stock: ${uSubs.map((s, idx) => `${idx + 1}. ${s.product_name ?? s.product_id}`).join(" → ")}${uMode === "only_listed" ? " · no other products" : ""}`
+              : "If out of stock: I ask you";
+        return (
+          <div key={u.id} className="usual-wrap">
+            <div className="usual">
+              <span className="w">{u.word}</span>
+              <div className="min-w-0 grid gap-0.5">
+                <div className="p">{u.product_name || <span className="muted">no product yet</span>}</div>
+                <div className="s">
+                  <span>{fallbackSentence}</span>
+                  {onSaveUsual && u.id && (
+                    <button type="button" className="link" onClick={() => openEditor(u)}>
+                      {isEditing ? "close" : "change"}
+                    </button>
+                  )}
+                  {src(u.source_id) && <span>· from {src(u.source_id)}</span>}
+                </div>
+              </div>
+              <span className="qty">{u.typical_qty != null ? `${u.typical_qty} ${unitText(u.unit)} / ${u.per || "week"}` : ""}</span>
+            </div>
+
+            {isEditing && u.id && onSaveUsual && (
+              <div className="usual-edit">
+                <div className="usual-edit-row">
+                  <span className="eyebrow">If {u.product_name ?? u.word} is out of stock</span>
+                  <div className="frow">
+                    {(["only_listed", "ask_any", "none"] as FallbackMode[]).map((mKey) => (
+                      <button
+                        key={mKey}
+                        type="button"
+                        className="tog"
+                        aria-pressed={mode === mKey}
+                        onClick={() => setMode(mKey)}
+                      >
+                        {FALLBACK_LABELS[mKey].short}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="muted text-[12.5px]">{FALLBACK_LABELS[mode].desc}</p>
+                </div>
+
+                {mode !== "none" && (
+                  <div className="usual-edit-row">
+                    <span className="eyebrow">Approved substitutes in order</span>
+                    {subs.length === 0 ? (
+                      <p className="muted text-[13px]">No substitutes added yet. Pick one below so I know what to take instead.</p>
+                    ) : (
+                      <div className="grid gap-1.5">
+                        {subs.map((s, idx) => (
+                          <div key={s.product_id} className="sub-item">
+                            <span className="sub-rank">#{idx + 1}</span>
+                            <div className="min-w-0 flex-1">
+                              <b>{s.product_name}</b>
+                            </div>
+                            <div className="sub-acts">
+                              <button type="button" className="sub-btn" disabled={idx === 0} onClick={() => moveSub(idx, -1)} aria-label="Move up">↑</button>
+                              <button type="button" className="sub-btn" disabled={idx === subs.length - 1} onClick={() => moveSub(idx, 1)} aria-label="Move down">↓</button>
+                              <button type="button" className="sub-btn del" onClick={() => removeSub(s.product_id)} aria-label="Remove substitute">×</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="sub-search">
+                      <div className="frow">
+                        <Icon name="search" size={16} className="text-ink3" />
+                        <input
+                          className="field wide"
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                          placeholder={`Search Valio Aimo for "${u.word}" substitutes…`}
+                          aria-label="Search catalog for substitute products"
+                        />
+                      </div>
+                      {searching && <div className="muted text-xs px-1">Searching…</div>}
+                      {!searching && hits.length > 0 && (
+                        <div className="sub-hits">
+                          {hits
+                            .filter((h) => h.product_id !== u.product_id && !subs.some((s) => s.product_id === h.product_id))
+                            .slice(0, 4)
+                            .map((h) => (
+                              <div key={h.product_id} className="sub-hit">
+                                <div className="min-w-0">
+                                  <div className="font-medium text-[13.5px]">{h.name}</div>
+                                </div>
+                                <Button small variant="ghost" onClick={() => addSub(h, u.product_id)}>+ Add as #{subs.length + 1}</Button>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="frow justify-end pt-1">
+                  <Button small variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
+                  <Button
+                    small
+                    variant="primary"
+                    disabled={saving || (mode === "only_listed" && subs.length === 0)}
+                    onClick={async () => {
+                      setSaving(true);
+                      try {
+                        await onSaveUsual({
+                          id: u.id!,
+                          substitutes: mode === "none" ? [] : subs,
+                          fallback_mode: mode,
+                        });
+                        setEditingId(null);
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                  >
+                    {saving ? "Saving…" : "Save"}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
-          <span className="qty">{u.typical_qty != null ? `${u.typical_qty} ${unitText(u.unit)} / ${u.per || "week"}` : ""}</span>
-        </div>
-      ))}
+        );
+      })}
       {canOrder && (
         <div className="usual-foot">
           <span className="est">
