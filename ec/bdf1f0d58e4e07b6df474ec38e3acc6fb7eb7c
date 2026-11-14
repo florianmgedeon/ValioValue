@@ -1,0 +1,39 @@
+backend/buyer_agent/routes_uploads.py
+  s_583bf54d2e5411::t_7409f781b9952f 134,137-140
+  s_583bf54d2e5411::t_d38a84404d318c 107-114,117
+frontend/src/features/onboarding/OnboardingView.tsx
+  s_583bf54d2e5411::t_148df0d56f603a 156
+frontend/src/api/kitchen.ts
+  s_583bf54d2e5411::t_148df0d56f603a 78-82
+frontend/src/features/kitchen/KitchenView.tsx
+  s_583bf54d2e5411::t_148df0d56f603a 58-59
+frontend/src/features/camera/PhoneCameraModal.tsx
+  s_583bf54d2e5411::t_65beada354020e 4,21-22,29-31,37,41-42,47,50-51,57,66-71,73-76,89,91,94-104,111,121-126,143-159,161-167,169-173,178,184,189-190,196
+  s_583bf54d2e5411::t_f60ac48517bbf5 160
+frontend/src/app/PhoneCamera.tsx
+  s_583bf54d2e5411::t_148df0d56f603a 10-11,20-21,41-42,44,47-52,96
+frontend/src/features/order/OrderView.tsx
+  s_583bf54d2e5411::t_148df0d56f603a 56-60
+backend/tests/test_photos.py
+  s_583bf54d2e5411::t_132e6f44f88e95 73-91
+contracts/backend-api.yaml
+  s_583bf54d2e5411::t_d38a84404d318c 435-440
+backend/buyer_agent/static/phone.html
+  s_583bf54d2e5411::t_47633198597748 98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ecbdf1f0d58e4e07b6df474ec38e3acc6fb7eb7c",
+  "prompts": {},
+  "sessions": {
+    "s_583bf54d2e5411": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71ebea5f-12d5-4f70-b07c-4fc119d7bdc2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
