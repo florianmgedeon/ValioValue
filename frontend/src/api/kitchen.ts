@@ -1,6 +1,6 @@
 import { apiRequest, apiUrl } from "./client";
 import { mock, MOCK, usualOrder } from "./mock";
-import type { KitchenProfile, Pairing, PairingStreamEvent, UploadMeta, UsualOrder } from "./types";
+import type { IngestResponse, KitchenProfile, Pairing, PairingStreamEvent, UploadMeta, UsualOrder } from "./types";
 
 export function getKitchenProfile(buyerId?: string): Promise<KitchenProfile> {
   const query = buyerId ? `?buyer_id=${encodeURIComponent(buyerId)}` : "";
@@ -21,9 +21,9 @@ export function getKitchenHistory(
 }
 
 export function ingestKitchenDocuments(
-  request: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
-  return apiRequest<Record<string, unknown>>("/kitchen/ingest", {
+  request: { buyer_id?: string; upload_ids?: string[]; text?: string; title?: string; by?: string },
+): Promise<IngestResponse> {
+  return apiRequest<IngestResponse>("/kitchen/ingest", {
     method: "POST",
     json: request,
   });

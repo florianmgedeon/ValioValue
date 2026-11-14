@@ -8,6 +8,7 @@ import { queryClient, useKitchen } from "./queries";
 import { navigate, useHashRoute, type Route } from "./route";
 import { SignProvider } from "./signing";
 import { Placeholder } from "./Placeholder";
+import { DemoMenu, OnboardingView } from "../features/onboarding";
 import OrderView from "../features/order/OrderView";
 import KitchenView from "../features/kitchen/KitchenView";
 
@@ -23,7 +24,7 @@ function Screen({ route }: { route: Route }): ReactNode {
     case "kitchen":
       return <KitchenView />;
     case "onboard":
-      return <Placeholder pkg="F3" title="Let me get to know your kitchen." composer={false} />;
+      return <OnboardingView />;
     case "ui":
       return UiGallery ? <Suspense fallback={null}><UiGallery /></Suspense> : null;
   }
@@ -45,6 +46,7 @@ function Shell() {
       <Header tab={route.tab} showTabs={showTabs} />
       <Screen route={route} />
       <Composer />
+      {showTabs && <DemoMenu />}
     </>
   );
 }

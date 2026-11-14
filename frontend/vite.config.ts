@@ -11,6 +11,8 @@ export default defineConfig(({ mode }) => {
     server: {
       host: "0.0.0.0",
       port: 5173,
+      // F3: the example kitchen bundles the demo documents from ../contracts/fixtures/uploads.
+      fs: { allow: [".", "../contracts/fixtures/uploads"] },
       proxy: {
         "/api": {
           target: backendUrl,
