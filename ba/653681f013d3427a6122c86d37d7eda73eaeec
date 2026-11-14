@@ -1,0 +1,59 @@
+frontend/mockup/kitchen-agent.html
+  s_1010a528576322::t_3808b659419352 253-290,464-466,468,470-492,705-715,717,721-730,750,752-757,789-790,795,797-805,948,950-966,1002-1018,1043-1044,1046-1048,1050,1171-1229,1261,1263,1267,1271-1288,1292-1379,1381-1392,1529,1586-1612
+frontend/src/features/kitchen/Profile.tsx
+  s_1010a528576322::t_17b9ace4977457 3,12-14,175-197,206-276,284-411,413-414
+frontend/src/features/kitchen/kitchen.css
+  s_e851bc72f681e9::t_03de3d86cd38a0 37,44-46,49,51-68,107
+backend/buyer_agent/ingest.py
+  s_1010a528576322::t_ecf29a572abe69 76-90,94,96,101-103,107,116-124
+backend/buyer_agent/kitchen.py
+  s_1010a528576322::t_3dd2a535d32751 25,178-204,208-209,212,224-280,292-307,325,327
+backend/buyer_agent/llm.py
+  s_1010a528576322::t_d90c92d8439842 351-356,362-364,367-368,383-384,402-405
+backend/buyer_agent/routes_kitchen.py
+  s_1010a528576322::t_4c0d3e13d31378 56-66,85-87,93,96-97,115-121,218-221
+backend/buyer_agent/story.py
+  s_1010a528576322::t_e12e7fd077987a 52-53
+backend/tests/test_kitchen.py
+  s_1010a528576322::t_fc0336ff3811ce 218-270
+backend/tests/test_usual_and_autonomy.py
+  s_1010a528576322::t_ddbf9150b4aefc 170-235
+contracts/backend-api.yaml
+  s_1010a528576322::t_ec51ce91553358 512-529,695-696,879-880,895,899-900,902,1279-1292
+frontend/src/api/kitchen.ts
+  s_1010a528576322::t_01ab9cb709a4b4 15-33
+frontend/src/features/kitchen/KitchenView.tsx
+  s_1010a528576322::t_e1603e2e208e95 215-229,296
+mcp-server/tests/test_usual.py
+  s_1010a528576322::t_394a04c819c8e3 150-281
+mcp-server/valio_mcp/diff.py
+  s_1010a528576322::t_c428e403c6bdbe 68,70-71,73-74,77,81-108
+mcp-server/valio_mcp/intent.py
+  s_1010a528576322::t_e0ee838325d349 46-51,148-150,153-190,218,226,315-323,325,344-347,389-402
+mcp-server/valio_mcp/server.py
+  s_1010a528576322::t_9b649c3773db46 224-227,229-237,244,249-250,257-261,268,273-275,317-325,422-424,427-430,433-443,448-456,483-484,488,492-494
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ba653681f013d3427a6122c86d37d7eda73eaeec",
+  "prompts": {},
+  "sessions": {
+    "s_1010a528576322": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cc381f25-f5b9-446f-9877-2a339fe9ddd2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    },
+    "s_e851bc72f681e9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "84943bb8-b6af-46d9-9c7c-eec5528ca187",
+        "model": "unknown"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
