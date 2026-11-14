@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useComposer, useComposerText } from "../../app/composer";
 import { usePhoneCamera } from "../../app/PhoneCamera";
+import { navigate } from "../../app/route";
 import { Button } from "../../ui";
 import { TypingBlock, BlockView, type BlockCtx } from "./blocks";
 import { fmtTime } from "./data";
@@ -9,10 +10,13 @@ import { StartView } from "./StartView";
 import { useOrderSession } from "./useOrderSession";
 import "./order.css";
 
-const HINTS = ["120 L milk by Monday", "the usual, but double the oat drink", "ignore the nut rule just this once"];
+const HINTS = ["the usual", "120 L milk by Monday", "the usual, but double the oat drink"];
 
-/** The Order tab (F1): start screen until a chat starts, then only this order. */
-export default function OrderView() {
+/**
+ * The Order tab (F1): photo tile + chat until an order starts, then only this order. Every way in (photo, typed,
+ * spoken, "Order the usual" from the Kitchen tab via `#order/usual`) ends in this one thread.
+ */
+export default function OrderView({ start }: { start?: string }) {
   const { sessionId, state, send, sending, newOrder, local } = useOrderSession();
   const { onPhoto } = usePhoneCamera();
   const prefill = useComposerText();
@@ -24,7 +28,17 @@ export default function OrderView() {
     hints: inOrder ? [] : HINTS,
     placeholder: inOrder ? "Answer me or add something…" : "What do you need?",
     camera: "order",
+    prominent: !inOrder,
   });
+
+  // "Order the usual" from the Kitchen tab lands here as `#order/usual`: start it once, then clear the route.
+  const started = useRef(false);
+  useEffect(() => {
+    if (start !== "usual" || started.current) return;
+    started.current = true;
+    navigate("order");
+    if (!sessionId) void send("Order the usual");
+  }, [start, sessionId, send]);
 
   // A photo for "order" starts (or continues) the chat with the upload attached (decision W2).
   useEffect(() => onPhoto("order", (u) => { if (u.upload_id) void send("", [{ upload_id: u.upload_id }]); }), [onPhoto, send]);
@@ -52,10 +66,10 @@ export default function OrderView() {
 
   let n = 0;
   return (
-    <main className="order-wrap order">
+    <main className={`order-wrap order ${inOrder ? "" : "order-start"}`}>
       <div className="thread">
         {!inOrder ? (
-          <StartView onUsual={() => void send("Order the usual")} />
+          <StartView />
         ) : (
           <>
             <div className="orderbar">
@@ -70,10 +84,12 @@ export default function OrderView() {
           </>
         )}
       </div>
-      <aside className="aside">
-        {inOrder && <LivePanel live={live} />}
-        <KitchenPanel />
-      </aside>
+      {inOrder && (
+        <aside className="aside">
+          <LivePanel live={live} />
+          <KitchenPanel />
+        </aside>
+      )}
     </main>
   );
 }

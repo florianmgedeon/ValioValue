@@ -18,7 +18,7 @@ const UiGallery = import.meta.env.DEV ? lazy(() => import("./UiGallery")) : null
 function Screen({ route }: { route: Route }): ReactNode {
   switch (route.tab) {
     case "order":
-      return <OrderView />;
+      return <OrderView start={route.param} />;
     case "activity":
       return <ActivityView orderId={route.param} />;
     case "kitchen":
