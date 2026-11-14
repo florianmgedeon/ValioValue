@@ -1,0 +1,38 @@
+backend/buyer_agent/static/console.html
+  s_4aec49dabc3028::t_0b07b249b335bf 7,144
+backend/buyer_agent/static/app.html
+  s_4aec49dabc3028::t_0b07b249b335bf 7,133
+frontend/src/features/camera/PhoneCameraModal.tsx
+  s_4aec49dabc3028::t_0b07b249b335bf 200
+backend/buyer_agent/static/phone.html
+  s_4aec49dabc3028::t_0b07b249b335bf 7
+frontend/mockup/learned-from-orders.html
+  s_4aec49dabc3028::t_0b07b249b335bf 178
+frontend/mockup/kitchen-agent.html
+  s_4aec49dabc3028::t_0b07b249b335bf 2,1424
+  s_4aec49dabc3028::t_0ffda39b577c33 792
+frontend/index.html
+  s_4aec49dabc3028::t_0b07b249b335bf 15
+frontend/mockup/kitchen-tidy.html
+  s_4aec49dabc3028::t_0b07b249b335bf 238
+frontend/mockup/substitutes-placement.html
+  s_4aec49dabc3028::t_0b07b249b335bf 206
+frontend/src/app/Header.tsx
+  s_4aec49dabc3028::t_0ffda39b577c33 35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8e95c24d9fc24b0ec4f2ae49ecfbe06635e9357f",
+  "prompts": {},
+  "sessions": {
+    "s_4aec49dabc3028": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9d6a7fe4-4ead-448d-83d2-9e37b085ae95",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
