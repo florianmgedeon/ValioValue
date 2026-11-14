@@ -206,12 +206,7 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
         )}
       </CardFooter>
     </Card>
-    {/* The question goes below the card, as the agent's chat message, so it reads as "answer me in the chat". */}
-    {questions.length > 0 && !b.signed && (
-      <div className="say rise">
-        {questions.map((q) => <p key={q}><b>{q}</b></p>)}
-      </div>
-    )}
+    {/* The question itself follows as the agent's chat message, so it reads as "answer me in the chat". */}
     </>
   );
 }
