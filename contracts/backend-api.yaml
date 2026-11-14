@@ -1,16 +1,22 @@
 openapi: 3.1.0
 info:
   title: ValioValue Buyer Agent API
-  version: 0.1.0
+  version: 0.2.0
   description: |
     Contract between the frontend and the buyer-side backend.
     The frontend talks ONLY to this API. It never talks to the MCP server directly.
 
-    Flow:
+    Flow (v0.2, "what you see is what you sign"):
       1. POST /chat           -> returns session_id
       2. GET  /chat/{id}/stream (SSE) -> agent progress as typed events
-      3. If an `approval_required` event arrives, the human decides via POST /approvals/{id}
-      4. GET  /orders/{id}/audit -> human-readable decision log
+      3. `intent_proposed`: the agent's reading of the request. The human checks the chips and
+         confirms via POST /intents/{id}/confirm (signed). Nothing is searched or ordered before.
+      4. The agent searches and orders against the confirmed intent. Valio Aimo diffs every
+         quote against it and decides the tier: auto, ask or block.
+      5. If an `approval_required` event arrives, the human decides via POST /approvals/{id},
+         sending the cart_hash they were shown.
+      6. GET /orders/{id}/audit -> human-readable decision log
+         GET /orders/{id}/verify -> live check of hashes and signatures on the receipt
 
     Event payloads are defined in components/schemas/*Event and have example
     files in contracts/fixtures/events/.
@@ -53,8 +59,8 @@ paths:
       summary: Server-sent events stream of the agent's progress
       description: |
         `text/event-stream`. Each SSE message has `event: <type>` and `data: <json>`.
-        Types: reasoning, message, tool_call, tool_result, offers, approval_required,
-        order_confirmed, error, done. Ignore unknown types.
+        Types: reasoning, message, intent_proposed, intent_confirmed, tool_call, tool_result,
+        offers, approval_required, order_confirmed, order_rejected, error, done. Ignore unknown types.
       parameters:
         - in: path
           name: session_id
@@ -74,6 +80,9 @@ paths:
                   - $ref: "#/components/schemas/OffersEvent"
                   - $ref: "#/components/schemas/ApprovalRequiredEvent"
                   - $ref: "#/components/schemas/OrderConfirmedEvent"
+                  - $ref: "#/components/schemas/IntentProposedEvent"
+                  - $ref: "#/components/schemas/IntentConfirmedEvent"
+                  - $ref: "#/components/schemas/OrderRejectedEvent"
                   - $ref: "#/components/schemas/ErrorEvent"
                   - $ref: "#/components/schemas/DoneEvent"
 
@@ -147,6 +156,63 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/AuditEntry" }
 
+  /mandate:
+    get:
+      summary: The buyer's purchasing mandate as Valio Aimo enforces it
+      responses:
+        "200":
+          description: Mandate
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Mandate" }
+
+  /intents/{intent_id}/confirm:
+    post:
+      summary: Human confirms (or edits and confirms) the order intent. Signed by the buyer key.
+      description: |
+        Send the intent_hash that was displayed. If edits are sent, the server re-validates, the
+        hash changes and the response carries the new intent. Only a confirmed intent can be ordered.
+      parameters:
+        - in: path
+          name: intent_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [intent_hash]
+              properties:
+                intent_hash: { type: string, description: "Hash the human was shown" }
+                confirmed_by: { type: string, example: "chef.anna" }
+                edits:
+                  type: object
+                  description: "Optional field changes, same shape as OrderIntent (quantity, deliver_by, hard_rules, budget, preferences)"
+      responses:
+        "200":
+          description: Confirmed intent. The agent continues in the same SSE stream.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderIntent" }
+        "409": { description: "Hash mismatch (the intent changed) or open questions" }
+
+  /orders/{order_id}/verify:
+    get:
+      summary: Recompute hashes and check all signatures of an order's receipt
+      parameters:
+        - in: path
+          name: order_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Verification" }
+
 components:
   schemas:
     ChatRequest:
@@ -191,6 +257,11 @@ components:
         allergens: { type: array, items: { type: string } }
         quote_id: { type: string, description: "Binds the order to this fixed price" }
         quote_expires_at: { type: string, format: date-time }
+        evidence:
+          type: array
+          description: "Per hard rule of the confirmed intent: verdict plus the data that proves it"
+          items: { $ref: "#/components/schemas/RuleEvidence" }
+        provenance: { $ref: "#/components/schemas/Provenance" }
 
     PolicyCheck:
       type: object
@@ -216,6 +287,10 @@ components:
         decided_by: { type: string, nullable: true }
         decided_at: { type: string, format: date-time, nullable: true }
         comment: { type: string, nullable: true }
+        tier: { type: string, enum: [auto, ask, block] }
+        diff: { $ref: "#/components/schemas/Diff" }
+        cart_hash: { type: string }
+        intent: { $ref: "#/components/schemas/OrderIntent" }
 
     ApprovalDecision:
       type: object
@@ -224,6 +299,7 @@ components:
         decision: { type: string, enum: [approve, reject] }
         comment: { type: string }
         decided_by: { type: string, example: "chef.anna" }
+        cart_hash: { type: string, description: "Required for approve: the hash the human was shown. Mismatch = 409." }
 
     AuditEntry:
       type: object
@@ -235,6 +311,150 @@ components:
         summary: { type: string, example: "Checked price and availability for 3 lactose-free milk products for 2026-11-16" }
         reason: { type: string, nullable: true }
         data: { type: object, additionalProperties: true }
+
+
+    # ---------- v0.2 trust objects ----------
+    HardRule:
+      type: object
+      required: [rule]
+      properties:
+        rule: { type: string, enum: [lactose_free, exclude_allergen, origin] }
+        allergen: { type: string, description: "for exclude_allergen, e.g. milk, gluten, peanuts" }
+        strictness: { type: string, enum: [contains, contains_or_may_contain], default: contains_or_may_contain }
+        country: { type: string, description: "for origin, ISO alpha-2" }
+        source: { type: string, enum: [request, mandate], description: "mandate rules cannot be edited away" }
+
+    OrderIntent:
+      type: object
+      required: [intent_id, status, product, quantity, deliver_by, hard_rules, readback, chips, questions]
+      properties:
+        intent_id: { type: string, example: "int_9f2c1a7b" }
+        status: { type: string, enum: [proposed, confirmed, consumed, expired] }
+        buyer_id: { type: string }
+        mandate_id: { type: string }
+        product: { type: object, properties: { query: { type: string, example: "lactose-free milk" } } }
+        quantity:
+          type: object
+          properties:
+            amount: { type: number, example: 1000 }
+            unit: { type: string, enum: [L, KG, SALES_UNIT] }
+            max_over_pct: { type: number, example: 2, description: "Rounding up to whole packs allowed up to this % over" }
+            allow_under: { type: boolean, default: false }
+        deliver_by: { type: string, format: date }
+        hard_rules: { type: array, items: { $ref: "#/components/schemas/HardRule" } }
+        preferences:
+          type: object
+          properties:
+            optimise: { type: string, enum: [price, reliability, co2] }
+            origin: { type: string, nullable: true }
+        budget: { type: object, nullable: true, properties: { max_total: { type: number }, currency: { type: string } } }
+        readback: { type: string, example: "1,000 L lactose-free milk, delivered by Mon 16 Nov 2026, cheapest that delivers in full." }
+        chips:
+          type: array
+          items: { type: object, properties: { field: { type: string }, label: { type: string }, locked: { type: boolean } } }
+        questions: { type: array, items: { type: string }, description: "Non-empty = cannot be confirmed yet" }
+        intent_hash: { type: string, description: "SHA-256 over RFC 8785 canonical JSON of the binding fields" }
+        buyer_signature: { type: string, nullable: true, description: "Ed25519, base64url" }
+        confirmed_by: { type: string, nullable: true }
+        confirmed_at: { type: string, format: date-time, nullable: true }
+        expires_at: { type: string, format: date-time }
+
+    RuleEvidence:
+      type: object
+      properties:
+        rule: { type: string, example: "lactose_free" }
+        verdict: { type: string, enum: [safe, excluded, unknown] }
+        signals:
+          type: array
+          items:
+            type: object
+            properties:
+              source: { type: string, enum: [gs1, ingredients, claim, name, catalog] }
+              field: { type: string, example: "allergen.ML" }
+              value: { type: string, example: "FREE_FROM" }
+              says: { type: string, enum: [safe, excluded] }
+
+    Provenance:
+      type: object
+      properties:
+        source: { type: string, example: "Valio Aimo API /api/price + /api/availability" }
+        fetched_at: { type: string, format: date-time }
+        valid_until: { type: string, format: date-time }
+        signature: { type: string, description: "Valio Aimo Ed25519 signature over the quote" }
+        key_id: { type: string }
+
+    DiffCheck:
+      type: object
+      properties:
+        field: { type: string, enum: [product, hard_rules, quantity, delivery_date, budget, spend_limit, quote_valid, order_cutoff, availability, binding] }
+        intended: { type: string, example: "1,000 L" }
+        cart: { type: string, example: "1,008 L (84 × 12 L)" }
+        ok: { type: boolean }
+        severity: { type: string, enum: [none, ask, block] }
+        detail: { type: string }
+
+    Diff:
+      type: object
+      properties:
+        deviations: { type: integer, example: 0 }
+        checks: { type: array, items: { $ref: "#/components/schemas/DiffCheck" } }
+
+    Receipt:
+      type: object
+      properties:
+        order_id: { type: string }
+        intent_hash: { type: string }
+        cart_hash: { type: string }
+        buyer_intent_signature: { type: string }
+        buyer_cart_signature: { type: string, nullable: true, description: "Only when a human approved (tier ask)" }
+        valio_signature: { type: string }
+        fingerprint: { type: string, example: "7F3A-91C2", description: "Short form of cart_hash for display" }
+        verify_url: { type: string }
+
+    Verification:
+      type: object
+      properties:
+        order_id: { type: string }
+        valid: { type: boolean }
+        checks: { type: array, items: { type: object, properties: { name: { type: string }, ok: { type: boolean }, detail: { type: string } } } }
+
+    Mandate:
+      type: object
+      properties:
+        mandate_id: { type: string }
+        mandate_hash: { type: string }
+        display_name: { type: string }
+        spend_limit: { type: number }
+        currency: { type: string }
+        allowed_categories: { type: array, nullable: true, items: { type: string } }
+        mandatory_rules: { type: array, items: { $ref: "#/components/schemas/HardRule" } }
+
+    IntentProposedEvent:
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { const: intent_proposed }
+            intent: { $ref: "#/components/schemas/OrderIntent" }
+
+    IntentConfirmedEvent:
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { const: intent_confirmed }
+            intent: { $ref: "#/components/schemas/OrderIntent" }
+
+    OrderRejectedEvent:
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { const: order_rejected }
+            order_id: { type: string }
+            tier: { const: block }
+            diff: { $ref: "#/components/schemas/Diff" }
+            message: { type: string }
 
     # ---------- SSE events ----------
     EventBase:
@@ -302,6 +522,10 @@ components:
             request_summary: { type: string }
             offers: { type: array, items: { $ref: "#/components/schemas/Offer" } }
             recommended_product_id: { type: string, nullable: true }
+            excluded:
+              type: array
+              description: "Rejected options, one line each, e.g. 'Valio X 1 L: contains milk (GS1 AM CONTAINS)'"
+              items: { type: object, properties: { product_id: { type: string }, name: { type: string }, reason: { type: string } } }
 
     ApprovalRequiredEvent:
       allOf:
@@ -324,6 +548,9 @@ components:
             currency: { type: string }
             delivery_date: { type: string, format: date }
             approved_by: { type: string, nullable: true, description: "null if placed autonomously" }
+            tier: { type: string, enum: [auto, ask] }
+            diff: { $ref: "#/components/schemas/Diff" }
+            receipt: { $ref: "#/components/schemas/Receipt" }
 
     ErrorEvent:
       allOf:
