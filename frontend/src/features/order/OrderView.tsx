@@ -57,6 +57,7 @@ export default function OrderView({ start }: { start?: string }) {
       local,
       retry: () => state.lastText && void send(state.lastText),
       prefill,
+      send: (t: string) => void send(t),
       issues: f?.kind === "funnel" ? f.issues : {},
       intent: rb?.kind === "readback" ? rb.intent : null,
       usualExcluded: f?.kind === "funnel" ? f.usualExcluded : [],
