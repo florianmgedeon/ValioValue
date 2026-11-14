@@ -46,9 +46,14 @@ NOT_MILK = ("coconut milk", "oat milk", "soy milk", "soya milk", "almond milk", 
             "cream of tartar", "kookosmaito", "kookoskerma", "kaakaovoi", "maapähkinävoi", "kaurakerma",
             "soijakerma", "soijamaito", "mantelimaito", "riisimaito", "kauramaito", "sheavoi")
 NEGATED = re.compile(r"(free|vapaa|ton|tön|fri)$")
+# In a product NAME, generic words like "cream" or "milk" describe the use, not the source, when the name is
+# clearly plant-based ("Oat cooking cream", "Soy milk drink"). Casein, whey etc. always count.
+PLANT_MARK = re.compile(r"\b(oat|soy|soya|almond|coconut|rice|pea|plant[- ]based|vegan|kaura|soija|manteli|kookos|kasvipohjainen)\b")
+GENERIC_DAIRY = {"milk", "milks", "cream", "butter", "cheese", "yoghurt", "yogurt", "maito", "kerma", "voi", "juusto",
+                 "jogurtti", "mjölk", "grädde", "smör", "ost"}
 
 
-def milk_scan(text: str | None) -> list[str]:
+def milk_scan(text: str | None, *, is_name: bool = False) -> list[str]:
     """Milk derivative words found in a text. Handles plant look-alikes and negations ('maidoton',
     'milk-free', 'laktoositon' does not hit on 'laktoosi', but '...maitojuoma' still hits on 'maito')."""
     if not text:
@@ -58,7 +63,11 @@ def milk_scan(text: str | None) -> list[str]:
         t = t.replace(phrase, " ")
     t = re.sub(r"\b[\wäöå]+[ -](?:free|fri)\b", " ", t)  # "milk-free", "dairy free"
     hits: list[str] = []
+    plant_name = is_name and bool(PLANT_MARK.search(t))
     for tok in re.findall(r"[\wäöå]+", t):
+        if plant_name and (tok in GENERIC_DAIRY or any(tok.startswith(g) or tok.endswith(g) for g in GENERIC_DAIRY
+                                                       if len(g) > 3)):
+            continue
         if NEGATED.search(tok):  # maidoton, laktoositon, mjölkfri
             continue
         if tok in MILK_TOKENS:
@@ -98,7 +107,7 @@ def eval_allergen(p: Product, allergen: str, strictness: str = "contains_or_may_
         signals.append(_sig("gs1", f"allergen.{a}", "FREE_FROM", "safe"))
     if a == "milk":
         for where, text in (("ingredients", p.key_ingredients), ("name", p.names_all)):
-            hits = milk_scan(text)
+            hits = milk_scan(text, is_name=(where == "name"))
             if hits:
                 signals.append(_sig(where, "milk derivatives", ", ".join(hits), "excluded"))
         for c in p.claims:

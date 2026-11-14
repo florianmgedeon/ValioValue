@@ -56,7 +56,13 @@ def _passthrough(r: httpx.Response):
 
 @app.get("/", include_in_schema=False)
 async def root():
-    return RedirectResponse("/console")
+    return RedirectResponse("/app")
+
+
+@app.get("/app", include_in_schema=False)
+async def buyer_app():
+    """Buyer UI: request, intent, sourcing, cart, receipt, with mandate, trust inspector and audit trail."""
+    return FileResponse(Path(__file__).parent / "static" / "app.html")
 
 
 @app.get("/console", include_in_schema=False)

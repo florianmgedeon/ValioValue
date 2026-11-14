@@ -282,9 +282,15 @@ def _side_events(session: Session, tool: str, args: dict, res: dict) -> bool:
         return True
     if tool == "search_products" and res.get("excluded") is not None:
         session.excluded[res.get("item_id") or "_"] = res["excluded"]
+        if not res.get("products") and res.get("item_id"):  # nothing safe: show why, as an empty offer card
+            session.emit("offers", request_summary="no product meets every rule", offers=[],
+                         recommended_product_id=None, excluded=res["excluded"], intent_id=args.get("intent_id"),
+                         item_id=res["item_id"], product_query=res.get("query"))
     if tool == "check_offer" and res.get("offers") is not None:
         iid = res.get("item_id")
-        summary_ = (f"{res.get('requested_quantity', 0):,.0f} {unit_word(res.get('requested_unit') or 'SALES_UNIT')}"
+        rq = float(res.get("requested_quantity") or 0)
+        summary_ = (f"{rq:,.0f}" if rq.is_integer() else f"{rq:,.2f}".rstrip("0")) + (
+            f" {unit_word(res.get('requested_unit') or 'SALES_UNIT')}"
                     + (f" {res['product_query']}" if res.get("product_query") else "")
                     + f", delivery by {res.get('requested_date')}")
         session.emit("offers", request_summary=summary_, offers=res["offers"],

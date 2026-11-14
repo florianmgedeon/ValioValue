@@ -4,7 +4,7 @@ Hack Junction 2026 · Valio Aimo Challenge · **Trusted Trade Agents**
 
 An external purchasing agent that finds products, compares offers and orders from Valio Aimo, with the guardrails enforced on Valio Aimo's side, not in the agent's prompt.
 
-**V2: what you see is what you sign.** The agent first turns the request into an OrderIntent. The buyer confirms and signs it. Valio Aimo then diffs every order against it, field by field, and decides: auto, ask (a human signs the exact cart) or block. Every receipt can be verified live. Plan and rationale: [`docs/v2-plan.md`](docs/v2-plan.md).
+**V2: what you see is what you sign.** The agent first turns the request (a product, a list or a whole recipe) into an OrderIntent with one item per ingredient. The buyer confirms and signs it. Valio Aimo then diffs every cart line against its item, field by field, and decides: auto, ask (a human signs the exact cart) or block. Every item is bought exactly once. Every receipt can be verified live. Plan and rationale: [`docs/v2-plan.md`](docs/v2-plan.md).
 
 ## Architecture
 
@@ -47,7 +47,9 @@ scripts/dev.sh                        # mcp-server :8001 + backend :8000
 (cd mcp-server && ../.venv/bin/pytest)  # 31 tests incl. property-based guarantee
 ```
 
-Open **http://localhost:8000/console**: the reference trust UI (mandate, intent chips with "Confirm & sign", rule evidence, price lock countdown, rejected options, "You asked vs cart", tier badges, "Verify receipt") plus agent steps and audit trail. Served by the backend, no build step, separate from `frontend/`.
+Open **http://localhost:8000/app**: the buyer UI. Paste or upload a recipe or a request, check and sign the intent (one line per ingredient), see per item the products proven safe with their evidence and signed price locks, the cart with "what differs from what you signed", sign it, and verify the receipt. The right column shows the mandate, the trust inspector (mandate, intent, quotes, cart, receipt as a hash chain) and the audit trail.
+
+**http://localhost:8000/console** is the developer view: the reference trust UI (mandate, intent chips with "Confirm & sign", rule evidence, price lock countdown, rejected options, "You asked vs cart", tier badges, "Verify receipt") plus agent steps and audit trail. Served by the backend, no build step, separate from `frontend/`.
 
 No LLM key: `LLM_PROVIDER=scripted` runs a deterministic agent through the same MCP flow.
 No network to the Valio API: `FAKE_VALIO=1 scripts/dev.sh` with `VALIO_API_BASE=http://127.0.0.1:8099`.

@@ -38,6 +38,10 @@ CASES = [
     ("plain milk is not lactose-free", prod("Kevytmaito 1 l", ["milk"]), LACTOSE_FREE, "excluded"),
     ("low lactose is not lactose-free", prod("Hyla", ["milk"], claims=["LOW_LACTOSE"]), LACTOSE_FREE, "excluded"),
     ("maidoton means milk-free", prod("Maidoton levite", ingredients="kasviöljy, vesi"), MILK_ALLERGY, "safe"),
+    ("oat cooking cream is plant-based", prod("Oat cooking cream 1 l plant-based | kaura ruoanvalmistus", free=["milk"]),
+     MILK_ALLERGY, "safe"),
+    ("plant name does not hide casein", prod("Oat cooking cream", ingredients="oat base, casein"), MILK_ALLERGY, "excluded"),
+    ("plant name does not hide GS1 contains", prod("Soy milk drink", ["milk"]), MILK_ALLERGY, "excluded"),
     ("origin missing is unknown", prod("Apple", country=None), {"rule": "origin", "country": "fi"}, "unknown"),
 ]
 

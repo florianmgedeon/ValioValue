@@ -164,7 +164,7 @@
         <span style="flex:1"></span>
         <button id="send" class="primary">Send</button>
       </div>
-      <p class="muted" style="margin:12px 0 0;font-size:12px">💭 = the model's own reasoning before each decision. Click any tool call to see its documentation, the exact input and the full output.</p>
+      <p class="muted" style="margin:12px 0 0;font-size:12px">Developer view. The buyer UI is at <a href="/app">/app</a>. 💭 = the model's own reasoning before each decision. Click any tool call to see its documentation, the exact input and the full output.</p>
       <div id="timeline"></div>
     </div>
   </section>
@@ -236,7 +236,7 @@ function intentCard(it) {
     <div class="rb">${esc(it.readback)}</div>
     <div class="ichips">${chips}</div>${qs}
     <div class="editf" id="e_${id}">
-      <label>Quantity <input type="number" id="eq_${id}" value="${it.quantity.amount}" min="0"> ${esc(it.quantity.unit)}</label>
+      <label>Quantity <input type="number" id="eq_${id}" value="${it.items[0].quantity.amount}" min="0"> ${esc(it.items[0].quantity.unit)}</label>
       <label>By <input type="date" id="ed_${id}" value="${esc(it.deliver_by)}"></label>
       <label>Budget <input type="number" id="eb_${id}" value="${it.budget ? it.budget.max_total : ""}" placeholder="none"> EUR</label>
       <label><input type="checkbox" id="el_${id}" ${has("lactose_free") ? "checked" : ""}> lactose-free</label>
@@ -265,7 +265,7 @@ async function reviseIntent(id) {
   if (v("el").checked) rules.push({rule: "lactose_free"});
   if (v("em").checked) rules.push({rule: "exclude_allergen", allergen: "milk", strictness: "contains_or_may_contain"});
   (it.hard_rules || []).filter((x) => x.source !== "mandate" && !(x.rule === "lactose_free" || (x.rule === "exclude_allergen" && x.allergen === "milk"))).forEach((x) => rules.push(x));
-  const edits = {quantity: {amount: Number(v("eq").value)}, deliver_by: v("ed").value, hard_rules: rules,
+  const edits = {items: [{item_id: it.items[0].item_id, quantity: {amount: Number(v("eq").value)}}], deliver_by: v("ed").value, hard_rules: rules,
     budget: v("eb").value ? {max_total: Number(v("eb").value)} : null};
   document.querySelectorAll(`[data-int="${id}"] button`).forEach((b) => b.disabled = true);
   await fetch(`/intents/${id}/confirm`, {method: "POST", headers: {"Content-Type": "application/json"},
@@ -276,7 +276,7 @@ async function answerDairy(id, kind) {
   const it = INTENT;
   const keep = (it.hard_rules || []).filter((x) => x.source !== "mandate" && x.rule !== "lactose_free" && !(x.rule === "exclude_allergen" && x.allergen === "milk"));
   const rule = kind === "allergy" ? {rule: "exclude_allergen", allergen: "milk", strictness: "contains_or_may_contain"} : {rule: "lactose_free"};
-  const edits = {hard_rules: [...keep, rule], product: {query: kind === "allergy" ? "plant-based milk alternative" : "lactose-free milk"}};
+  const edits = {hard_rules: [...keep, rule], items: it.items.map((i) => ({item_id: i.item_id, product: {query: kind === "allergy" ? "plant-based milk alternative" : "lactose-free milk"}}))};
   document.querySelectorAll(`#i_${id} button`).forEach((b) => b.disabled = true);
   await fetch(`/intents/${id}/confirm`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({intent_hash: it.intent_hash, edits})});
 }

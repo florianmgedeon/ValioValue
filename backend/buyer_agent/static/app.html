@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ValioValue · Trusted purchasing</title>
+<style>
+  :root {
+    --bg: #f4f5f2; --card: #fff; --ink: #18211c; --muted: #66706a; --line: #e2e5df; --soft: #f7f8f5;
+    --brand: #0f3d2e; --brand-2: #1c6b4f; --brand-soft: #e7f2ec;
+    --ok: #137a49; --ok-soft: #e5f5ec; --warn: #9a5b00; --warn-soft: #fff3df; --bad: #b42318; --bad-soft: #fdeceb;
+    --blue: #2454d6; --blue-soft: #ebf0ff;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; color: var(--ink); background: var(--bg); }
+  header { display: flex; align-items: center; gap: 14px; padding: 12px 28px; background: var(--brand); color: #fff; position: sticky; top: 0; z-index: 10; }
+  header h1 { margin: 0; font-size: 17px; letter-spacing: .01em; }
+  header .tag { opacity: .75; font-size: 13px; }
+  header select { font: inherit; padding: 5px 8px; border-radius: 7px; border: 0; }
+  header .pill { font-size: 12px; padding: 3px 9px; border-radius: 99px; background: rgba(255,255,255,.14); }
+  .stepper { display: flex; gap: 0; padding: 0 28px; background: #fff; border-bottom: 1px solid var(--line); position: sticky; top: 50px; z-index: 9; }
+  .stepper div { flex: 1; padding: 11px 8px; font-size: 12.5px; color: var(--muted); border-bottom: 3px solid transparent; display: flex; gap: 8px; align-items: center; }
+  .stepper .dot { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: var(--line); font-size: 11px; font-weight: 700; color: var(--muted); }
+  .stepper .on { color: var(--ink); border-color: var(--brand-2); font-weight: 600; }
+  .stepper .on .dot { background: var(--brand-2); color: #fff; }
+  .stepper .done .dot { background: var(--ok-soft); color: var(--ok); }
+  .stepper .warn .dot { background: var(--warn-soft); color: var(--warn); }
+  .stepper .bad .dot { background: var(--bad-soft); color: var(--bad); }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 22px; padding: 22px 28px 60px; max-width: 1560px; margin: 0 auto; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .card + .card { margin-top: 18px; }
+  h2 { margin: 0 0 4px; font-size: 16px; }
+  h3 { margin: 0; font-size: 14px; }
+  .sub { color: var(--muted); font-size: 12.5px; margin-bottom: 12px; }
+  .muted { color: var(--muted); }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .grow { flex: 1; }
+  button { font: inherit; border: 1px solid var(--line); background: #fff; border-radius: 9px; padding: 7px 13px; cursor: pointer; }
+  button:hover { border-color: #c9cec6; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--brand); color: #fff; border-color: var(--brand); font-weight: 600; }
+  button.ghost { background: transparent; }
+  button.danger { color: var(--bad); border-color: #f0c7c3; }
+  .seal { display: inline-flex; align-items: center; gap: 9px; background: var(--brand); color: #fff; border: 0; font-weight: 650; padding: 10px 15px; border-radius: 10px; }
+  .seal:hover { background: #0b2f23; }
+  .seal .fp { font: 11px var(--mono); background: rgba(255,255,255,.15); padding: 2px 7px; border-radius: 5px; letter-spacing: .06em; }
+  .seal:disabled { background: #a2aba5; }
+  textarea { width: 100%; min-height: 92px; resize: vertical; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; font: inherit; background: var(--soft); }
+  .preset { font-size: 12px; padding: 4px 10px; border-radius: 99px; background: var(--brand-soft); color: var(--brand); border: 0; }
+  input[type=number], input[type=date], input[type=text] { font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px; background: #fff; }
+  .fpt { font: 11.5px var(--mono); background: #eef0eb; padding: 1px 6px; border-radius: 5px; letter-spacing: .04em; white-space: nowrap; }
+  .empty { color: var(--muted); font-style: italic; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 13px; }
+  th { color: var(--muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  .chip { display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 99px; border: 1px solid #c6d9cf; background: #fff; margin: 2px 4px 2px 0; }
+  .chip.locked { background: #eef0eb; border-color: var(--line); color: var(--muted); }
+  .q { background: var(--warn-soft); border: 1px solid #f2d6a6; border-radius: 10px; padding: 10px 12px; margin: 8px 0; }
+  .tier { font-size: 11px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; padding: 3px 9px; border-radius: 6px; }
+  .tier.auto { background: var(--ok-soft); color: var(--ok); }
+  .tier.ask { background: var(--warn-soft); color: var(--warn); }
+  .tier.block { background: var(--bad-soft); color: var(--bad); }
+  .big { font-size: 24px; font-weight: 760; margin: 2px 0 6px; letter-spacing: -.01em; }
+  .big.ok { color: var(--ok); } .big.warn { color: var(--warn); } .big.bad { color: var(--bad); }
+  .tick { display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; padding: 1px 7px; border-radius: 5px; margin: 2px 4px 0 0; cursor: help; position: relative; white-space: nowrap; }
+  .tick.safe { background: var(--ok-soft); color: var(--ok); }
+  .tick.excluded { background: var(--bad-soft); color: var(--bad); }
+  .tick.unknown { background: var(--warn-soft); color: var(--warn); }
+  .tick .tip { display: none; position: absolute; z-index: 20; left: 0; top: 125%; width: 320px; background: var(--ink); color: #fff; padding: 9px 11px; border-radius: 9px; font-size: 12px; line-height: 1.45; white-space: normal; box-shadow: 0 6px 24px rgba(0,0,0,.18); }
+  .tick:hover .tip { display: block; }
+  .lock { font-size: 11.5px; color: var(--ok); white-space: nowrap; cursor: help; }
+  .lock.exp { color: var(--bad); }
+  .item-card { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-top: 12px; }
+  .item-card .head { display: flex; gap: 10px; align-items: baseline; }
+  .iid { font: 11px var(--mono); background: var(--brand-soft); color: var(--brand); padding: 1px 6px; border-radius: 5px; }
+  tr.best td { background: #f1f9f4; }
+  tr.nope td { color: var(--muted); }
+  .rank { font-size: 10.5px; font-weight: 750; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: var(--ok-soft); color: var(--ok); }
+  .issue { color: var(--bad); font-size: 12px; }
+  details.rej { margin-top: 8px; font-size: 12.5px; }
+  details.rej summary { cursor: pointer; color: var(--muted); }
+  details.rej li { margin: 2px 0; }
+  table.diff td { font-size: 12.5px; padding: 6px 8px; }
+  table.diff tr.grp td { background: var(--soft); font-weight: 650; font-size: 12.5px; }
+  table.diff tr.ask td { background: #fff8ea; }
+  table.diff tr.block td { background: var(--bad-soft); }
+  .y { color: var(--ok); font-weight: 750; } .n { color: var(--bad); font-weight: 750; }
+  .vlist { list-style: none; margin: 10px 0 0; padding: 0; }
+  .vlist li { padding: 4px 0; opacity: 0; transform: translateY(4px); transition: all .25s; font-size: 13px; }
+  .vlist li.in { opacity: 1; transform: none; }
+  .chain { list-style: none; margin: 0; padding: 0; }
+  .chain li { position: relative; padding: 0 0 14px 30px; }
+  .chain li::before { content: ""; position: absolute; left: 9px; top: 22px; bottom: 0; width: 2px; background: var(--line); }
+  .chain li:last-child::before { display: none; }
+  .chain .ic { position: absolute; left: 0; top: 1px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; background: var(--line); color: var(--muted); }
+  .chain .on .ic { background: var(--ok-soft); color: var(--ok); }
+  .chain .wait .ic { background: var(--warn-soft); color: var(--warn); }
+  .chain b { font-size: 13px; }
+  .chain .d { font-size: 12px; color: var(--muted); }
+  .kv { display: grid; grid-template-columns: 112px 1fr; gap: 4px 10px; font-size: 13px; }
+  .kv > div:nth-child(odd) { color: var(--muted); }
+  .audit { list-style: none; margin: 0; padding: 0; }
+  .audit li { padding: 0 0 10px 18px; position: relative; font-size: 12.5px; }
+  .audit li::before { content: ""; position: absolute; left: 3px; top: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--muted)); }
+  .audit .who { font-size: 10.5px; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; color: var(--c, var(--muted)); }
+  .msg { padding: 9px 12px; border-radius: 10px; background: var(--soft); border: 1px solid var(--line); margin-top: 8px; }
+  .msg.user { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .activity { margin-top: 10px; font-size: 12.5px; }
+  .activity summary { cursor: pointer; color: var(--muted); }
+  .activity li { margin: 3px 0; }
+  .activity code { font: 11.5px var(--mono); background: #eef0eb; padding: 1px 5px; border-radius: 4px; }
+  .spin { display: inline-block; width: 11px; height: 11px; border: 2px solid var(--line); border-top-color: var(--brand-2); border-radius: 50%; animation: s .8s linear infinite; vertical-align: -1px; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  aside { position: sticky; top: 104px; align-self: start; max-height: calc(100vh - 120px); overflow: auto; }
+  .hidden { display: none !important; }
+  .banner { border-radius: 12px; padding: 14px 16px; border: 1px solid; }
+  .banner.ok { background: var(--ok-soft); border-color: #bfe3cd; }
+  .banner.warn { background: var(--warn-soft); border-color: #f2d6a6; }
+  .banner.bad { background: var(--bad-soft); border-color: #f0c7c3; }
+  .edit-qty { width: 92px; }
+  .linebtn { padding: 2px 8px; font-size: 12px; }
+  @media (max-width: 1150px) { main { grid-template-columns: 1fr; } aside { position: static; max-height: none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>ValioValue</h1><span class="tag">Trusted purchasing with Valio Aimo · what you see is what you sign</span>
+  <span class="grow"></span>
+  <label style="font-size:12.5px;opacity:.85">Buyer</label>
+  <select id="buyer"><option>juvenes</option><option>hotel-chain-helsinki</option><option>school-kitchen-espoo</option><option>default</option></select>
+  <label style="font-size:12.5px;opacity:.85">You are</label>
+  <input type="text" id="who" value="chef.anna" style="width:110px">
+  <span id="health" class="pill">…</span>
+</header>
+<nav class="stepper" id="stepper"></nav>
+
+<main>
+  <section>
+    <!-- 1 request -->
+    <div class="card" id="s-request">
+      <h2>1 · What do you need?</h2>
+      <div class="sub">A product, a list, or a whole recipe. The agent writes it down first, nothing is bought before you confirm.</div>
+      <textarea id="msg" placeholder="e.g. I need 1,000 litres of lactose-free milk by Monday"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="preset" data-ex="risotto">🍚 Risotto recipe, 40 portions</button>
+        <button class="preset" data-ex="I need 1,000 litres of lactose-free milk by Monday">1,000 L milk (needs signature)</button>
+        <button class="preset" data-ex="We need 120 litres of lactose-free milk by Monday">120 L milk (auto)</button>
+        <button class="preset" data-ex="We need 100 litres of non-dairy milk by Monday">Non-dairy (question)</button>
+        <button class="preset" data-ex="choc">🍫 Dessert, milk allergy</button>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <label class="muted" style="cursor:pointer"><input type="file" id="file" accept=".txt,.md,.csv" class="hidden">📎 <u>Upload recipe (.txt / .md)</u></label>
+        <span class="grow"></span>
+        <button id="send" class="primary">Send to agent</button>
+      </div>
+      <div id="convo"></div>
+    </div>
+
+    <!-- 2 intent -->
+    <div class="card hidden" id="s-intent"></div>
+    <!-- 3 sourcing -->
+    <div class="card hidden" id="s-sourcing"></div>
+    <!-- 4 cart -->
+    <div class="card hidden" id="s-cart"></div>
+    <!-- 5 receipt -->
+    <div class="card hidden" id="s-receipt"></div>
+  </section>
+
+  <aside>
+    <div class="card">
+      <h3>Purchasing mandate</h3>
+      <div class="sub">Set once by the buyer, enforced by Valio Aimo on every order.</div>
+      <div id="mandate" class="empty">Loading…</div>
+    </div>
+    <div class="card">
+      <h3>Trust inspector</h3>
+      <div class="sub">Every step is a hash. Signed steps cannot be changed afterwards.</div>
+      <ul class="chain" id="chain"></ul>
+    </div>
+    <div class="card">
+      <div class="row"><h3>Audit trail</h3><span class="grow"></span><button class="linebtn" id="reloadAudit">Reload</button></div>
+      <div class="sub">Who did what, and why. Same log for buyer and Valio Aimo.</div>
+      <div id="audit" class="empty">Appears once an order is placed.</div>
+    </div>
+  </aside>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const md = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
+const money = (v, c = "EUR") => v == null ? "–" : `${Number(v).toLocaleString("en", {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${c}`;
+const num = (v) => v == null ? "–" : Number(v).toLocaleString("en", {maximumFractionDigits: 2});
+const fp = (h) => { const x = String(h || "").split(":").pop().slice(0, 8).toUpperCase(); return x ? `${x.slice(0, 4)}-${x.slice(4)}` : "–"; };
+const dt = (iso) => iso ? String(iso).replace("T", " ").slice(0, 16) : "";
+const time = (iso) => iso ? new Date(iso).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"}) : "";
+const unitW = (u) => ({L: "L", KG: "kg", SALES_UNIT: "units"}[u] || u);
+const FIELD = {binding: "Bound to intent", product: "Right product", hard_rules: "Rule", quantity: "Quantity", delivery_date: "Delivery",
+  availability: "Availability", budget: "Your budget", spend_limit: "Agent limit", quote_valid: "Price lock", order_cutoff: "Cut-off", quote_signature: "Valio signature"};
+const ACTORS = {buyer_agent: ["Buyer agent", "#2454d6"], valio_mcp: ["Valio Aimo", "#137a49"], policy_engine: ["Policy engine", "#9a5b00"], human: ["Human", "#18211c"]};
+const PRESETS = {
+  risotto: `Mushroom risotto, serves 4. We need 40 portions by Monday:
+- 320 g arborio rice
+- 1 l vegetable stock
+- 50 g butter
+- 2 dl cooking cream
+- 60 g parmesan`,
+  choc: `Chocolate mousse for 30 guests by Monday, one guest has a milk allergy:
+- 1.2 kg dark chocolate
+- 3 l oat cooking cream`,
+};
+
+let S = null, source = null, MANDATE = null;
+function reset() {
+  S = {session: null, msgs: [], activity: {}, intent: null, intentConfirmed: false, items: {}, approval: null,
+       order: null, rejected: [], verify: null, busy: false};
+}
+reset();
+
+// ------------------------------------------------------------------ rendering
+function render() { renderStepper(); renderConvo(); renderIntent(); renderSourcing(); renderCart(); renderReceipt(); renderChain(); }
+
+function renderStepper() {
+  const st = [
+    ["Request", S.msgs.length ? "done" : "on"],
+    ["Intent", !S.intent ? "" : S.intentConfirmed ? "done" : S.intent.questions?.length ? "warn" : "on"],
+    ["Sourcing", !S.intentConfirmed ? "" : Object.keys(S.items).length ? (S.approval || S.order ? "done" : "on") : "on"],
+    ["Cart", S.order ? "done" : S.approval ? "warn" : S.rejected.length ? "bad" : ""],
+    ["Receipt", S.verify?.valid ? "done" : S.order ? "on" : ""],
+  ];
+  $("#stepper").innerHTML = st.map(([t, c], i) => `<div class="${c}"><span class="dot">${c === "done" ? "✓" : i + 1}</span>${t}</div>`).join("");
+}
+
+function renderConvo() {
+  const acts = Object.values(S.activity);
+  $("#convo").innerHTML = S.msgs.map((m) => `<div class="msg ${m.role === "user" ? "user" : ""}">${md(m.text)}</div>`).join("")
+    + (acts.length ? `<details class="activity"><summary>${S.busy ? '<span class="spin"></span> ' : ""}Agent activity · ${acts.length} step${acts.length > 1 ? "s" : ""} (tools on Valio Aimo's MCP server)</summary><ul>
+      ${acts.map((a) => `<li>${a.done ? (a.ok ? "✓" : "✗") : '<span class="spin"></span>'} <code>${esc(a.tool)}</code> ${esc(a.label)}${a.summary ? ` <span class="muted">→ ${esc(a.summary)}</span>` : ""}</li>`).join("")}</ul></details>` : "");
+}
+
+function ruleLabel(r) { return r.rule === "lactose_free" ? "lactose-free" : r.rule === "exclude_allergen" ? `no ${r.allergen}${r.strictness === "contains_or_may_contain" ? " (incl. may contain)" : ""}` : r.rule === "origin" ? `origin ${String(r.country).toUpperCase()}` : r.rule; }
+
+function renderIntent() {
+  const el = $("#s-intent"), it = S.intent;
+  if (!it) { el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+  const id = it.intent_id, conf = S.intentConfirmed;
+  const glob = it.hard_rules || [];
+  const rows = it.items.map((i) => `<tr>
+      <td><span class="iid">${esc(i.item_id)}</span></td>
+      <td><b>${esc(i.product.query)}</b>${i.note ? `<div class="muted" style="font-size:12px">${esc(i.note)}</div>` : ""}</td>
+      <td class="num">${conf ? `${num(i.quantity.amount)} ${unitW(i.quantity.unit)}` : `<input class="edit-qty" type="number" step="any" min="0" data-q="${esc(i.item_id)}" value="${i.quantity.amount}"> ${unitW(i.quantity.unit)}`}</td>
+      <td>${(i.hard_rules || []).map((r) => `<span class="chip">${esc(ruleLabel(r))}</span>`).join("") || '<span class="muted">–</span>'}</td>
+      <td class="num">${conf ? `<span class="tier ${i.status === "ordered" ? "auto" : i.status === "in cart" ? "ask" : ""}" style="${i.status === "open" ? "background:#eef0eb;color:var(--muted)" : ""}">${esc(i.status)}</span>` : (it.items.length > 1 ? `<button class="linebtn danger" onclick="removeItem('${esc(i.item_id)}')">Remove</button>` : "")}</td></tr>`).join("");
+  const milkAllergy = glob.some((r) => r.rule === "exclude_allergen" && r.allergen === "milk" && r.source !== "mandate");
+  el.innerHTML = `<div class="row"><h2>2 · What I understood</h2><span class="grow"></span>
+      ${conf ? `<span class="tier auto">signed</span>` : `<span class="tier ask">waiting for you</span>`}</div>
+    <div class="sub">${conf ? "Confirmed. The agent may only buy exactly this, every item at most once." : "Check every line. You can change quantities, remove items or add a rule, then confirm."}</div>
+    <div class="banner ${conf ? "ok" : "warn"}" style="margin-bottom:12px"><b>${esc(it.readback)}</b></div>
+    <table><tr><th></th><th>Item</th><th class="num">Quantity</th><th>Item rules</th><th class="num"></th></tr>${rows}</table>
+    <div class="row" style="margin-top:10px">
+      <span class="muted">For all items:</span>
+      ${glob.map((r) => `<span class="chip ${r.source === "mandate" ? "locked" : ""}">${r.source === "mandate" ? "🔒 " : ""}${esc(ruleLabel(r))}</span>`).join("") || '<span class="muted">no extra rules</span>'}
+      <span class="chip">by ${esc(it.deliver_by)}</span>
+      ${it.budget ? `<span class="chip">budget ${money(it.budget.max_total, it.budget.currency)}</span>` : ""}
+      <span class="chip">${esc({price: "cheapest in full", reliability: "most reliable", co2: "lowest CO₂"}[it.preferences.optimise])}</span>
+    </div>
+    ${(it.questions || []).map((q) => `<div class="q">❓ ${esc(q)}${/non-dairy/i.test(q) ? `<div class="row" style="margin-top:8px">
+        <button onclick="answerDairy('allergy')">Milk allergy: no milk at all</button><button onclick="answerDairy('lactose')">Lactose intolerance: lactose-free is fine</button></div>` : ""}</div>`).join("")}
+    ${conf ? `<div class="row" style="margin-top:12px"><span style="color:var(--ok)">✓ Signed by <b>${esc(it.confirmed_by)}</b> at ${dt(it.confirmed_at)}</span> · intent <span class="fpt" title="${esc(it.intent_hash)}">${fp(it.intent_hash)}</span></div>`
+    : `<div class="row" style="margin-top:12px">
+        <label><input type="checkbox" id="allergy" ${milkAllergy ? "checked" : ""}> milk allergy for all items</label>
+        <label>by <input type="date" id="by" value="${esc(it.deliver_by)}"></label>
+        <label>budget <input type="number" id="budget" style="width:100px" value="${it.budget ? it.budget.max_total : ""}" placeholder="none"></label>
+        <button onclick="applyEdits()">Update</button>
+        <span class="grow"></span>
+        <button class="seal" onclick="confirmIntent()" ${it.questions?.length ? "disabled title='Answer the questions first'" : ""}>🔒 Confirm &amp; sign <span class="fp">${fp(it.intent_hash)}</span></button>
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:6px;text-align:right">You sign hash <span class="fpt" title="${esc(it.intent_hash)}">${fp(it.intent_hash)}</span>. Any change creates a new hash you would sign again.</div>`}`;
+}
+
+function ticks(evs) {
+  return (evs || []).map((ev) => {
+    const sig = (ev.signals || []).map((s) => `${s.says === "safe" ? "✓" : "✗"} ${esc(s.source)} · ${esc(s.field)} = ${esc(s.value)}`).join("<br>") || "No data. Unknown is never treated as safe.";
+    const label = ev.rule.replace("exclude_allergen:", "no ").replace("lactose_free", "lactose-free").replace("origin:", "origin ");
+    return `<span class="tick ${ev.verdict}">${ev.verdict === "safe" ? "✓" : ev.verdict === "excluded" ? "✗" : "?"} ${esc(label)}<span class="tip"><b>${esc(ev.verdict.toUpperCase())}</b>, decided from product data, not by the AI<br>${sig}</span></span>`;
+  }).join("");
+}
+
+function lock(o) {
+  const p = o.provenance || {};
+  return `<div class="lock" data-exp="${esc(o.quote_expires_at)}" title="Signed by Valio Aimo (${esc(p.key_id)})&#10;${esc(p.source)}&#10;fetched ${esc(p.fetched_at)}&#10;hash ${esc(p.hash)}">🔒 price locked</div>`;
+}
+
+function renderSourcing() {
+  const el = $("#s-sourcing"), it = S.intent;
+  if (!S.intentConfirmed || !it) { el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+  const cards = it.items.map((i) => {
+    const e = S.items[i.item_id];
+    if (!e) return `<div class="item-card"><div class="head"><span class="iid">${esc(i.item_id)}</span><h3>${esc(i.product.query)}</h3><span class="muted">${num(i.quantity.amount)} ${unitW(i.quantity.unit)}</span><span class="grow"></span>${S.busy ? '<span class="spin"></span>' : '<span class="muted">no offer</span>'}</div></div>`;
+    const rows = (e.offers || []).map((o) => `<tr class="${o.rank === "best" ? "best" : ""} ${o.can_fulfil ? "" : "nope"}">
+        <td>${o.rank ? `<span class="rank">${o.rank}</span>` : ""}</td>
+        <td><div>${esc(o.name)}</div><div class="muted" style="font-size:11.5px">#${esc(o.product_id)} · ${o.content_per_sales_unit ? `${num(o.content_per_sales_unit)} ${esc(o.comparison_unit)}/${esc(o.sales_unit)}` : esc(o.sales_unit)}${(o.certificates || []).map((c) => ` · ${esc(c.replace(/_/g, " ").toLowerCase())}`).join("")}</div>
+          ${(o.fulfil_issues || []).map((x) => `<div class="issue">✗ ${esc(x)}</div>`).join("")}</td>
+        <td class="num">${num(o.quantity)} ${esc(o.sales_unit)}</td>
+        <td class="num"><b>${money(o.total_price, o.currency)}</b><div class="muted" style="font-size:11.5px">${o.comparison_price != null ? money(o.comparison_price) + "/" + esc(o.comparison_unit) : ""}</div></td>
+        <td class="num">${esc(o.available_date || "–")}<div class="muted" style="font-size:11.5px">${o.delivery_reliability != null ? Math.round(o.delivery_reliability * 100) + "% on time" : ""}</div></td>
+        <td class="num">${o.co2_kg_per_kg != null ? num(o.co2_kg_per_kg) : "–"}</td>
+        <td>${ticks(o.evidence)}${lock(o)}</td></tr>`).join("");
+    const rej = e.excluded?.length ? `<details class="rej"><summary>${e.excluded.length} more checked and excluded by your rules</summary><ul>${e.excluded.map((x) => `<li><b>${esc(x.name)}</b> · ${esc(x.reason)}</li>`).join("")}</ul></details>` : "";
+    return `<div class="item-card"><div class="head"><span class="iid">${esc(i.item_id)}</span><h3>${esc(i.product.query)}</h3><span class="muted">${esc(e.request_summary)}</span></div>
+      <div style="overflow-x:auto"><table style="margin-top:6px"><tr><th></th><th>Product</th><th class="num">Qty</th><th class="num">Total net</th><th class="num">Delivery</th><th class="num">kg CO₂e/kg</th><th>Your rules · proof</th></tr>${rows || '<tr><td colspan="7" class="empty">No product meets every rule. Nothing is bought for this item.</td></tr>'}</table></div>${rej.replace("<details", rows ? "<details" : "<details open")}</div>`;
+  }).join("");
+  el.innerHTML = `<h2>3 · Sourcing</h2><div class="sub">Per item: only products proven safe from data, live prices signed by Valio Aimo. Hover a green tick for its proof, the lock for the signature.</div>${cards}`;
+  tickLocks();
+}
+
+function diffTable(d, it, lines) {
+  const name = (iid) => { const l = (lines || []).find((x) => x.item_id === iid); const i = it?.items?.find((x) => x.item_id === iid); return `${i ? esc(i.product.query) : esc(iid)}${l ? ` <span class="muted" style="font-weight:400">→ ${esc(l.name)}</span>` : ""}`; };
+  const groups = {};
+  (d?.checks || []).forEach((c) => (groups[c.item_id || "_cart"] ||= []).push(c));
+  const row = (c) => `<tr class="${c.ok ? "" : c.severity}"><td>${c.ok ? '<span class="y">✓</span>' : '<span class="n">✗</span>'}</td><td>${esc(FIELD[c.field] || c.field)}</td><td>${esc(c.intended)}</td><td>${esc(c.cart)}</td><td class="muted">${esc(c.detail)}</td></tr>`;
+  const html = Object.entries(groups).map(([k, cs]) => {
+    const bad = cs.filter((c) => !c.ok).length;
+    return `<tr class="grp"><td colspan="5">${k === "_cart" ? "Whole cart" : `<span class="iid">${esc(k)}</span> ${name(k)}`} <span class="muted" style="font-weight:400">· ${bad ? `${bad} deviation${bad > 1 ? "s" : ""}` : "all match"}</span></td></tr>${cs.map(row).join("")}`;
+  }).join("");
+  return `<table class="diff"><tr><th></th><th>Check</th><th>You asked</th><th>Cart</th><th>Why</th></tr>${html}</table>`;
+}
+
+function devList(d, lines) {
+  const bad = (d?.checks || []).filter((c) => !c.ok);
+  if (!bad.length) return `<div class="banner ok" style="margin-top:10px">Every line matches the item you signed: right product, every rule proven from data, exact quantity within tolerance, in time, signed price.</div>`;
+  const nm = (iid) => { const i = S.intent?.items?.find((x) => x.item_id === iid); return i ? esc(i.product.query) : "Whole cart"; };
+  return `<div class="banner ${bad.some((c) => c.severity === "block") ? "bad" : "warn"}" style="margin-top:10px"><b>What differs from what you signed</b>
+    <table class="diff" style="margin-top:6px">${bad.map((c) => `<tr class="${c.severity}"><td>${c.item_id ? `<span class="iid">${esc(c.item_id)}</span> ` : ""}${nm(c.item_id)}</td><td><b>${esc(FIELD[c.field] || c.field)}</b></td><td>you asked <b>${esc(c.intended)}</b></td><td>cart <b>${esc(c.cart)}</b></td><td class="muted">${esc(c.detail)}</td></tr>`).join("")}</table>
+    <div class="muted" style="font-size:12px;margin-top:6px">${bad.some((c) => c.severity === "block") ? "Blocked: a hard rule cannot be overridden by anyone." : "You decide: approving signs exactly this cart, including these differences."}</div></div>`;
+}
+
+function renderCart() {
+  const el = $("#s-cart");
+  const a = S.approval, o = S.order, rej = S.rejected[S.rejected.length - 1];
+  if (!a && !o && !rej) { el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+  const src = o || a || rej;
+  const d = src.diff, n = d?.deviations ?? 0, tier = src.tier || (a ? "ask" : "auto");
+  const lines = src.lines || [];
+  const head = rej && !a && !o
+    ? `<div class="big bad">Blocked by Valio Aimo</div><div>${esc(rej.message)}</div>`
+    : `<div class="big ${n ? "warn" : "ok"}">${n ? `${n} deviation${n > 1 ? "s" : ""} from what you signed` : "0 deviations from what you signed"}</div>`;
+  const lineRows = lines.map((l) => `<tr><td><span class="iid">${esc(l.item_id || "")}</span></td><td>${esc(l.name)}</td><td class="num">${num(l.quantity)} ${esc(l.sales_unit)}</td><td class="num">${money(l.unit_price, l.currency)}</td><td class="num"><b>${money(l.total_price, l.currency)}</b></td><td>${ticks(l.evidence)}</td></tr>`).join("");
+  const total = src.total_price ?? lines.reduce((s, l) => s + l.total_price, 0);
+  el.innerHTML = `<div class="row"><h2>4 · Cart</h2><span class="grow"></span><span class="tier ${esc(tier)}">${esc(tier)}</span></div>
+    <div class="sub">Valio Aimo compared every line with the item you signed, field by field. ${tier === "auto" ? "Nothing deviates and it is within the mandate, so Valio confirmed it on its own." : tier === "ask" ? "A human must sign this exact cart." : "A hard rule is broken. This cannot be overridden."}</div>
+    ${head}
+    ${lines.length ? `<table style="margin-top:8px"><tr><th></th><th>Product</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Line total</th><th>Rules</th></tr>${lineRows}
+      <tr><td></td><td><b>Total net</b></td><td></td><td></td><td class="num"><b>${money(total, src.currency)}</b></td><td></td></tr></table>` : ""}
+    ${devList(d, lines)}
+    <details style="margin-top:10px"><summary class="muted" style="cursor:pointer">All checks: you asked vs. cart · ${(d?.checks || []).length} checks, ${(d?.checks || []).filter((c) => c.ok).length} match</summary>${diffTable(d, S.intent, lines)}</details>
+    ${a && !o ? `<div class="row" style="margin-top:14px"><span class="muted">${esc(a.agent_rationale || "")}</span><span class="grow"></span>
+       <button class="danger" onclick="decide('reject')">Reject</button>
+       <button class="seal" onclick="decide('approve')">🔒 Approve &amp; sign cart <span class="fp">${esc(a.fingerprint || fp(a.cart_hash))}</span></button></div>` : ""}`;
+}
+
+function renderReceipt() {
+  const el = $("#s-receipt"), o = S.order;
+  if (!o) { el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+  const rc = o.receipt || {}, open = o.items_open_after || [];
+  el.innerHTML = `<div class="row"><h2>5 · Receipt</h2><span class="grow"></span><span class="tier ${esc(o.tier)}">${esc(o.tier)}</span></div>
+    <div class="sub">Signed by Valio Aimo. Anyone can recompute it, independent of the agent.</div>
+    <div class="banner ok"><div class="kv">
+      <div>Order</div><div><b>${esc(o.order_id)}</b> · ${money(o.total_price, o.currency)} net · delivery ${esc(o.delivery_date)}</div>
+      <div>Approved</div><div>${o.approved_by ? `${esc(o.approved_by)} signed cart <span class="fpt">${esc(o.fingerprint)}</span>` : "nobody needed: 0 deviations, within the mandate"}</div>
+      <div>Receipt</div><div><span class="fpt" title="${esc(rc.receipt_hash)}">${esc(o.fingerprint)}</span> · Valio key <span class="fpt">${esc((rc.valio_key_id || "").slice(8, 20))}</span></div>
+      ${open.length ? `<div>Still open</div><div>${open.map((x) => `<span class="iid">${esc(x)}</span>`).join(" ")} (no product met every rule and could deliver in full on time, see Sourcing)</div>` : ""}
+    </div></div>
+    <div class="row" style="margin-top:12px"><button class="primary" onclick="verify()">Verify receipt now</button><span class="muted" style="font-size:12px">Recomputes every hash and checks every signature on the server.</span></div>
+    <div id="verifyOut">${S.verify ? verifyHtml(S.verify, false) : ""}</div>`;
+}
+
+function verifyHtml(v, animate) {
+  return `<ul class="vlist">${v.checks.map((c) => `<li class="${animate ? "" : "in"}"><span class="${c.ok ? "y" : "n"}">${c.ok ? "✓" : "✗"}</span> <b>${esc(c.name.replace(/_/g, " "))}</b> <span class="muted">· ${esc(c.detail)}</span></li>`).join("")}
+    <li class="${animate ? "" : "in"}"><b style="color:${v.valid ? "var(--ok)" : "var(--bad)"}">${v.valid ? "✓ Receipt valid" : "✗ Receipt NOT valid"}</b></li></ul>`;
+}
+
+function renderChain() {
+  const it = S.intent, a = S.approval, o = S.order;
+  const quotes = Object.values(S.items).flatMap((e) => e.offers || []);
+  const key = quotes[0]?.provenance?.key_id;
+  const step = (cls, ic, title, d) => `<li class="${cls}"><span class="ic">${ic}</span><b>${title}</b><div class="d">${d}</div></li>`;
+  $("#chain").innerHTML = [
+    step(MANDATE ? "on" : "", "1", "Mandate", MANDATE ? `${esc(MANDATE.mandate_id)} <span class="fpt">${fp(MANDATE.mandate_hash)}</span>` : "–"),
+    step(S.intentConfirmed ? "on" : it ? "wait" : "", "2", "Intent", it ? `<span class="fpt">${fp(it.intent_hash)}</span> ${it.items.length} item${it.items.length > 1 ? "s" : ""} · ${S.intentConfirmed ? `signed by ${esc(it.confirmed_by)} (Ed25519)` : "waiting for your signature"}` : "–"),
+    step(quotes.length ? "on" : "", "3", "Quotes", quotes.length ? `${quotes.length} price${quotes.length > 1 ? "s" : ""} signed by Valio Aimo <span class="fpt">${esc((key || "").slice(8, 16))}</span>` : "–"),
+    step(o ? "on" : a ? "wait" : "", "4", "Cart", (o || a) ? `<span class="fpt">${esc((o || a).fingerprint)}</span> names intent ${fp(it?.intent_hash)} · ${o?.approved_by ? `signed by ${esc(o.approved_by)}` : a && !o ? "waiting for your signature" : "auto, 0 deviations"}` : "–"),
+    step(S.verify?.valid ? "on" : o ? "wait" : "", "5", "Receipt", o ? `signed by Valio Aimo · ${S.verify ? (S.verify.valid ? "verified ✓" : "INVALID") : "not verified yet"}` : "–"),
+  ].join("");
+}
+
+function tickLocks() {
+  document.querySelectorAll("[data-exp]").forEach((el) => {
+    const ms = new Date(el.dataset.exp) - new Date();
+    if (isNaN(ms)) return;
+    if (ms <= 0) { el.textContent = "price lock expired"; el.classList.add("exp"); return; }
+    el.textContent = `🔒 price locked · ${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
+  });
+}
+setInterval(tickLocks, 1000);
+
+// ------------------------------------------------------------------ events
+function handle(e) {
+  switch (e.type) {
+    case "message": S.msgs.push({role: "agent", text: e.text}); break;
+    case "tool_call": S.activity[e.call_id] = {tool: e.tool, label: e.label}; S.busy = true; break;
+    case "tool_result": Object.assign(S.activity[e.call_id] || {}, {done: true, ok: e.ok, summary: e.summary}); break;
+    case "intent_proposed": S.intent = e.intent; S.intentConfirmed = false; S.items = {}; S.approval = null; S.order = null; S.rejected = []; S.verify = null; break;
+    case "intent_confirmed": S.intent = e.intent; S.intentConfirmed = true; break;
+    case "offers": S.items[e.item_id || S.intent?.items?.[0]?.item_id || "i1"] = e; break;
+    case "approval_required": {
+      S.approval = e.approval;
+      const ids = (e.approval.cart?.lines || []).map((l) => l.item_id);
+      if (S.intent) S.intent.items.forEach((i) => { if (ids.includes(i.item_id)) i.status = "in cart"; });
+      loadAudit(e.approval.order_id); break;
+    }
+    case "order_rejected": S.rejected.push(e); break;
+    case "order_confirmed": {
+      S.order = e;
+      if (S.approval && S.approval.order_id === e.order_id) S.order = {...S.approval, ...e};
+      S.order.lines = (e.lines || []).map((l) => ({...l}));
+      if (S.intent) S.intent.items.forEach((i) => { if (!(e.items_open_after || []).includes(i.item_id)) i.status = "ordered"; });
+      loadAudit(e.order_id); break;
+    }
+    case "error": S.msgs.push({role: "agent", text: `⚠️ ${e.message}`}); break;
+    case "done": S.busy = false; $("#send").disabled = false; break;
+  }
+  render();
+}
+
+function listen(id) {
+  if (source) source.close();
+  source = new EventSource(`/chat/${id}/stream`);
+  ["message", "tool_call", "tool_result", "offers", "approval_required", "order_confirmed", "order_rejected",
+   "intent_proposed", "intent_confirmed", "error", "done"].forEach((t) => source.addEventListener(t, (m) => handle(JSON.parse(m.data))));
+}
+
+// ------------------------------------------------------------------ actions
+async function send() {
+  const message = $("#msg").value.trim();
+  if (!message) return;
+  reset();
+  S.msgs.push({role: "user", text: message}); S.busy = true;
+  $("#send").disabled = true; render();
+  const r = await fetch("/chat", {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({message, buyer_id: $("#buyer").value})});
+  const {session_id} = await r.json();
+  S.session = session_id; listen(session_id);
+  $("#audit").innerHTML = '<p class="empty">Appears once an order is placed.</p>';
+}
+
+async function postIntent(body) {
+  const r = await fetch(`/intents/${S.intent.intent_id}/confirm`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+  if (!r.ok) { const e = await r.json(); alert(JSON.stringify(e.detail || e)); }
+  return r;
+}
+
+async function confirmIntent() {
+  document.querySelectorAll("#s-intent button").forEach((b) => b.disabled = true);
+  S.busy = true;
+  await postIntent({intent_hash: S.intent.intent_hash, confirmed_by: $("#who").value || "buyer.human"});
+}
+
+function currentEdits() {
+  const items = S.intent.items.map((i) => {
+    const inp = document.querySelector(`[data-q="${i.item_id}"]`);
+    return {item_id: i.item_id, quantity: {amount: Number(inp ? inp.value : i.quantity.amount)}};
+  });
+  const keep = (S.intent.hard_rules || []).filter((r) => r.source !== "mandate" && !(r.rule === "exclude_allergen" && r.allergen === "milk"));
+  if ($("#allergy")?.checked) keep.push({rule: "exclude_allergen", allergen: "milk", strictness: "contains_or_may_contain"});
+  const b = $("#budget")?.value;
+  return {items, hard_rules: keep, deliver_by: $("#by")?.value || S.intent.deliver_by, budget: b ? {max_total: Number(b)} : null};
+}
+
+async function applyEdits() { await postIntent({intent_hash: S.intent.intent_hash, edits: currentEdits()}); }
+async function removeItem(iid) { const e = currentEdits(); e.items.push({item_id: iid, remove: true}); await postIntent({intent_hash: S.intent.intent_hash, edits: e}); }
+async function answerDairy(kind) {
+  const keep = (S.intent.hard_rules || []).filter((r) => r.source !== "mandate" && r.rule !== "lactose_free" && !(r.rule === "exclude_allergen" && r.allergen === "milk"));
+  const rule = kind === "allergy" ? {rule: "exclude_allergen", allergen: "milk", strictness: "contains_or_may_contain"} : {rule: "lactose_free"};
+  const items = S.intent.items.map((i) => ({item_id: i.item_id, product: {query: kind === "allergy" ? i.product.query.replace(/non-?dairy\s*/i, "plant-based ") : i.product.query.replace(/non-?dairy/i, "lactose-free")}}));
+  await postIntent({intent_hash: S.intent.intent_hash, edits: {hard_rules: [...keep, rule], items}});
+}
+
+async function decide(decision) {
+  document.querySelectorAll("#s-cart button").forEach((b) => b.disabled = true);
+  const a = S.approval;
+  const r = await fetch(`/approvals/${a.approval_id}`, {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({decision, decided_by: $("#who").value || "buyer.human", cart_hash: a.cart_hash})});
+  if (!r.ok) { const e = await r.json(); alert(JSON.stringify(e.detail || e)); return; }
+  if (decision === "reject") { S.approval = null; S.rejected.push({message: `Rejected by ${$("#who").value}. The items are open again.`, diff: a.diff, tier: "ask", lines: a.lines}); render(); }
+  loadAudit(a.order_id);
+}
+
+async function verify() {
+  const v = await (await fetch(`/orders/${encodeURIComponent(S.order.order_id)}/verify`)).json();
+  S.verify = v;
+  $("#verifyOut").innerHTML = verifyHtml(v, true);
+  $("#verifyOut").querySelectorAll("li").forEach((li, i) => setTimeout(() => li.classList.add("in"), 110 * i));
+  renderChain(); renderStepper();
+}
+
+async function loadAudit(orderId) {
+  const id = orderId || S.order?.order_id || S.approval?.order_id;
+  if (!id) return;
+  const r = await fetch(`/orders/${encodeURIComponent(id)}/audit`);
+  if (!r.ok) return;
+  const list = await r.json();
+  $("#audit").innerHTML = `<ul class="audit">${list.map((a) => { const [w, c] = ACTORS[a.actor] || [a.actor, "#66706a"];
+    return `<li style="--c:${c}"><div class="who">${esc(w)} <span class="muted" style="font-weight:400;text-transform:none">${time(a.timestamp)}</span></div>${esc(a.summary)}${a.reason ? `<div class="muted">Why: ${esc(a.reason)}</div>` : ""}</li>`; }).join("")}</ul>`;
+}
+
+async function loadMandate() {
+  try {
+    MANDATE = await (await fetch(`/mandate?buyer_id=${encodeURIComponent($("#buyer").value)}`)).json();
+    const rules = (MANDATE.mandatory_rules || []).map((r) => `<span class="chip locked">🔒 ${esc(ruleLabel(r))}</span>`).join("") || '<span class="muted">none</span>';
+    $("#mandate").className = "";
+    $("#mandate").innerHTML = `<div class="kv">
+      <div>Buyer</div><div><b>${esc(MANDATE.display_name)}</b></div>
+      <div>Agent alone</div><div>search, compare and order up to <b>${money(MANDATE.spend_limit, MANDATE.currency)}</b> per order, only with 0 deviations</div>
+      <div>Human signs</div><div>anything above, any deviation from your intent</div>
+      <div>Never</div><div>a broken allergen rule, an expired price, an item twice</div>
+      <div>Always</div><div>${rules}</div>
+      <div>Mandate</div><div><span class="fpt">${esc(MANDATE.mandate_id)}</span> <span class="fpt" title="${esc(MANDATE.mandate_hash)}">${fp(MANDATE.mandate_hash)}</span></div></div>`;
+  } catch { $("#mandate").textContent = "Cannot load mandate."; }
+  renderChain();
+}
+
+async function health() {
+  try { const h = await (await fetch("/health")).json(); $("#health").textContent = `agent: ${h.llm_provider}`; }
+  catch { $("#health").textContent = "backend offline"; }
+}
+
+document.querySelectorAll("[data-ex]").forEach((b) => b.onclick = () => { $("#msg").value = PRESETS[b.dataset.ex] || b.dataset.ex; $("#msg").focus(); });
+$("#file").onchange = async (e) => { const f = e.target.files[0]; if (f) $("#msg").value = await f.text(); };
+$("#send").onclick = send;
+$("#msg").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send(); });
+$("#buyer").onchange = loadMandate;
+$("#reloadAudit").onclick = () => loadAudit();
+health(); loadMandate(); render();
+</script>
+</body>
+</html>

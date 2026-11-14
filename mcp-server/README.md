@@ -8,12 +8,12 @@ Valio Aimo's agent interface. MCP over Streamable HTTP on `localhost:8001/mcp`. 
 pip install -r mcp-server/requirements-dev.txt
 cd mcp-server && python -m valio_mcp.server
 curl localhost:8001/health
-pytest                                   # 31 tests incl. property-based (Hypothesis)
+pytest                                   # 41 tests incl. property-based (Hypothesis)
 ```
 
 ## The guarantee
 
-When the buyer hits Send, Valio Aimo executes only what the buyer confirmed. Not against free text, but against an **OrderIntent the buyer saw and signed** ("what you see is what you sign"). `tests/test_guarantee.py` checks it on 1,500 random intent/quote pairs per run: an autonomous order never deviates from its intent.
+When the buyer hits Send, Valio Aimo executes only what the buyer confirmed. Not against free text, but against an **OrderIntent the buyer saw and signed** ("what you see is what you sign"). An intent has one or more items (a product, a list, a recipe). **Every item is bought exactly once and only as specified**, together in one cart or in waves. `tests/test_guarantee.py` checks it on random intent/quote pairs per run: an autonomous order never deviates from its intent, and a cart line can only fill a distinct, open item.
 
 ```
 propose_intent ─> human confirms + signs intent_hash ─> search / check_offer (intent_id)
@@ -24,10 +24,10 @@ propose_intent ─> human confirms + signs intent_hash ─> search / check_offer
 
 | Tool | Annotations | What it does |
 |---|---|---|
-| `propose_intent(original_request, product_query, quantity, quantity_unit, deliver_by, hard_rules, ...)` | write, not destructive | Fixed OrderIntent. Adds the mandate's mandatory rules, cross-checks numbers and "non-dairy" against the buyer's own text, returns read-back, chips, open questions and an RFC 8785 + SHA-256 hash. The agent must stop here |
-| `search_products(query, intent_id, ...)` | read-only | Catalog search. With `intent_id` every hard rule is evaluated from data, unsafe products come back in `excluded` with the reason |
-| `check_offer(product_ids, intent_id)` | read-only | Live price and availability. Quantity, unit and date come from the intent. Each offer: `quote_id`, expiry, rule `evidence`, `provenance` signed by Valio Aimo (Ed25519) |
-| `place_order(quote_id, intent_id, reason)` | destructive, idempotent | Diff quote vs intent, tier, receipt. One confirmed intent buys exactly one order, replays return the same order |
+| `propose_intent(original_request, items[], deliver_by, hard_rules, ...)` | write, not destructive | Fixed OrderIntent with one item per product or ingredient. Adds the mandate's mandatory rules, cross-checks numbers and "non-dairy" against the buyer's own text, returns read-back, chips, open questions and an RFC 8785 + SHA-256 hash. The agent must stop here |
+| `search_products(query, intent_id, item_id, ...)` | read-only | Catalog search. Products whose kind changes (oat, soy, plant-based ...) only match when asked for. With `intent_id` every hard rule is evaluated from data, unsafe products come back in `excluded` with the reason |
+| `check_offer(product_ids, intent_id, item_id)` | read-only | Live price and availability. Quantity, unit and date come from the item. Each offer: `quote_id`, expiry, rule `evidence`, `provenance` signed by Valio Aimo (Ed25519) |
+| `place_order(intent_id, lines[{item_id, quote_id}], reason)` | destructive, idempotent | Per-line diff plus cart-level budget and mandate, tier, one cart hash, receipt. Each item once, open items stay orderable, replays return the same order |
 | `get_order_status(order_id)` | read-only | Order and approval |
 
 Annotations are hints for hosts. Enforcement is server side.
