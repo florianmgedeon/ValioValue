@@ -133,3 +133,22 @@ async def test_chat_endpoint_accepts_attachments(client):
     s = agent.SESSIONS[r.json()["session_id"]]
     await wait_done(s)
     assert any(e["type"] == "intent_proposed" for e in s.events)
+
+
+def test_anthropic_replays_thinking_only_for_the_current_turn():
+    """Thinking signatures are bound to the system prompt, which is rebuilt each turn (it has the time in it).
+    Old thinking blocks must be dropped, or Anthropic answers 400 'block is bound to a different conversation'."""
+    think = {"type": "thinking", "thinking": "hm", "signature": "sig"}
+    call = {"type": "tool_use", "id": "c1", "name": "propose_intent", "input": {}}
+    history = [
+        {"role": "user", "text": "120 L milk"},
+        {"role": "assistant", "raw": [think, call]},
+        {"role": "tool", "tool_call_id": "c1", "content": "{}"},
+        {"role": "user", "text": "I signed intent int_1"},
+        {"role": "assistant", "raw": [think, dict(call, id="c2")]},
+        {"role": "tool", "tool_call_id": "c2", "content": "{}"},
+    ]
+    msgs = AnthropicProvider._messages(history)
+    assistants = [m["content"] for m in msgs if m["role"] == "assistant"]
+    assert [b["type"] for b in assistants[0]] == ["tool_use"]
+    assert [b["type"] for b in assistants[1]] == ["thinking", "tool_use"]
