@@ -1,0 +1,53 @@
+frontend/src/app/PhoneCamera.tsx
+  s_f3eb039c5cfafd::t_4baeb8940f085a 1,4-5,13,21,27-31,38,42-48,67-75,80
+frontend/src/app/App.tsx
+  s_f3eb039c5cfafd::t_3340ccfd736270 11,25,47
+frontend/src/features/onboarding/fixtures.ts
+  s_f3eb039c5cfafd::t_f66befd8076263 1-26
+frontend/src/features/onboarding/index.ts
+  s_f3eb039c5cfafd::t_c27529f5a63eb3 1-3
+frontend/src/features/camera/PhoneCameraModal.tsx
+  s_f3eb039c5cfafd::t_a696328a072a72 1-142,144-164
+  s_f3eb039c5cfafd::t_2ead73c4722685 143
+frontend/src/features/camera/ingestPhoto.ts
+  s_f3eb039c5cfafd::t_ec3b7d3227ec44 1-20
+frontend/src/api/kitchen.ts
+  s_f3eb039c5cfafd::t_83e0182c37995f 3,24-26
+frontend/vite.config.ts
+  s_f3eb039c5cfafd::t_3340ccfd736270 14-15
+frontend/src/features/onboarding/DemoMenu.tsx
+  s_f3eb039c5cfafd::t_c27529f5a63eb3 1-6,8-14
+  s_f3eb039c5cfafd::t_3340ccfd736270 7
+frontend/src/features/onboarding/LearnCard.tsx
+  s_f3eb039c5cfafd::t_c1f4b62df1eb6f 1-82
+docs/work-packages/F3-frontend-onboarding-camera.md
+  s_f3eb039c5cfafd::t_71dffc63806fda 3,43-53
+frontend/src/features/onboarding/OnboardingView.tsx
+  s_f3eb039c5cfafd::t_674dc6f2b02697 1-110,112-121,123-168,170-285,287-290,297-403
+  s_f3eb039c5cfafd::t_263e6e5af821cc 111
+  s_f3eb039c5cfafd::t_16e4d6ab338f7d 291-296
+  s_f3eb039c5cfafd::t_c27529f5a63eb3 169,286
+  s_f3eb039c5cfafd::t_e723a18eecba11 122
+frontend/src/api/types.ts
+  s_f3eb039c5cfafd::t_83e0182c37995f 20-22
+frontend/package.json
+  s_f3eb039c5cfafd::t_f5376af49cbbcc 19,26
+frontend/package-lock.json
+  s_f3eb039c5cfafd::t_533aca9bafdb82 12,19,1122-1141,1536-1544,1591-1599,1636-1646,1716-1724,1741-1752,2073-2081,2196-2204,2709-2717,2794-2802,2851-2867,2887-2895,2905-2910,2973-2978,3011-3036,3179-3185,3295-3300,3311-3330,3337-3358,3368-3432
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3449bc0ee3c39710278bfa3e303d49b8bf9f25b3",
+  "prompts": {},
+  "sessions": {
+    "s_f3eb039c5cfafd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f234992e-42c1-4ad6-8c30-5aac59db6b46",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
