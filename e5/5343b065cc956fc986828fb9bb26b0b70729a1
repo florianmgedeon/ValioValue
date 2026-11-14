@@ -1,0 +1,42 @@
+backend/tests/test_rules.py
+  s_cb56dc6d820f9c::t_0c8eda0d57eedf 71
+  s_cb56dc6d820f9c::t_5ec6ed4d7a9611 1-70,72-121
+mcp-server/valio_mcp/server.py
+  s_cb56dc6d820f9c::t_9eedf86f5663b7 20-21,41
+  s_cb56dc6d820f9c::t_24bde79a32c000 822-845
+mcp-server/valio_mcp/coverage.py
+  s_cb56dc6d820f9c::t_0c8eda0d57eedf 61
+  s_cb56dc6d820f9c::t_f83b08cffecf0f 1-60,62-66
+contracts/backend-api.yaml
+  s_cb56dc6d820f9c::t_9ec47a58b360ba 220-289,442-455
+backend/buyer_agent/app.py
+  s_cb56dc6d820f9c::t_11c628e1b7856c 19,23
+contracts/fixtures/mandate-draft-sesame.json
+  s_cb56dc6d820f9c::t_9ec47a58b360ba 1-11
+docs/work-packages/3-polish.md
+  s_cb56dc6d820f9c::t_b2f985f3a3ba07 3,23-30
+  s_cb56dc6d820f9c::t_e85ba772919358 31
+backend/buyer_agent/routes_rules.py
+  s_cb56dc6d820f9c::t_0c8eda0d57eedf 202-203,207,251-253,265
+  s_cb56dc6d820f9c::t_fd343a27036821 1-201,204-206,208-250,254-264,266-286
+mcp-server/README.md
+  s_cb56dc6d820f9c::t_b2f985f3a3ba07 70-71
+mcp-server/tests/test_coverage.py
+  s_cb56dc6d820f9c::t_9eedf86f5663b7 1-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e55343b065cc956fc986828fb9bb26b0b70729a1",
+  "prompts": {},
+  "sessions": {
+    "s_cb56dc6d820f9c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d96a3b4d-a902-4c39-af87-e39f34818e10",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
