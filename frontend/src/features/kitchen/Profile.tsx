@@ -1,17 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { apiUrl } from "../../api/client";
-import { searchKitchenProducts, type KitchenCatalogProduct } from "../../api/kitchen";
 import type { KitchenProfile, Schema } from "../../api/types";
-import { useComposerText } from "../../app/composer";
-import { navigate } from "../../app/route";
-import { Button, Chip, Icon, KindTag, Mark, Paper, YesNo, eur, type Kind } from "../../ui";
-import { useKitchenContext, useUsualOrder } from "../order/data";
+import { Button, Chip, Drawer, Icon, KindTag, Mark, Paper, YesNo, type Kind } from "../../ui";
 
 type Suggestion = Schema["Suggestion"];
 type Source = Schema["Source"];
-type UsualProduct = Schema["UsualProduct"];
-type FallbackMode = NonNullable<UsualProduct["fallback_mode"]>;
-type SubstituteEntry = { product_id: string; product_name: string };
 
 /** Backend suggestion kinds → the UI's kind colours. */
 export const KIND_OF: Record<NonNullable<Suggestion["kind"]>, Kind> = { about: "about", usual: "usual", must: "must", prefer: "prefer", autonomy: "auto" };
@@ -86,27 +79,30 @@ export function Suggestions({ items, sources, onAccept, onReject, busy }: {
   busy: string | null;
 }) {
   if (!items.length) return null;
-  const src = (id?: string) => sources.find((x) => x.id === id)?.title;
+  const srcOf = (id?: string) => sources.find((x) => x.id === id);
   return (
-    <section className="sec" style={{ borderColor: "var(--accent)" }}>
+    <section className="sec to-check">
       <div className="sec-h">
-        <Icon name="bulb" />
-        <h2>New from your documents</h2>
+        <h2>To check <span className="n">({items.length})</span></h2>
         <span className="spacer" />
-        <span className="muted text-[13px]">I never turn these on without you</span>
+        <span className="muted text-[13px]">Nothing changes until you say yes</span>
       </div>
       {items.map((s) => {
-        const usual = usualText(s);
+        const src = srcOf(s.source_id);
+        // From an order (2a): the quote is my own sentence ("You chose … instead of …"), not a document's words.
+        const fromOrder = src?.type === "order" || src?.type === "correction";
+        const usual = fromOrder ? null : usualText(s);
         return (
-          <div key={s.id} className="rule new" aria-busy={busy === s.id}>
+          <div key={s.id} className="rule" aria-busy={busy === s.id}>
             <div className="grid gap-1">
               <div className="t">{s.kind && <KindTag kind={KIND_OF[s.kind]} />}{s.title}</div>
               <div className="s">
+                {fromOrder && s.quote && <span>{s.quote}</span>}
                 {usual && <span>{usual}</span>}
-                {src(s.source_id) && <span>from {src(s.source_id)}</span>}
-                {(s.kind === "must" || s.kind === "prefer" || s.kind === "autonomy") && <span>· needs your OK</span>}
+                {!fromOrder && src?.title && <span>from {src.title}</span>}
+                {(s.kind === "must" || s.kind === "prefer" || s.kind === "autonomy") && <span>· needs your signature</span>}
               </div>
-              {s.quote && !s.quote.startsWith(s.title ?? "\u0000") && <div className="q">“{s.quote}”</div>}
+              {!fromOrder && s.quote && !s.quote.startsWith(s.title ?? "\u0000") && <div className="q">“{s.quote}”</div>}
             </div>
             <YesNo value={undefined} onChange={(yes) => (yes ? onAccept(s) : onReject(s))} />
           </div>
@@ -116,7 +112,7 @@ export function Suggestions({ items, sources, onAccept, onReject, busy }: {
   );
 }
 
-export function About({ profile, onSave }: { profile: KitchenProfile; onSave: (text: string) => Promise<void> }) {
+export function About({ profile, onSave, footer }: { profile: KitchenProfile; onSave: (text: string) => Promise<void>; footer?: ReactNode }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(profile.about?.text ?? "");
   const [saving, setSaving] = useState(false);
@@ -164,6 +160,7 @@ export function About({ profile, onSave }: { profile: KitchenProfile; onSave: (t
           {facts.map((f) => <Chip key={f.id ?? f.label} kind="about">{f.label}</Chip>)}
         </div>
       )}
+      {footer}
     </section>
   );
 }
@@ -172,292 +169,48 @@ export function unitText(u?: string) {
   return u === "KG" ? "kg" : u === "SALES_UNIT" ? "packs" : u ?? "";
 }
 
-const FALLBACK_LABELS: Record<FallbackMode, { short: string; desc: string }> = {
-  only_listed: {
-    short: "Only take these substitutes",
-    desc: "If #1 is out of stock, I try your substitutes in order and never fall back to any other product.",
-  },
-  ask_any: {
-    short: "Ask me before other products",
-    desc: "I try your substitutes first; if none are in stock, I ask you before picking another product.",
-  },
-  none: {
-    short: "Never substitute",
-    desc: "Only your primary product may be ordered. If it's out of stock, I leave it open.",
-  },
-};
-
-/** The usual products and amounts in one block, with inline substitute & fallback rules and "Order the usual". */
-export function UsualSection({
-  profile,
-  onSaveUsual,
-}: {
-  profile: KitchenProfile;
-  onSaveUsual?: (update: { id: string; substitutes: SubstituteEntry[]; fallback_mode: FallbackMode }) => Promise<void>;
-}) {
-  const setText = useComposerText();
-  const usual = useUsualOrder();
-  const k = useKitchenContext();
-  const items = (profile.usual ?? []).filter((u) => (u.status ?? "active") === "active");
-  const src = (id?: string) => profile.sources?.find((x) => x.id === id)?.title;
-  const est = usual.data?.estimate_total ?? null;
-  const fits = est !== null && k.limit !== null ? est <= k.limit : null;
-  const canOrder = items.some((u) => u.typical_qty != null);
-
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [subs, setSubs] = useState<SubstituteEntry[]>([]);
-  const [mode, setMode] = useState<FallbackMode>("ask_any");
-  const [query, setQuery] = useState("");
-  const [hits, setHits] = useState<KitchenCatalogProduct[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  const openEditor = (u: UsualProduct) => {
-    if (editingId === u.id) {
-      setEditingId(null);
-      return;
-    }
-    const currentSubs = (u.substitutes ?? [])
-      .filter((s): s is { product_id: string; product_name?: string | null } => !!s.product_id)
-      .map((s) => ({ product_id: s.product_id, product_name: s.product_name ?? s.product_id }));
-    setEditingId(u.id ?? null);
-    setSubs(currentSubs);
-    setMode(u.fallback_mode ?? (currentSubs.length > 0 ? "only_listed" : "ask_any"));
-    setQuery(u.word ?? "");
-    setHits([]);
-  };
-
-  useEffect(() => {
-    if (!editingId || !query.trim()) {
-      setHits([]);
-      return;
-    }
-    let cancelled = false;
-    setSearching(true);
-    const t = setTimeout(() => {
-      void searchKitchenProducts(query.trim(), 6)
-        .then((res) => {
-          if (!cancelled) setHits(res.products ?? []);
-        })
-        .catch(() => {
-          if (!cancelled) setHits([]);
-        })
-        .finally(() => {
-          if (!cancelled) setSearching(false);
-        });
-    }, 180);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [editingId, query]);
-
-  const addSub = (p: KitchenCatalogProduct, primaryId?: string | null) => {
-    if (p.product_id === primaryId || subs.some((s) => s.product_id === p.product_id)) return;
-    const next = [...subs, { product_id: p.product_id, product_name: p.name }];
-    setSubs(next);
-    if (mode === "ask_any" && subs.length === 0) setMode("only_listed");
-  };
-
-  const moveSub = (idx: number, dir: -1 | 1) => {
-    const target = idx + dir;
-    if (target < 0 || target >= subs.length) return;
-    const copy = [...subs];
-    const [item] = copy.splice(idx, 1);
-    copy.splice(target, 0, item!);
-    setSubs(copy);
-  };
-
-  const removeSub = (pid: string) => {
-    const next = subs.filter((s) => s.product_id !== pid);
-    setSubs(next);
-    if (next.length === 0 && mode === "only_listed") setMode("ask_any");
-  };
-
-  return (
-    <section className="sec usual-sec">
-      <div className="sec-h">
-        <h2>Your usual products</h2>
-        <p>When you say the word, I pick this product. With the usual amounts they make your usual order.</p>
-      </div>
-      {items.length === 0 && <div className="rule"><span className="muted text-sm">Nothing yet. Show me an invoice or a delivery note and I'll learn them.</span></div>}
-      {items.map((u) => {
-        const uSubs = (u.substitutes ?? []).filter((s) => !!s.product_id);
-        const uMode: FallbackMode = u.fallback_mode ?? (uSubs.length > 0 ? "only_listed" : "ask_any");
-        const isEditing = editingId === u.id;
-        const fallbackSentence =
-          uMode === "none"
-            ? "If out of stock: never substitute"
-            : uSubs.length > 0
-              ? `If out of stock: ${uSubs.map((s, idx) => `${idx + 1}. ${s.product_name ?? s.product_id}`).join(" → ")}${uMode === "only_listed" ? " · no other products" : ""}`
-              : "If out of stock: I ask you";
-        return (
-          <div key={u.id} className="usual-wrap">
-            <div className="usual">
-              <span className="w">{u.word}</span>
-              <div className="min-w-0 grid gap-0.5">
-                <div className="p">{u.product_name || <span className="muted">no product yet</span>}</div>
-                <div className="s">
-                  <span>{fallbackSentence}</span>
-                  {onSaveUsual && u.id && (
-                    <button type="button" className="link" onClick={() => openEditor(u)}>
-                      {isEditing ? "close" : "change"}
-                    </button>
-                  )}
-                  {src(u.source_id) && <span>· from {src(u.source_id)}</span>}
-                </div>
-              </div>
-              <span className="qty">{u.typical_qty != null ? `${u.typical_qty} ${unitText(u.unit)} / ${u.per || "week"}` : ""}</span>
-            </div>
-
-            {isEditing && u.id && onSaveUsual && (
-              <div className="usual-edit">
-                <div className="usual-edit-row">
-                  <span className="eyebrow">If {u.product_name ?? u.word} is out of stock</span>
-                  <div className="frow">
-                    {(["only_listed", "ask_any", "none"] as FallbackMode[]).map((mKey) => (
-                      <button
-                        key={mKey}
-                        type="button"
-                        className="tog"
-                        aria-pressed={mode === mKey}
-                        onClick={() => setMode(mKey)}
-                      >
-                        {FALLBACK_LABELS[mKey].short}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="muted text-[12.5px]">{FALLBACK_LABELS[mode].desc}</p>
-                </div>
-
-                {mode !== "none" && (
-                  <div className="usual-edit-row">
-                    <span className="eyebrow">Approved substitutes in order</span>
-                    {subs.length === 0 ? (
-                      <p className="muted text-[13px]">No substitutes added yet. Pick one below so I know what to take instead.</p>
-                    ) : (
-                      <div className="grid gap-1.5">
-                        {subs.map((s, idx) => (
-                          <div key={s.product_id} className="sub-item">
-                            <span className="sub-rank">#{idx + 1}</span>
-                            <div className="min-w-0 flex-1">
-                              <b>{s.product_name}</b>
-                            </div>
-                            <div className="sub-acts">
-                              <button type="button" className="sub-btn" disabled={idx === 0} onClick={() => moveSub(idx, -1)} aria-label="Move up">↑</button>
-                              <button type="button" className="sub-btn" disabled={idx === subs.length - 1} onClick={() => moveSub(idx, 1)} aria-label="Move down">↓</button>
-                              <button type="button" className="sub-btn del" onClick={() => removeSub(s.product_id)} aria-label="Remove substitute">×</button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="sub-search">
-                      <div className="frow">
-                        <Icon name="search" size={16} className="text-ink3" />
-                        <input
-                          className="field wide"
-                          value={query}
-                          onChange={(e) => setQuery(e.target.value)}
-                          placeholder={`Search Valio Aimo for "${u.word}" substitutes…`}
-                          aria-label="Search catalog for substitute products"
-                        />
-                      </div>
-                      {searching && <div className="muted text-xs px-1">Searching…</div>}
-                      {!searching && hits.length > 0 && (
-                        <div className="sub-hits">
-                          {hits
-                            .filter((h) => h.product_id !== u.product_id && !subs.some((s) => s.product_id === h.product_id))
-                            .slice(0, 4)
-                            .map((h) => (
-                              <div key={h.product_id} className="sub-hit">
-                                <div className="min-w-0">
-                                  <div className="font-medium text-[13.5px]">{h.name}</div>
-                                </div>
-                                <Button small variant="ghost" onClick={() => addSub(h, u.product_id)}>+ Add as #{subs.length + 1}</Button>
-                              </div>
-                            ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <div className="frow justify-end pt-1">
-                  <Button small variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
-                  <Button
-                    small
-                    variant="primary"
-                    disabled={saving || (mode === "only_listed" && subs.length === 0)}
-                    onClick={async () => {
-                      setSaving(true);
-                      try {
-                        await onSaveUsual({
-                          id: u.id!,
-                          substitutes: mode === "none" ? [] : subs,
-                          fallback_mode: mode,
-                        });
-                        setEditingId(null);
-                      } finally {
-                        setSaving(false);
-                      }
-                    }}
-                  >
-                    {saving ? "Saving…" : "Save"}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
-      {canOrder && (
-        <div className="usual-foot">
-          <span className="est">
-            {est !== null ? <>The usual order ≈ <b className="num">{eur(est)}</b>. </> : null}
-            {fits === true && "Inside your limit: I can order it alone."}
-            {fits === false && "Above your limit: you approve the cart."}
-          </span>
-          <Button small onClick={() => { navigate("order"); setText("the usual, but "); }}>Adjust</Button>
-          <Button variant="primary" small onClick={() => navigate("order", "usual")}>Order the usual</Button>
-        </div>
-      )}
-    </section>
-  );
-}
-
 function SourceThumb({ s }: { s: Source }) {
   if (s.upload_id && s.type === "photo") return <img src={uploadSrc(s.upload_id)} alt="" loading="lazy" />;
   const icon = s.type === "photo" ? "cam" : s.type === "text" ? "chat" : "doc";
   return <Icon name={icon} size={28} className="text-ink3" />;
 }
 
-export function Sources({ profile, orders }: { profile: KitchenProfile; orders: number | null }) {
+/** One line at the end of About: "Learned from 4 documents and 7 orders". The documents open in a drawer. */
+export function SourcesLine({ profile, orders }: { profile: KitchenProfile; orders: number | null }) {
+  const [open, setOpen] = useState(false);
   const docs = (profile.sources ?? []).filter((s) => s.type === "photo" || s.type === "pdf" || s.type === "text");
   const corrections = (profile.sources ?? []).filter((s) => s.type === "correction").length;
+  if (!docs.length && !orders) return null;
+  const parts = [docs.length ? `${docs.length} document${docs.length === 1 ? "" : "s"}` : "", orders ? `${orders} order${orders === 1 ? "" : "s"}` : ""].filter(Boolean);
   return (
-    <section className="sec">
-      <div className="sec-h">
-        <h2>What I learned from</h2>
-      </div>
-      <div className="sources">
-        {docs.map((s) => {
-          const inner = (
-            <>
-              <div className="th"><SourceThumb s={s} /></div>
-              <span className="line-clamp-2">{s.title}</span>
-            </>
-          );
-          return s.upload_id ? (
-            <a key={s.id} className="src" href={uploadSrc(s.upload_id)} target="_blank" rel="noreferrer">{inner}</a>
-          ) : (
-            <div key={s.id} className="src">{inner}</div>
-          );
-        })}
-        <div className="src"><div className="th n">{orders ?? "–"}</div>orders</div>
-        <div className="src"><div className="th n">{corrections}</div>your corrections</div>
-      </div>
-    </section>
+    <>
+      <button className="srcline" onClick={() => setOpen(true)}>
+        <span className="thumbs" aria-hidden="true">{docs.slice(0, 3).map((s) => <span key={s.id} />)}</span>
+        <span>Learned from {parts.map((p, i) => <span key={p}>{i ? " and " : ""}<b>{p}</b></span>)}</span>
+        <span className="spacer" />
+        <Icon name="chev" size={16} className="text-ink3" />
+      </button>
+      <Drawer open={open} onClose={() => setOpen(false)} title="What I learned from">
+        <div className="src-grid">
+          {docs.map((s) => {
+            const inner = (
+              <>
+                <div className="th"><SourceThumb s={s} /></div>
+                <span className="line-clamp-2">{s.title}</span>
+              </>
+            );
+            return s.upload_id ? (
+              <a key={s.id} className="src" href={uploadSrc(s.upload_id)} target="_blank" rel="noreferrer">{inner}</a>
+            ) : (
+              <div key={s.id} className="src">{inner}</div>
+            );
+          })}
+        </div>
+        <div className="src-nums">
+          <div><b>{orders ?? "–"}</b>orders</div>
+          <div><b>{corrections}</b>{corrections === 1 ? "of your corrections" : "your corrections"}</div>
+        </div>
+      </Drawer>
+    </>
   );
 }

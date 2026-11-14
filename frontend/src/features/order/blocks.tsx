@@ -8,7 +8,7 @@ import { SIGNER_NAME } from "../../app/queries";
 import { navigate } from "../../app/route";
 import { useSignedChange } from "../../app/signing";
 import { Button, Card, CardFooter, CardHeader, Chip, Cond, Icon, KindTag, Typing, eur, useToast, type Kind } from "../../ui";
-import { fmtDay, unitLabel, useKitchenContext } from "./data";
+import { fmtDay, unitLabel, useKitchenContext, useUsualOrder } from "./data";
 import { lineDeviations, mergeFunnel, type Block, type ItemIssue, type LocalAction, type UsualExcluded } from "./orderReducer";
 
 type Check = ReturnType<typeof lineDeviations>[number];
@@ -130,6 +130,12 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
   const anyUsual = it.items.some((i) => i.usual?.name);
   const anyNew = it.items.some((i) => !i.usual?.name);
   const questions = it.questions ?? [];
+  // 2e (D4): one sentence when a usual amount drifted and this order has that product
+  const usualOrder = useUsualOrder();
+  const driftNote = (usualOrder.data?.drift ?? []).filter((d) => d.kind === "quantity").map((d) => {
+    const item = it.items.find((i) => (i.product?.query ?? "").toLowerCase().includes(d.word ?? "\u0000"));
+    return item ? `${d.text} (${(d.detail ?? "").replace(/\.$/, "")}). This order has ${item.quantity?.amount} ${unitLabel(item.quantity?.unit)}.` : null;
+  }).filter(Boolean)[0];
   // Said once for the whole list, not on every line.
   const slacks = it.items.map((i) => i.quantity?.max_over_pct ?? 0);
   const sameSlack = slacks.every((x) => x === slacks[0]) ? slacks[0] ?? 0 : null;
@@ -222,6 +228,7 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
         </div>
       )}
       {(it.notes ?? []).length > 0 && <div className="applied">{it.notes!.join(" · ")}</div>}
+      {driftNote && <div className="applied drift-note"><Icon name="flag" />{driftNote}</div>}
       <CardFooter>
         <div className="fore">
           {questions.length ? (
@@ -432,7 +439,7 @@ function Blocked({ b, ctx }: { b: BlockOf<"block">; ctx: BlockCtx }) {
       </div>
       <CardFooter>
         <div className="fore">No setting lets me order this anyway. Only changing the rule does.</div>
-        <Button small variant="primary" onClick={() => navigate("kitchen")}>Open kitchen profile</Button>
+        <Button small variant="primary" onClick={() => navigate("kitchen", "may")}>Open your rules</Button>
       </CardFooter>
     </Card>
   );

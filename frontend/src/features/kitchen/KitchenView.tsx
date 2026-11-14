@@ -8,12 +8,15 @@ import type { KitchenProfile, Mandate, Schema, UploadMeta } from "../../api/type
 import { useComposer } from "../../app/composer";
 import { usePhoneCamera } from "../../app/PhoneCamera";
 import { keys, queryClient, SIGNER_NAME, useAutonomy, useKitchen, useMandate } from "../../app/queries";
+import { navigate } from "../../app/route";
 import { useSignedChange } from "../../app/signing";
 import { Button, Drawer, Icon, Typing, useToast } from "../../ui";
 import { AutonomySection, LEVELS } from "./Autonomy";
 import "./kitchen.css";
 import { applyOps, nextId, plural, ruleLabel, upsert, type Grant, type HardRule, type LevelChange, type Op, type Preference, type RuleGroup } from "./model";
-import { About, Sources, Suggestions, TeachCard, UsualSection } from "./Profile";
+import { LearnedSection } from "./Learned";
+import { About, SourcesLine, Suggestions, TeachCard } from "./Profile";
+import { levelLimit, useUsualOrder } from "../order/data";
 import { errText, MustSection, PreferSection, type RowFlags } from "./Rules";
 
 type Suggestion = Schema["Suggestion"];
@@ -23,7 +26,8 @@ const IMPORTANCE_TEXT: Record<number, string> = { 1: "nice to have", 2: "importa
 const shortDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "");
 
 /** Kitchen tab (F2): what the agent knows (profile, unsigned) and may do (mandate, signed). */
-export default function KitchenView() {
+export default function KitchenView({ view: viewParam }: { view?: string }) {
+  const tab: "know" | "may" = viewParam === "may" ? "may" : "know";
   const toast = useToast();
   const sign = useSignedChange();
   const camera = usePhoneCamera();
@@ -31,6 +35,7 @@ export default function KitchenView() {
   const mandate = useMandate();
   const autonomy = useAutonomy();
   const orders = useQuery({ queryKey: [...keys.orders, "all"], queryFn: () => listOrders({ limit: 200 }) });
+  const usualOrder = useUsualOrder();
 
   const [ops, setOps] = useState<Op[]>([]);
   const [levelChange, setLevelChange] = useState<LevelChange | null>(null);
@@ -55,7 +60,8 @@ export default function KitchenView() {
     }
   };
 
-  useEffect(() => camera.onPhoto("kitchen", (u: UploadMeta) => void ingest({ upload_ids: [u.upload_id!] }, "Photo")));
+  useEffect(() => camera.onPhoto("kitchen", (ups: UploadMeta[]) =>
+    void ingest({ upload_ids: ups.map((u) => u.upload_id!) }, ups.length > 1 ? `${ups.length} photos` : "Photo")));
 
   useComposer({
     onSubmit: (text) => void ingest({ text }, "Got it. Your note was"),
@@ -256,6 +262,8 @@ export default function KitchenView() {
   };
 
   const proposed = (profile.suggestions ?? []).filter((s) => s.status === "proposed");
+  const drift = usualOrder.data?.drift ?? [];
+  const limit = levelLimit(m);
   const name = m.display_name || "Your kitchen";
   const learnedSomething = (profile.sources ?? []).length > 0;
   return (
@@ -263,7 +271,7 @@ export default function KitchenView() {
       <div className="k-head">
         <div>
           <h1>{name}</h1>
-          <p>{reading ? "Reading…" : "What I know about your kitchen. Teach me more with a photo or a sentence below."}</p>
+          <p>{reading ? "Reading…" : "Teach me more with a photo or a sentence below."}</p>
         </div>
         <span className="spacer" />
         <Button small variant="ghost" onClick={() => setHistoryOpen(true)}>History</Button>
@@ -273,32 +281,42 @@ export default function KitchenView() {
 
       <Suggestions items={proposed} sources={profile.sources ?? []} onAccept={(s) => void accept(s)} onReject={(s) => void reject(s)} busy={busy} />
 
-      <AutonomySection
-        autonomy={a}
-        g1={g1}
-        extras={extras}
-        musts={view.mandatory_rules}
-        pendingLevel={levelChange}
-        changedGrants={flags.changed}
-        freshGrants={flags.fresh}
-        onLevel={onLevel}
-        onLimit={onLimit}
-        onToggleGrant={toggleGrant}
-        onAddGrant={addGrant}
-        locked={toast}
-      />
-
-      <div className="k-grid">
-        <MustSection rules={view.mandatory_rules} flags={flags} onToggle={toggleRule("must")} onUnknown={unknownRule} onAdd={addRule("must")} />
-        <PreferSection rules={view.preferences} flags={flags} onToggle={toggleRule("prefer")} onWeight={weightRule} onAdd={addRule("prefer")} />
+      <div className="views" role="tablist" aria-label="Kitchen">
+        <button role="tab" aria-selected={tab === "know"} onClick={() => navigate("kitchen")}>What I know <span className="sub">learned, no signature</span></button>
+        <button role="tab" aria-selected={tab === "may"} onClick={() => navigate("kitchen", "may")}><Icon name="lock" size={15} />What I may do <span className="sub">signed</span></button>
       </div>
 
-      <UsualSection profile={profile} onSaveUsual={saveUsual} />
+      {tab === "know" && (
+        <>
+          <LearnedSection profile={profile} usualOrder={usualOrder.data} limit={limit} drift={drift} onSaveUsual={saveUsual} />
+          <About profile={profile} onSave={saveAbout} footer={<SourcesLine profile={profile} orders={usualOrder.data?.history?.orders ?? orders.data?.length ?? null} />} />
+        </>
+      )}
 
-      <div className="k-grid">
-        <About profile={profile} onSave={saveAbout} />
-        <Sources profile={profile} orders={orders.data?.length ?? null} />
-      </div>
+      {tab === "may" && (
+        <>
+          <AutonomySection
+            autonomy={a}
+            g1={g1}
+            extras={extras}
+            musts={view.mandatory_rules}
+            pendingLevel={levelChange}
+            changedGrants={flags.changed}
+            freshGrants={flags.fresh}
+            onLevel={onLevel}
+            onLimit={onLimit}
+            onToggleGrant={toggleGrant}
+            onAddGrant={addGrant}
+            locked={toast}
+          />
+
+          <div className="k-grid">
+            <MustSection rules={view.mandatory_rules} flags={flags} onToggle={toggleRule("must")} onUnknown={unknownRule} onAdd={addRule("must")} />
+            <PreferSection rules={view.preferences} flags={flags} onToggle={toggleRule("prefer")} onWeight={weightRule} onAdd={addRule("prefer")} />
+          </div>
+          <p className="signnote"><Icon name="lock" size={15} />Changes here are signed by you and checked by Valio Aimo on every order.</p>
+        </>
+      )}
 
       {pendingCount > 0 && (
         <div className="k-changebar rise" role="status">

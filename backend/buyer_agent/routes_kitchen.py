@@ -47,6 +47,50 @@ async def usual_order(buyer_id: str | None = None):
     return await learning.usual_order(_bid(buyer_id))
 
 
+class DriftDecision(BaseModel):
+    key: str                   # from GET /kitchen/usual-order drift[].key: "quantity:<word>" or "cost"
+    keep: bool = True          # quantity: True = the new amount becomes the usual amount, False = back to the old one
+    value: float               # the drift's `to` (what the buyer saw); `from` for keep=False is taken from `back_to`
+    back_to: float | None = None
+
+
+class DriftIn(BaseModel):
+    buyer_id: str | None = None
+    decisions: list[DriftDecision]
+    by: str | None = None
+
+
+@router.post("/kitchen/usual-order/drift")
+async def decide_drift(body: DriftIn):
+    """2e: the buyer looked at a drift. Quantity: set the usual amount (keep the new one or go back). Both kinds are
+    remembered in `drift_seen`, so the same value is not flagged again. No signature: usual amounts are profile data."""
+    bid = _bid(body.buyer_id)
+    if not body.decisions:
+        raise HTTPException(422, "no decisions")
+
+    def fn(p: dict):
+        seen = p.setdefault("drift_seen", {})
+        parts = []
+        for d in body.decisions:
+            if d.key.startswith("quantity:"):
+                word = d.key.split(":", 1)[1]
+                u = next((x for x in p.get("usual") or [] if x["word"] == word and x.get("status", "active") == "active"), None)
+                if not u:
+                    raise HTTPException(404, f"no usual product {word!r}")
+                qty = d.value if d.keep or d.back_to is None else d.back_to
+                u["typical_qty"] = qty
+                seen[d.key] = d.value
+                parts.append(f'Usual "{word}": {qty:g} {kitchen._unit(u.get("unit")) or ""} a {u.get("per") or "week"} (drift checked)')
+            elif d.key == "cost":
+                seen["cost"] = round(d.value)
+                parts.append(f"Cost drift checked (€{round(d.value)} a week)")
+            else:
+                raise HTTPException(422, f"unknown drift key {d.key!r}")
+        return "; ".join(parts)
+
+    return kitchen.update(bid, fn, body.by or "buyer.human", "drift checked")
+
+
 @router.get("/kitchen/history")
 async def kitchen_history(buyer_id: str | None = None):
     p = kitchen.load(_bid(buyer_id))

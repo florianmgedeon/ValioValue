@@ -159,3 +159,21 @@
   .verify-row { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
   .verify-row small { display: block; color: var(--ink3); font-size: 12.5px; overflow-wrap: anywhere; }
 }
+.drift-note { color: var(--auto); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+
+/* 2e: drift before the usual order */
+.drift-card { border: 2px solid var(--auto); box-shadow: var(--shadow); border-radius: 20px; overflow: hidden; background: var(--bg); }
+.drift-card .h { display: grid; gap: 4px; padding: 16px 20px; background: var(--auto-soft); }
+.drift-card .h h3 { font-size: 17px; font-weight: 700; }
+.drift-card .h p { font-size: 13px; color: var(--ink2); }
+.drift-card .dr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 16px; align-items: center; padding: 14px 20px; border-top: 1px solid var(--line); }
+.drift-card .h + .dr { border-top: 0; }
+.drift-card .dr .t { font-weight: 600; font-size: 14.5px; }
+.drift-card .dr .s { font-size: 12.5px; color: var(--ink3); margin-top: 2px; }
+.drift-card .spark { color: var(--auto); }
+.drift-card .choice { grid-column: 1 / -1; }
+.drift-card .seg { font-size: 13px; padding: 3px; border-radius: 10px; }
+.drift-card .seg button { padding: 5px 12px; border-radius: 8px; }
+.drift-card .f { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 20px; background: var(--surface); font-size: 13px; color: var(--ink3); }
+.drift-done { font-size: 13px; color: var(--ink3); padding-top: 6px; }
+

@@ -1,4 +1,4 @@
-"""Package 2a: learning from orders. Package 2c: the "Your usual order" card.
+"""Package 2a: learning from orders. Package 2c: the "Your usual order" card. Package 2e: weeks and drift.
 
 After an order is confirmed, compare what the buyer asked for with what was ordered and propose at most ONE
 thing to remember (decision W7: only suggestions, the buyer accepts in the UI). Two cases, in this order:
@@ -12,10 +12,12 @@ Everything here reads Valio Aimo's order data (`/internal/orders`), nothing is i
 """
 from __future__ import annotations
 
+import json
 import logging
+import statistics
 from datetime import date, timedelta
 
-from . import kitchen, valio
+from . import config, kitchen, valio
 
 log = logging.getLogger("buyer_agent.learning")
 
@@ -50,7 +52,7 @@ def ordered_items(order: dict) -> list[dict]:
                     "preferred": (item.get("product") or {}).get("preferred_product_id"),
                     "product_id": line.get("product_id"), "product_name": line.get("name"),
                     "quantity": q.get("amount") or line.get("requested_quantity"),
-                    "unit": q.get("unit") or line.get("requested_unit")})
+                    "unit": q.get("unit") or line.get("requested_unit"), "total_price": line.get("total_price")})
     return out
 
 
@@ -160,10 +162,17 @@ def next_weekday(today: date, weekday: int = 0) -> date:
 async def usual_order(buyer_id: str, today: date | None = None) -> dict:
     profile = kitchen.load(buyer_id)
     usual = [u for u in _active_usual(profile) if u.get("product_id") and u.get("typical_qty")]
+    today = today or date.today()
     prices: dict[str, float] = {}
+    orders: list[dict] = []
+    try:
+        orders = await recent_orders(buyer_id)
+    except Exception:  # noqa: BLE001 - the card works without prices and weeks
+        log.exception("could not read orders for %s", buyer_id)
+    weeks = weekly_lines(orders, history(buyer_id, today), today)
     if usual:
         try:
-            for o in await recent_orders(buyer_id):  # newest first: the first price found is the last paid
+            for o in orders:  # newest first: the first price found is the last paid
                 for line in o.get("lines") or []:
                     pid = line.get("product_id")
                     if pid in prices:
@@ -175,21 +184,179 @@ async def usual_order(buyer_id: str, today: date | None = None) -> dict:
                     break
         except Exception:  # noqa: BLE001 - the card works without prices
             log.exception("could not read last prices for %s", buyer_id)
+        for wk in reversed(weeks):  # then imported history, newest week first
+            for ln in wk["lines"]:
+                u = next((x for x in usual if x["product_id"] == ln.get("product_id")), None)
+                if u and u["product_id"] not in prices and ln.get("total_price") and ln.get("quantity") \
+                        and (ln.get("unit") or "").upper() == (u.get("unit") or "").upper():
+                    prices[u["product_id"]] = round(float(ln["total_price"]) / float(ln["quantity"]), 4)
     items = []
     for u in usual:
         price = prices.get(u["product_id"])
         items.append({"word": u["word"], "product_id": u["product_id"], "product_name": u.get("product_name"),
                       "quantity": u["typical_qty"], "unit": u.get("unit"),
                       "last_unit_price": round(price, 2) if price is not None else None,
-                      "estimate": round(price * float(u["typical_qty"]), 2) if price is not None else None})
+                      "estimate": round(price * float(u["typical_qty"]), 2) if price is not None else None,
+                      "weeks": item_weeks(u, profile, weeks)})
     known = [i["estimate"] for i in items if i["estimate"] is not None]
     pers = {u.get("per") or "week" for u in usual}
-    today = today or date.today()
+    ordered = [w for w in weeks if w["lines"]]
     return {"items": items, "estimate_total": round(sum(known), 2) if known else None,
             "estimate_complete": bool(items) and len(known) == len(items),
             "deliver_by": next_weekday(today).isoformat(),
             "based_on": f"your usual amounts per {pers.pop()}" if len(pers) == 1 else "your usual amounts",
-            "kitchen_profile_version": profile.get("version")}
+            "kitchen_profile_version": profile.get("version"),
+            "history": {"orders": sum(w["orders"] for w in weeks), "weeks": len(ordered),
+                        "since": ordered[0]["week"] if ordered else None},
+            "drift": drift(usual, profile, weeks), "still_learning": still_learning(profile, weeks)}
+
+
+# --------------------------------------------------------------------------- 2e: weeks and drift
+
+WEEKS = 8                 # how far back the bars and the drift look
+QTY_DRIFT = 0.15          # a usual amount drifted: the last two ordered weeks both ≥ 15 % off the earlier median
+COST_DRIFT = 0.05         # the weekly cost drifted: mean of the last 4 weeks ≥ 5 % off the 4 before
+
+
+def _monday(d: date) -> date:
+    return d - timedelta(days=d.weekday())
+
+
+def history(buyer_id: str, today: date) -> list[dict]:
+    """Imported order history (e.g. from invoices), contracts/fixtures/kitchen/{buyer_id}.orders-history.json.
+    Weeks are relative (`weeks_ago`), so the demo stays current. Not shown in Activity, not counted for autonomy."""
+    path = config.FIXTURES_DIR / "kitchen" / f"{kitchen._safe(buyer_id)}.orders-history.json"
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        log.exception("could not read %s", path)
+        return []
+    this_week = _monday(today)
+    return [{"week": this_week - timedelta(weeks=int(w["weeks_ago"])), "lines": w.get("lines") or [], "imported": True}
+            for w in data.get("weeks") or []]
+
+
+def weekly_lines(orders: list[dict], imported: list[dict], today: date) -> list[dict]:
+    """The last WEEKS weeks, oldest first: [{week, orders, lines: [{word, product_id, product_name, quantity, unit,
+    total_price}]}]. Ends with this week if it has an order, else with last week. Weeks without orders stay in."""
+    by_week: dict[date, dict] = {}
+    for w in imported:
+        e = by_week.setdefault(w["week"], {"orders": 0, "lines": []})
+        e["orders"] += 1 if w["lines"] else 0
+        e["lines"] += w["lines"]
+    for o in orders:
+        try:
+            d = date.fromisoformat(str(o.get("created_at") or "")[:10])
+        except ValueError:
+            continue
+        e = by_week.setdefault(_monday(d), {"orders": 0, "lines": []})
+        e["orders"] += 1
+        e["lines"] += ordered_items(o)
+    this_week = _monday(today)
+    end = this_week if by_week.get(this_week, {}).get("orders") else this_week - timedelta(weeks=1)
+    out = []
+    for i in range(WEEKS - 1, -1, -1):
+        wk = end - timedelta(weeks=i)
+        e = by_week.get(wk, {"orders": 0, "lines": []})
+        out.append({"week": wk.isoformat(), "orders": e["orders"], "lines": e["lines"]})
+    return out
+
+
+def _lines_for(u: dict, profile: dict, lines: list[dict]) -> list[dict]:
+    """The lines of one week that belong to this usual entry (same product, or the same word / alias)."""
+    return [ln for ln in lines if _usual_for(profile, ln.get("word") or "", ln.get("product_id")) is u
+            or ln.get("product_id") == u.get("product_id") or (ln.get("word") and ln.get("word") == u["word"])]
+
+
+def item_weeks(u: dict, profile: dict, weeks: list[dict]) -> list[dict]:
+    """Per week: amount in the usual unit (0 = not ordered) and the product(s) ordered."""
+    out = []
+    for w in weeks:
+        ls = _lines_for(u, profile, w["lines"])
+        same = [ln for ln in ls if (ln.get("unit") or "").upper() == (u.get("unit") or "").upper()]
+        qty = sum(float(ln.get("quantity") or 0) for ln in same)
+        names = sorted({ln.get("product_name") for ln in ls if ln.get("product_name")})
+        out.append({"week": w["week"], "quantity": round(qty, 2), "products": names})
+    return out
+
+
+def _fmt_qty(x: float) -> str:
+    return f"{x:g}"
+
+
+def _short(d: str) -> str:
+    return f"{date.fromisoformat(d).day} {date.fromisoformat(d):%b}"
+
+
+def drift(usual: list[dict], profile: dict, weeks: list[dict]) -> list[dict]:
+    """What changed over the last weeks, in plain sentences built from the numbers. Hidden once the buyer decided
+    on exactly this value (profile `drift_seen`)."""
+    seen = profile.get("drift_seen") or {}
+    out = []
+    for u in usual:
+        ws = [w for w in item_weeks(u, profile, weeks) if w["quantity"] > 0]
+        if len(ws) < 4:
+            continue
+        base = statistics.median(w["quantity"] for w in ws[:-2][:4])
+        last2 = [w["quantity"] for w in ws[-2:]]
+        if not base:
+            continue
+        pcts = [(q - base) / base for q in last2]
+        if not (all(p >= QTY_DRIFT for p in pcts) or all(p <= -QTY_DRIFT for p in pcts)):
+            continue
+        to = last2[-1]
+        key = f"quantity:{u['word']}"
+        if seen.get(key) == to:
+            continue
+        since = next(w["week"] for w in ws if abs(w["quantity"] - base) / base >= QTY_DRIFT)
+        unit = kitchen._unit(u.get("unit")) or ""
+        up = to > base
+        out.append({"key": key, "kind": "quantity", "word": u["word"], "usual_id": u.get("id"), "unit": u.get("unit"),
+                    "from": base, "to": to, "pct": round((to - base) / base * 100), "since": since,
+                    "text": f"{u['word'].capitalize()} {'crept up' if up else 'went down'}: "
+                            f"{_fmt_qty(base)} → {_fmt_qty(to)} {unit} a week",
+                    "detail": f"{'+' if up else '−'}{abs(round((to - base) / base * 100))} % since {_short(since)}."})
+    # cost: the last 4 calendar weeks against the 4 before, weeks without a delivery (holidays) left out
+    early_w = [w for w in weeks[:-4] if w["lines"]]
+    late_w = [w for w in weeks[-4:] if w["lines"]]
+    if len(early_w) >= 2 and len(late_w) >= 2:
+        def per_word(ws: list[dict]) -> dict[str, float]:
+            acc: dict[str, float] = {}
+            for w in ws:
+                for ln in w["lines"]:
+                    k = ln.get("word") or "other"
+                    acc[k] = acc.get(k, 0) + float(ln.get("total_price") or 0)
+            return {k: v / len(ws) for k, v in acc.items()}
+        e, lt = per_word(early_w), per_word(late_w)
+        a, b = sum(e.values()), sum(lt.values())
+        if a and abs(b - a) / a >= COST_DRIFT and seen.get("cost") != round(b):
+            up = b > a
+            delta = sorted(((lt.get(k, 0) - e.get(k, 0), k) for k in set(e) | set(lt)), reverse=up)
+            top = [k for d, k in delta[:2] if (d > 0) == up and abs(d) >= 1]
+            pct = round((b - a) / a * 100)
+            out.append({"key": "cost", "kind": "cost", "from": round(a), "to": round(b), "pct": pct,
+                        "since": weeks[-4]["week"], "words": top,
+                        "text": f"Cost drifted: €{round(a)} → €{round(b)} a week",
+                        "detail": f"{'+' if up else '−'}{abs(pct)} % in the last 4 weeks."
+                                  + (f" Mostly {' and '.join(top)}." if top else "")})
+    return out
+
+
+def still_learning(profile: dict, weeks: list[dict]) -> list[dict]:
+    """Words ordered at least twice, with more than one product and no usual product yet."""
+    seen: dict[str, dict] = {}
+    for w in weeks:
+        for ln in w["lines"]:
+            word = ln.get("word") or ""
+            if not word or _usual_for(profile, word, ln.get("product_id")):
+                continue
+            e = seen.setdefault(word, {"word": word, "orders": 0, "products": set()})
+            e["orders"] += 1
+            e["products"].add(ln.get("product_id"))
+    return [{"word": e["word"], "orders": e["orders"], "products": len(e["products"])}
+            for e in seen.values() if e["orders"] >= 2 and len(e["products"]) > 1]
 
 
 # --------------------------------------------------------------------------- 2c: the "learned" step of a story

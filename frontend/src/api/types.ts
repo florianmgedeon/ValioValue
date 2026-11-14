@@ -43,13 +43,9 @@ export type ApprovalStatus = "pending" | "approved" | "rejected";
 
 // ---- Shapes of endpoints that are planned but not in the contract yet (2c, 2d). Move to the contract when built.
 
-/** GET /kitchen/usual-order (2c) */
-export interface UsualOrder {
-  items: { word: string; product_id: string; product_name: string; quantity: number; unit: string; last_unit_price: number | null; estimate: number | null }[];
-  estimate_total: number | null;
-  deliver_by: string;
-  based_on: string;
-}
+/** GET /kitchen/usual-order (2c, 2e: weeks, drift, still_learning) */
+export type UsualOrder = Schema["UsualOrder"];
+export type Drift = Schema["Drift"];
 
 /** GET /orders/{id}/story (2c) */
 export type StoryStep =

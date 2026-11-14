@@ -1039,6 +1039,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pairings/{pair_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** End a pairing (the desktop closed the camera dialog). Later phone uploads get 404. */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    pair_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Ended (also when it was unknown) */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pairings/{pair_id}/stream": {
         parameters: {
             query?: never;
@@ -1242,6 +1278,63 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/kitchen/usual-order/drift": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 2e: the buyer decided on a drift (keep the new amount or go back); the same value is not flagged again */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        buyer_id?: string;
+                        by?: string;
+                        decisions: {
+                            /** @example quantity:milk */
+                            key: string;
+                            /** @default true */
+                            keep?: boolean;
+                            /**
+                             * @description The drift's `to`
+                             * @example 120
+                             */
+                            value: number;
+                            /**
+                             * @description The drift's `from`, used when keep=false
+                             * @example 100
+                             */
+                            back_to?: number | null;
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description The updated kitchen profile */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -2417,6 +2510,17 @@ export interface components {
                 last_unit_price?: number | null;
                 /** @example 130.8 */
                 estimate?: number | null;
+                /** @description 2e: the last 8 weeks, oldest first. quantity in the usual unit, 0 = not ordered. */
+                weeks?: {
+                    /**
+                     * Format: date
+                     * @description Monday of the week
+                     */
+                    week?: string;
+                    /** @example 120 */
+                    quantity?: number;
+                    products?: string[];
+                }[];
             }[];
             /** @description Sum of the known estimates */
             estimate_total?: number | null;
@@ -2430,6 +2534,51 @@ export interface components {
             /** @example your usual amounts per week */
             based_on?: string;
             kitchen_profile_version?: number;
+            /** @description 2e: what the weeks and the drift are based on (confirmed orders + imported history) */
+            history?: {
+                /** @example 7 */
+                orders?: number;
+                /**
+                 * @description Weeks with at least one delivery
+                 * @example 7
+                 */
+                weeks?: number;
+                /** Format: date */
+                since?: string | null;
+            };
+            /** @description 2e: what drifted before "Order the usual". quantity: the last two ordered weeks both >= 15 % off the median of the earlier weeks. cost: mean of the last 4 weeks >= 5 % off the 4 before (weeks without a delivery left out). Sentences are built by code. Hidden once decided (POST /kitchen/usual-order/drift). */
+            drift?: components["schemas"]["Drift"][];
+            still_learning?: {
+                /** @example cheese */
+                word?: string;
+                /** @example 3 */
+                orders?: number;
+                /** @example 3 */
+                products?: number;
+            }[];
+        };
+        Drift: {
+            /** @example quantity:milk */
+            key?: string;
+            /** @enum {string} */
+            kind?: "quantity" | "cost";
+            word?: string | null;
+            usual_id?: string | null;
+            unit?: string | null;
+            /** @example 100 */
+            from?: number;
+            /** @example 120 */
+            to?: number;
+            /** @example 20 */
+            pct?: number;
+            /** Format: date */
+            since?: string;
+            /** @description cost: the words that changed it most */
+            words?: string[];
+            /** @example Milk crept up: 100 → 120 L a week */
+            text?: string;
+            /** @example +20 % since 26 Oct. */
+            detail?: string;
         };
         PairedEvent: {
             /** @constant */

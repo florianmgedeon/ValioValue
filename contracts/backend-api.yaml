@@ -432,6 +432,12 @@ paths:
                 purpose: { type: string, enum: [order, kitchen], description: "Where the desktop sends the photo (W2)" }
       responses:
         "200": { description: Pairing, content: { application/json: { schema: { $ref: "#/components/schemas/Pairing" } } } }
+  /pairings/{pair_id}:
+    delete:
+      summary: End a pairing (the desktop closed the camera dialog). Later phone uploads get 404.
+      parameters: [{ in: path, name: pair_id, required: true, schema: { type: string } }]
+      responses:
+        "204": { description: Ended (also when it was unknown) }
   /pairings/{pair_id}/stream:
     get:
       summary: SSE for the desktop, events `paired`, `photo_received`, `expired`. Pairings live 30 min in memory.
@@ -503,6 +509,31 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/UsualOrder" }
+  /kitchen/usual-order/drift:
+    post:
+      summary: "2e: the buyer decided on a drift (keep the new amount or go back); the same value is not flagged again"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decisions]
+              properties:
+                buyer_id: { type: string }
+                by: { type: string }
+                decisions:
+                  type: array
+                  items:
+                    type: object
+                    required: [key, value]
+                    properties:
+                      key: { type: string, example: "quantity:milk" }
+                      keep: { type: boolean, default: true }
+                      value: { type: number, description: "The drift's `to`", example: 120 }
+                      back_to: { type: number, nullable: true, description: "The drift's `from`, used when keep=false", example: 100 }
+      responses:
+        "200": { description: The updated kitchen profile }
   /kitchen/history:
     get:
       summary: Profile versions with summaries, newest first
@@ -1216,11 +1247,58 @@ components:
               unit: { type: string, example: L }
               last_unit_price: { type: number, nullable: true, example: 1.09 }
               estimate: { type: number, nullable: true, example: 130.8 }
+              weeks:
+                type: array
+                description: "2e: the last 8 weeks, oldest first. quantity in the usual unit, 0 = not ordered."
+                items:
+                  type: object
+                  properties:
+                    week: { type: string, format: date, description: Monday of the week }
+                    quantity: { type: number, example: 120 }
+                    products: { type: array, items: { type: string } }
         estimate_total: { type: number, nullable: true, description: "Sum of the known estimates" }
         estimate_complete: { type: boolean, description: "Every item has an estimate" }
         deliver_by: { type: string, format: date, description: "Next Monday" }
         based_on: { type: string, example: "your usual amounts per week" }
         kitchen_profile_version: { type: integer }
+        history:
+          type: object
+          description: "2e: what the weeks and the drift are based on (confirmed orders + imported history)"
+          properties:
+            orders: { type: integer, example: 7 }
+            weeks: { type: integer, description: Weeks with at least one delivery, example: 7 }
+            since: { type: string, format: date, nullable: true }
+        drift:
+          type: array
+          description: >
+            2e: what drifted before "Order the usual". quantity: the last two ordered weeks both >= 15 % off the
+            median of the earlier weeks. cost: mean of the last 4 weeks >= 5 % off the 4 before (weeks without a
+            delivery left out). Sentences are built by code. Hidden once decided (POST /kitchen/usual-order/drift).
+          items: { $ref: "#/components/schemas/Drift" }
+        still_learning:
+          type: array
+          items:
+            type: object
+            properties:
+              word: { type: string, example: cheese }
+              orders: { type: integer, example: 3 }
+              products: { type: integer, example: 3 }
+
+    Drift:
+      type: object
+      properties:
+        key: { type: string, example: "quantity:milk" }
+        kind: { type: string, enum: [quantity, cost] }
+        word: { type: string, nullable: true }
+        usual_id: { type: string, nullable: true }
+        unit: { type: string, nullable: true }
+        from: { type: number, example: 100 }
+        to: { type: number, example: 120 }
+        pct: { type: integer, example: 20 }
+        since: { type: string, format: date }
+        words: { type: array, items: { type: string }, description: "cost: the words that changed it most" }
+        text: { type: string, example: "Milk crept up: 100 → 120 L a week" }
+        detail: { type: string, example: "+20 % since 26 Oct." }
 
     PairedEvent:
       type: object
