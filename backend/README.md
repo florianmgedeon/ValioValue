@@ -25,6 +25,7 @@ Set `LLM_PROVIDER` in `.env`. All adapters are plain HTTP in `buyer_agent/llm.py
 ## How a turn runs
 
 1. Open an MCP session with headers `X-Agent-Session` and `X-Buyer-Id` (the Valio side uses them for audit and policy).
-2. Loop: LLM gets tools, backend executes calls on MCP, streams `tool_call` / `tool_result`, plus `offers` after `check_offer`.
-3. `place_order` ends the turn with `approval_required` or `order_confirmed`.
-4. `POST /approvals/{id}` forwards the human decision to Valio with the approver token and emits `order_confirmed` on the original session stream.
+2. `propose_intent` ends the first turn with `intent_proposed`.
+3. `POST /intents/{id}/confirm` signs the shown `intent_hash` with the buyer key (`buyer_agent/signing.py`), Valio confirms, the agent resumes: `search_products`, `check_offer`, `place_order`, all with the `intent_id`.
+4. `place_order` ends the turn with `approval_required` or `order_confirmed`. A block emits `order_rejected` and the agent may try the next offer once.
+5. `POST /approvals/{id}` signs the shown `cart_hash` and forwards the decision. `GET /orders/{id}/verify` checks the receipt.

@@ -13,41 +13,29 @@ The MCP server is the trust boundary. Every rule that matters is enforced there.
 ## Agent loop (backend)
 
 1. Fetch the tool list from the MCP server.
-2. Send user message plus tool definitions to the LLM.
-3. LLM returns tool calls. Backend runs them on the MCP server and streams `tool_call` / `tool_result` events.
-4. Repeat until the LLM gives a final answer.
-5. If `place_order` returns `pending_approval`, emit `approval_required` and stop.
-6. When a human approves via `POST /approvals/{id}`, the backend calls the MCP server to finalise and emits `order_confirmed`.
+2. New request: the LLM calls `propose_intent`. The backend emits `intent_proposed` and stops. The read-back text comes from Valio, not the model.
+3. The human confirms (`POST /intents/{id}/confirm`, with the displayed `intent_hash`). The backend signs the hash with the buyer key, Valio verifies it, the backend emits `intent_confirmed` and resumes the agent.
+4. The LLM calls `search_products` and `check_offer` with the `intent_id`, then `place_order(quote_id, intent_id)`.
+5. `place_order` returns `confirmed` (auto), `pending_approval` (ask) or `rejected` (block, the agent may try the next offer once).
+6. Approve: the human sends the `cart_hash` they were shown, the backend signs it, Valio confirms and signs the receipt.
 
-The LLM provider sits behind a small interface so it can be swapped.
+The LLM provider sits behind a small interface so it can be swapped. `scripted` runs the same flow without a key.
 
-## MCP tools (draft)
+## MCP tools
 
-| Tool | Purpose | Data source |
+See [`mcp-server/README.md`](../mcp-server/README.md). Not a tool on purpose: confirming an intent, approving an order.
+
+## Trust chain
+
+| Object | Hash | Signed by |
 |---|---|---|
-| `search_products` | Text search plus filters (lactose free, category, certificates, allergens) | local catalog |
-| `get_product_details` | Full product info incl. reliability and CO2 | local files |
-| `check_offer` | Price and availability for a shortlist on a date. Returns quotes with expiry | mock API |
-| `find_substitutes` | Ranked good / better / best alternatives inside the assortment | local + mock API |
-| `place_order` | Takes `quote_id`s. Returns `confirmed` or `pending_approval` with reasons | SQLite + policy |
-| `get_order_status` | Status of an order or approval | SQLite |
-| `explain_decision` | Human-readable audit log for an order | SQLite |
+| Mandate | `mandate_hash` (RFC 8785 + SHA-256) | part of every intent |
+| OrderIntent | `intent_hash` over the binding fields | buyer (Ed25519) on confirm |
+| Quote | hash of price, quantity, availability, expiry | Valio Aimo, when quoted |
+| Cart | `cart_hash`, names the `intent_hash` and quote signature | buyer, only for tier ask |
+| Receipt | over order, intent hash, cart hash, tier, approver | Valio Aimo |
 
-**Resources:** buyer policy (mandate), data provenance.
-
-Not a tool on purpose: `approve_order`. Only humans approve, via the backend REST API.
-
-## Policy engine (in mcp-server)
-
-Checked on every `place_order`:
-
-* `spend_limit`: order total vs. autonomous limit per buyer
-* `allowed_category`: product category in the buyer's mandate
-* `allergen_rules`: forbidden allergens (school, hospital kitchens)
-* `substitution`: substitutes outside stated preferences need approval
-* `quote_valid`: quote not expired, before `closingTime`
-
-Policies live in a JSON or YAML file per buyer.
+`GET /verify/{order_id}` recomputes everything from stored content.
 
 ## Facts about the mock API
 

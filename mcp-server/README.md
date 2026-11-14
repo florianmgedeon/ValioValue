@@ -2,48 +2,78 @@
 
 Owner: Florian
 
-Valio Aimo's agent interface. MCP over Streamable HTTP on `localhost:8001/mcp`.
+Valio Aimo's agent interface. MCP over Streamable HTTP on `localhost:8001/mcp`. This is the trust boundary: every rule that matters is decided here, from data, never by the agent's LLM.
 
 ```bash
-pip install -r mcp-server/requirements.txt
+pip install -r mcp-server/requirements-dev.txt
 cd mcp-server && python -m valio_mcp.server
 curl localhost:8001/health
+pytest                                   # 31 tests incl. property-based (Hypothesis)
+```
+
+## The guarantee
+
+When the buyer hits Send, Valio Aimo executes only what the buyer confirmed. Not against free text, but against an **OrderIntent the buyer saw and signed** ("what you see is what you sign"). `tests/test_guarantee.py` checks it on 1,500 random intent/quote pairs per run: an autonomous order never deviates from its intent.
+
+```
+propose_intent ─> human confirms + signs intent_hash ─> search / check_offer (intent_id)
+     ─> place_order(quote_id, intent_id) ─> diff quote vs intent ─> auto | ask | block
 ```
 
 ## MCP tools
 
-| Tool | What it does | Source |
+| Tool | Annotations | What it does |
 |---|---|---|
-| `search_products(query, filters, limit)` | Catalog search with fi/sv/en synonyms. Filters: `lactose_free`, `exclude_allergens`, `category`, `country_of_origin` | static product file |
-| `check_offer(product_ids, requested_date, quantity, quantity_unit)` | Live price and availability. Converts `L`/`KG` to sales units (catalog price / comparison price), rounds up to lot size, issues a `quote_id` per product | `/api/price`, `/api/availability` |
-| `place_order(quote_id, reason)` | Runs the policy engine. Returns `confirmed`, `pending_approval` or `rejected` | SQLite + `policies.json` |
-| `get_order_status(order_id)` | Order and approval status | SQLite |
+| `propose_intent(original_request, product_query, quantity, quantity_unit, deliver_by, hard_rules, ...)` | write, not destructive | Fixed OrderIntent. Adds the mandate's mandatory rules, cross-checks numbers and "non-dairy" against the buyer's own text, returns read-back, chips, open questions and an RFC 8785 + SHA-256 hash. The agent must stop here |
+| `search_products(query, intent_id, ...)` | read-only | Catalog search. With `intent_id` every hard rule is evaluated from data, unsafe products come back in `excluded` with the reason |
+| `check_offer(product_ids, intent_id)` | read-only | Live price and availability. Quantity, unit and date come from the intent. Each offer: `quote_id`, expiry, rule `evidence`, `provenance` signed by Valio Aimo (Ed25519) |
+| `place_order(quote_id, intent_id, reason)` | destructive, idempotent | Diff quote vs intent, tier, receipt. One confirmed intent buys exactly one order, replays return the same order |
+| `get_order_status(order_id)` | read-only | Order and approval |
 
-Resource: `valio://policy/{buyer_id}` (the mandate that is enforced).
+Annotations are hints for hosts. Enforcement is server side.
 
-## Policy engine
+## Hard rules (`constraints.py`)
 
-Checked on every `place_order`, server side:
+Per product and rule: `safe`, `excluded` or `unknown`, with the signals. Unknown is never safe. OR logic: one "contains" signal excludes.
 
-| Rule | On fail |
+* GS1 allergen levels `CONTAINS` / `MAY_CONTAIN` / `FREE_FROM` (`MAY_CONTAIN` excludes under allergy strictness)
+* Nutritional claims (`FREE_FROM_LACTOSE`, `LOW_LACTOSE` is not lactose-free). A "milk-free" claim loses to an ingredient hit
+* Milk-derivative scan of name and ingredients in en/fi/sv, with plant look-alikes (oat/coconut milk, cocoa/peanut butter) and negations (`maidoton`, `milk-free`)
+
+## Diff and tiers (`diff.py`, `policy.py`)
+
+| Check | Mismatch |
 |---|---|
-| `quote_valid` (not expired, before cut-off) | rejected |
-| `availability` (full quantity on the requested date) | human approval |
-| `spend_limit` (per buyer in `policies.json`, net of VAT) | human approval |
+| binding (buyer, exact quantity the quote was asked for), quote signature, quote valid, cut-off | block |
+| hard rules (lactose, allergens) not `safe` | block |
+| product class (catalog search for the intent's product includes it) | ask |
+| quantity in Decimal: not less, max +`max_over_pct` from pack rounding | ask |
+| delivery date, availability, budget, mandate spend limit, category | ask |
+
+`auto` = 0 deviations: confirmed, receipt signed by Valio Aimo. `ask` = a human signs the exact cart hash. `block` = rejected, the intent stays usable.
 
 ## Human-only endpoints (not MCP)
 
 Bearer `APPROVER_TOKEN`. Called by the buyer backend for its human UI, never by the LLM.
 
 ```
+GET  /internal/intents/{id}
+POST /internal/intents/{id}/confirm   {"intent_hash", "signature", "confirmed_by"}     409 on hash mismatch or open questions
+POST /internal/intents/{id}/revise    {"edits": {...}}  -> new proposed intent, new hash
 GET  /internal/approvals?status=pending
-POST /internal/approvals/{approval_id}   {"decision":"approve|reject","decided_by":"chef.anna","comment":"..."}
-GET  /internal/orders/{order_id}
-GET  /internal/orders/{order_id}/audit
+POST /internal/approvals/{id}         {"decision", "decided_by", "cart_hash", "signature"}   409 if the cart changed
+GET  /internal/orders/{id}  /internal/orders/{id}/audit  /internal/mandate/{buyer_id}
 ```
+
+Public: `GET /verify/{order_id}` recomputes every hash and checks every signature. `GET /keys` returns Valio Aimo's public key.
+
+## Mandates (`policies.json`)
+
+`juvenes` (1,000 EUR autonomous), `hotel-chain-helsinki` (500), `school-kitchen-espoo` (300, always no peanuts and tree nuts incl. may contain), `default`.
 
 ## Data
 
-* `data/raw/products.json` (gitignored, fetch with `scripts/fetch_data.sh`). Falls back to `data/products.sample.json` (6 invented DEV SAMPLE products) when missing.
+* `data/raw/products.json` (gitignored, fetch with `scripts/fetch_data.sh`). Falls back to `data/products.sample.json` (6 invented DEV SAMPLE products).
 * `data/delivery_reliability.csv`, `data/carbon_footprint.csv` from the challenge.
+* Demo keys are generated in `data/keys/` (gitignored). Production: buyer keys as passkeys/wallet, Valio key in an HSM.
 * Offline: `python mcp-server/dev/fake_valio_api.py` serves invented prices on `:8099` in the real API's shape.

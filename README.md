@@ -4,6 +4,8 @@ Hack Junction 2026 · Valio Aimo Challenge · **Trusted Trade Agents**
 
 An external purchasing agent that finds products, compares offers and orders from Valio Aimo, with the guardrails enforced on Valio Aimo's side, not in the agent's prompt.
 
+**V2: what you see is what you sign.** The agent first turns the request into an OrderIntent. The buyer confirms and signs it. Valio Aimo then diffs every order against it, field by field, and decides: auto, ask (a human signs the exact cart) or block. Every receipt can be verified live. Plan and rationale: [`docs/v2-plan.md`](docs/v2-plan.md).
+
 ## Architecture
 
 ```
@@ -19,7 +21,7 @@ mcp-server/ (localhost:8001/mcp, later hosted)   Valio Aimo side
 
 * The **frontend** only talks to the backend.
 * The **backend** never talks to the Valio Aimo API directly, only through the MCP server.
-* **Approvals** are human only. They go through the backend REST API, never through an MCP tool, so the agent cannot approve its own orders.
+* **Confirming intents and approving orders** are human only. They go through the backend REST API with the buyer's signature, never through an MCP tool, so the agent cannot confirm or approve itself.
 
 More detail in [`docs/architecture.md`](docs/architecture.md).
 
@@ -41,10 +43,11 @@ cp .env.example .env                  # add VALIO_API_KEY, optionally an LLM key
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 scripts/fetch_data.sh                 # downloads the full product catalog into data/raw/
 scripts/dev.sh                        # mcp-server :8001 + backend :8000
-.venv/bin/python scripts/demo_e2e.py  # 1,000 L lactose-free milk -> approval -> confirmed -> audit
+.venv/bin/python scripts/demo_e2e.py  # intent -> signed confirm -> offers -> signed approval -> verify -> audit
+(cd mcp-server && ../.venv/bin/pytest)  # 31 tests incl. property-based guarantee
 ```
 
-Open **http://localhost:8000/console** for a plain debug UI: agent steps, offers, approvals, audit trail. It is served by the backend, no build step, and separate from `frontend/`.
+Open **http://localhost:8000/console**: the reference trust UI (mandate, intent chips with "Confirm & sign", rule evidence, price lock countdown, rejected options, "You asked vs cart", tier badges, "Verify receipt") plus agent steps and audit trail. Served by the backend, no build step, separate from `frontend/`.
 
 No LLM key: `LLM_PROVIDER=scripted` runs a deterministic agent through the same MCP flow.
 No network to the Valio API: `FAKE_VALIO=1 scripts/dev.sh` with `VALIO_API_BASE=http://127.0.0.1:8099`.
@@ -79,11 +82,14 @@ When the real backend is ready, it runs on the same port with the same contract.
 | Event | Show in UI as |
 |---|---|
 | `message` | Agent chat bubble (markdown) |
+| `intent_proposed` | Read-back, chips, questions, "Confirm & sign" button with `intent_hash` fingerprint. Confirm via `POST /intents/{id}/confirm` |
+| `intent_confirmed` | "Signed by ..." line, agent continues in the same stream |
+| `order_rejected` | Blocked box with the rule and the diff |
 | `tool_call` | Live step indicator, use the `label` field |
 | `tool_result` | Tick off the step, show `summary` |
-| `offers` | Product cards with price, availability, reliability, CO2, rank |
-| `approval_required` | Approval card with reason and policy checks |
-| `order_confirmed` | Confirmation card |
+| `offers` | Product cards with price, availability, reliability, CO2, rank, rule `evidence`, `provenance`, and `excluded` options |
+| `approval_required` | Approval card with `diff` (you asked vs cart), `tier`, "Approve & sign cart" sending `cart_hash` |
+| `order_confirmed` | Confirmation card with `tier`, `diff`, `receipt`, "Verify receipt" via `GET /orders/{id}/verify` |
 | `error` | Error banner |
 | `done` | Agent finished this turn |
 
