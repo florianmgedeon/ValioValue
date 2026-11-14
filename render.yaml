@@ -11,13 +11,13 @@ services:
     envVars:
       - key: APPROVER_TOKEN
         generateValue: true
-      - key: LLM_PROVIDER
-        value: scripted          # anthropic | openai | gemini | openai_compatible | scripted
+      - key: LLM_PROVIDER        # anthropic | openai | gemini | openai_compatible | scripted
+        value: anthropic
+      - key: LLM_MODEL
+        value: claude-haiku-5-5
+      - key: LLM_API_KEY         # secret, set in the dashboard. Empty = scripted agent (no LLM, no cost)
+        sync: false
       - key: DEFAULT_BUYER_ID
         value: school-kitchen-espoo
-      - key: VALIO_API_KEY       # empty = offline fake Valio API
-        sync: false
-      - key: LLM_API_KEY
-        sync: false
-      - key: LLM_MODEL
+      - key: VALIO_API_KEY       # secret, set in the dashboard. Empty = offline fake Valio API
         sync: false

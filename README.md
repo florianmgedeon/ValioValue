@@ -60,7 +60,7 @@ No network to the Valio API: `FAKE_VALIO=1 scripts/dev.sh` with `VALIO_API_BASE=
 
 ## Deploy for a demo
 
-**Hosted link (free, Render):** push to GitHub, then Render dashboard → New → Blueprint → this repo. Render reads `render.yaml` and builds the `Dockerfile`: one container with the built React UI and buyer backend (public) plus the mcp-server (internal only, `127.0.0.1:8001`). In the dashboard set `VALIO_API_KEY` (empty = offline fake Valio API, set = full catalog downloaded on start) and, only for the demo itself, `LLM_PROVIDER` + `LLM_API_KEY` (default `scripted`, no cost). The QR code for the phone points at the Render URL automatically. The free plan sleeps after 15 min idle (about 1 min to wake), so open the URL before the demo. Data resets on every restart.
+**Hosted link (free, Render):** push to GitHub, then Render dashboard → New → Blueprint → this repo. Render reads `render.yaml` and builds the `Dockerfile`: one container with the built React UI and buyer backend (public) plus the mcp-server (internal only, `127.0.0.1:8001`). In the dashboard set `VALIO_API_KEY` (empty = offline fake Valio API, set = full catalog downloaded on start) and `LLM_API_KEY` (the blueprint sets `LLM_PROVIDER=anthropic`, `LLM_MODEL=claude-haiku-5-5`; without a key the scripted agent runs, no cost). The link is public, so set a spending limit for that key. The QR code for the phone points at the Render URL automatically. The free plan sleeps after 15 min idle (about 1 min to wake), so open the URL before the demo. Data resets on every restart.
 
 Dress rehearsal with the same image and Render's limits (512 MB, `PORT`), then open http://localhost:8000:
 
