@@ -1,0 +1,19 @@
+docs/work-packages/2b-orders-and-autonomy.md
+  s_1bfb11234b64f3::t_98a1947f9d734f 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bf846ab7d05abe03ff0a369e0600c053b61486f2",
+  "prompts": {},
+  "sessions": {
+    "s_1bfb11234b64f3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "69b7a2a3-5d49-49d9-a191-914ab89c9203",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
