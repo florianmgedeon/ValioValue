@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { apiUrl } from "../../api/client";
 import type { KitchenProfile, Schema } from "../../api/types";
-import { Button, Chip, Icon, KindTag, Mark, Paper, YesNo, type Kind } from "../../ui";
+import { Button, Chip, Drawer, Icon, KindTag, Mark, Paper, YesNo, type Kind } from "../../ui";
 
 type Suggestion = Schema["Suggestion"];
 type Source = Schema["Source"];
@@ -79,27 +79,30 @@ export function Suggestions({ items, sources, onAccept, onReject, busy }: {
   busy: string | null;
 }) {
   if (!items.length) return null;
-  const src = (id?: string) => sources.find((x) => x.id === id)?.title;
+  const srcOf = (id?: string) => sources.find((x) => x.id === id);
   return (
-    <section className="sec" style={{ borderColor: "var(--accent)" }}>
+    <section className="sec to-check">
       <div className="sec-h">
-        <Icon name="bulb" />
-        <h2>New from your documents</h2>
+        <h2>To check <span className="n">({items.length})</span></h2>
         <span className="spacer" />
-        <span className="muted text-[13px]">I never turn these on without you</span>
+        <span className="muted text-[13px]">Nothing changes until you say yes</span>
       </div>
       {items.map((s) => {
-        const usual = usualText(s);
+        const src = srcOf(s.source_id);
+        // From an order (2a): the quote is my own sentence ("You chose … instead of …"), not a document's words.
+        const fromOrder = src?.type === "order" || src?.type === "correction";
+        const usual = fromOrder ? null : usualText(s);
         return (
-          <div key={s.id} className="rule new" aria-busy={busy === s.id}>
+          <div key={s.id} className="rule" aria-busy={busy === s.id}>
             <div className="grid gap-1">
               <div className="t">{s.kind && <KindTag kind={KIND_OF[s.kind]} />}{s.title}</div>
               <div className="s">
+                {fromOrder && s.quote && <span>{s.quote}</span>}
                 {usual && <span>{usual}</span>}
-                {src(s.source_id) && <span>from {src(s.source_id)}</span>}
-                {(s.kind === "must" || s.kind === "prefer" || s.kind === "autonomy") && <span>· needs your OK</span>}
+                {!fromOrder && src?.title && <span>from {src.title}</span>}
+                {(s.kind === "must" || s.kind === "prefer" || s.kind === "autonomy") && <span>· needs your signature</span>}
               </div>
-              {s.quote && !s.quote.startsWith(s.title ?? "\u0000") && <div className="q">“{s.quote}”</div>}
+              {!fromOrder && s.quote && !s.quote.startsWith(s.title ?? "\u0000") && <div className="q">“{s.quote}”</div>}
             </div>
             <YesNo value={undefined} onChange={(yes) => (yes ? onAccept(s) : onReject(s))} />
           </div>
@@ -109,7 +112,7 @@ export function Suggestions({ items, sources, onAccept, onReject, busy }: {
   );
 }
 
-export function About({ profile, onSave }: { profile: KitchenProfile; onSave: (text: string) => Promise<void> }) {
+export function About({ profile, onSave, footer }: { profile: KitchenProfile; onSave: (text: string) => Promise<void>; footer?: ReactNode }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(profile.about?.text ?? "");
   const [saving, setSaving] = useState(false);
@@ -157,6 +160,7 @@ export function About({ profile, onSave }: { profile: KitchenProfile; onSave: (t
           {facts.map((f) => <Chip key={f.id ?? f.label} kind="about">{f.label}</Chip>)}
         </div>
       )}
+      {footer}
     </section>
   );
 }
@@ -171,31 +175,42 @@ function SourceThumb({ s }: { s: Source }) {
   return <Icon name={icon} size={28} className="text-ink3" />;
 }
 
-export function Sources({ profile, orders }: { profile: KitchenProfile; orders: number | null }) {
+/** One line at the end of About: "Learned from 4 documents and 7 orders". The documents open in a drawer. */
+export function SourcesLine({ profile, orders }: { profile: KitchenProfile; orders: number | null }) {
+  const [open, setOpen] = useState(false);
   const docs = (profile.sources ?? []).filter((s) => s.type === "photo" || s.type === "pdf" || s.type === "text");
   const corrections = (profile.sources ?? []).filter((s) => s.type === "correction").length;
+  if (!docs.length && !orders) return null;
+  const parts = [docs.length ? `${docs.length} document${docs.length === 1 ? "" : "s"}` : "", orders ? `${orders} order${orders === 1 ? "" : "s"}` : ""].filter(Boolean);
   return (
-    <section className="sec">
-      <div className="sec-h">
-        <h2>What I learned from</h2>
-      </div>
-      <div className="sources">
-        {docs.map((s) => {
-          const inner = (
-            <>
-              <div className="th"><SourceThumb s={s} /></div>
-              <span className="line-clamp-2">{s.title}</span>
-            </>
-          );
-          return s.upload_id ? (
-            <a key={s.id} className="src" href={uploadSrc(s.upload_id)} target="_blank" rel="noreferrer">{inner}</a>
-          ) : (
-            <div key={s.id} className="src">{inner}</div>
-          );
-        })}
-        <div className="src"><div className="th n">{orders ?? "–"}</div>orders</div>
-        <div className="src"><div className="th n">{corrections}</div>your corrections</div>
-      </div>
-    </section>
+    <>
+      <button className="srcline" onClick={() => setOpen(true)}>
+        <span className="thumbs" aria-hidden="true">{docs.slice(0, 3).map((s) => <span key={s.id} />)}</span>
+        <span>Learned from {parts.map((p, i) => <span key={p}>{i ? " and " : ""}<b>{p}</b></span>)}</span>
+        <span className="spacer" />
+        <Icon name="chev" size={16} className="text-ink3" />
+      </button>
+      <Drawer open={open} onClose={() => setOpen(false)} title="What I learned from">
+        <div className="src-grid">
+          {docs.map((s) => {
+            const inner = (
+              <>
+                <div className="th"><SourceThumb s={s} /></div>
+                <span className="line-clamp-2">{s.title}</span>
+              </>
+            );
+            return s.upload_id ? (
+              <a key={s.id} className="src" href={uploadSrc(s.upload_id)} target="_blank" rel="noreferrer">{inner}</a>
+            ) : (
+              <div key={s.id} className="src">{inner}</div>
+            );
+          })}
+        </div>
+        <div className="src-nums">
+          <div><b>{orders ?? "–"}</b>orders</div>
+          <div><b>{corrections}</b>{corrections === 1 ? "of your corrections" : "your corrections"}</div>
+        </div>
+      </Drawer>
+    </>
   );
 }

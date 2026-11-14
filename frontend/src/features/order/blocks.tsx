@@ -395,7 +395,7 @@ function Blocked({ b, ctx }: { b: BlockOf<"block">; ctx: BlockCtx }) {
       </div>
       <CardFooter>
         <div className="fore">No setting lets me order this anyway. Only changing the rule does.</div>
-        <Button small variant="primary" onClick={() => navigate("kitchen")}>Open kitchen profile</Button>
+        <Button small variant="primary" onClick={() => navigate("kitchen", "may")}>Open your rules</Button>
       </CardFooter>
     </Card>
   );

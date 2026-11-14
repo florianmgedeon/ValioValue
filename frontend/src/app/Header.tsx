@@ -54,10 +54,7 @@ export function Header({ tab, showTabs }: { tab: Tab; showTabs: boolean }) {
           <button
             className="flex h-9 items-center gap-2.5 rounded-full bg-auto-soft pr-3 pl-2.5 text-[13px] font-semibold whitespace-nowrap text-auto"
             title="What I may order without you"
-            onClick={() => {
-              navigate("kitchen");
-              window.setTimeout(() => document.getElementById("autonomy")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
-            }}
+            onClick={() => navigate("kitchen", "may")}
           >
             <Icon name="hand" className="hidden sm:block" />
             <span className="hidden md:inline">{long}</span>

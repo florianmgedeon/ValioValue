@@ -1,12 +1,9 @@
 import { useState } from "react";
-import { decideDrift } from "../../api/kitchen";
 import type { Drift, KitchenProfile, Schema, UsualOrder } from "../../api/types";
 import { useComposerText } from "../../app/composer";
-import { keys, queryClient, SIGNER_NAME } from "../../app/queries";
 import { navigate } from "../../app/route";
-import { Button, Drawer, Icon, Segmented, eur, useToast } from "../../ui";
+import { Button, Drawer, Icon, eur } from "../../ui";
 import { unitText } from "./Profile";
-import { errText } from "./Rules";
 
 type Suggestion = Schema["Suggestion"];
 type Usual = NonNullable<KitchenProfile["usual"]>[number];
@@ -14,7 +11,7 @@ type Week = NonNullable<NonNullable<UsualOrder["items"]>[number]["weeks"]>[numbe
 
 const day = (iso?: string | null) => (iso ? new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "");
 
-/** Suggestions that came from an order (2a: at most one per order). Documents keep their own section. */
+/** Suggestions that came from an order (2a: at most one per order), as opposed to a document. */
 export function isFromOrder(s: Suggestion, profile: KitchenProfile) {
   const src = profile.sources?.find((x) => x.id === s.source_id);
   return src?.type === "order" || src?.type === "correction";
@@ -38,18 +35,6 @@ function Bars({ weeks }: { weeks: Week[] }) {
   );
 }
 
-function Spark({ values }: { values: number[] }) {
-  const v = values.filter((x) => x > 0);
-  if (v.length < 2) return null;
-  const min = Math.min(...v), max = Math.max(...v);
-  const pts = v.map((x, i) => `${2 + (i * 68) / (v.length - 1)},${max === min ? 12 : 20 - ((x - min) / (max - min)) * 16}`).join(" ");
-  return (
-    <svg className="spark" width={72} height={24} viewBox="0 0 72 24" aria-hidden="true">
-      <polyline fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" points={pts} />
-    </svg>
-  );
-}
-
 /** Against the weeks with any delivery, so a closed week (holiday) does not count as "not ordered". */
 function howOften(weeks: Week[], deliveries: number) {
   const n = weeks.filter((w) => (w.quantity ?? 0) > 0).length;
@@ -57,15 +42,12 @@ function howOften(weeks: Week[], deliveries: number) {
   return n >= deliveries ? "every week" : `in ${n} of ${deliveries} weeks`;
 }
 
-/** "What I learned from your orders": one row per usual product, the 8 weeks behind it, at most one open question. */
-export function LearnedSection({ profile, usualOrder, limit, question, onAccept, onReject, busy, drift }: {
+/** "What I learned from your orders": one row per usual product and the 8 weeks behind it. Drift shows as orange
+ *  bars here; the drift decision itself comes when the buyer orders the usual (Order tab). */
+export function LearnedSection({ profile, usualOrder, limit, drift }: {
   profile: KitchenProfile;
   usualOrder: UsualOrder | undefined;
   limit: number | null;
-  question: Suggestion | undefined;
-  onAccept: (s: Suggestion) => void;
-  onReject: (s: Suggestion) => void;
-  busy: string | null;
   drift: Drift[];
 }) {
   const setText = useComposerText();
@@ -89,20 +71,6 @@ export function LearnedSection({ profile, usualOrder, limit, question, onAccept,
         {h?.orders ? <span className="muted text-[13px]">{h.orders} orders since {day(h.since)}</span> : null}
         <p>When you say the word, I pick this product. The bars are the last eight weeks.</p>
       </div>
-
-      {question && (
-        <div className="l-ask" aria-busy={busy === question.id}>
-          <span className="ic"><Icon name="bulb" /></span>
-          <div>
-            <div className="t">{question.title}</div>
-            {question.quote && <div className="s">{question.quote}</div>}
-          </div>
-          <div className="acts">
-            <Button small onClick={() => onReject(question)} disabled={busy === question.id}>Just this time</Button>
-            <Button small variant="primary" onClick={() => onAccept(question)} disabled={busy === question.id}>Remember</Button>
-          </div>
-        </div>
-      )}
 
       {items.length === 0 && <div className="l-empty muted">Nothing yet. After a few orders, or one invoice photo, I know your usual products.</div>}
       {items.map((u) => {
@@ -134,7 +102,7 @@ export function LearnedSection({ profile, usualOrder, limit, question, onAccept,
         </div>
       )}
 
-      {items.some((u) => u.typical_qty != null) && drift.length === 0 && (
+      {items.some((u) => u.typical_qty != null) && (
         <div className="usual-foot">
           <span className="est">
             {est !== null ? <>The usual order ≈ <b className="num">{eur(est)}</b>. </> : null}
@@ -182,77 +150,5 @@ function UsualDrawer({ usual, weeks, deliveries, drift, onClose }: { usual: Usua
       )}
       <p className="muted text-[13px]">Change the amount or the product by telling me below, e.g. “we need 100 L milk a week”.</p>
     </Drawer>
-  );
-}
-
-/** 2e: before "Order the usual", what drifted. Shown only when something did. */
-export function DriftCard({ drift, usualOrder, limit }: { drift: Drift[]; usualOrder: UsualOrder | undefined; limit: number | null }) {
-  const toast = useToast();
-  const [keep, setKeep] = useState<Record<string, "keep" | "back">>({});
-  const [busy, setBusy] = useState(false);
-  const qty = drift.filter((d) => d.kind === "quantity");
-  const cost = drift.find((d) => d.kind === "cost");
-
-  const go = async () => {
-    setBusy(true);
-    try {
-      await decideDrift(drift.map((d) => ({
-        key: d.key!, value: d.to!, keep: (keep[d.key!] ?? "keep") === "keep", back_to: d.kind === "quantity" ? d.from : null,
-      })), SIGNER_NAME);
-      await Promise.all([queryClient.invalidateQueries({ queryKey: keys.kitchen }), queryClient.invalidateQueries({ queryKey: ["usual-order"] })]);
-      navigate("order", "usual");
-    } catch (e) {
-      toast(errText(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const series = (word: string) => usualOrder?.items?.find((i) => i.word === word)?.weeks?.map((w) => w.quantity ?? 0) ?? [];
-  return (
-    <section className="drift-card" id="drift">
-      <div className="h">
-        <h2>Before you order the usual</h2>
-        <span className="chip">{drift.length === 1 ? "1 thing drifted" : `${drift.length} things drifted`}</span>
-        <p>Over the last weeks your orders changed. Have a look, then I order.</p>
-      </div>
-      {qty.map((d) => (
-        <div key={d.key} className="dr">
-          <div>
-            <div className="t">{d.text}</div>
-            <div className="s">{d.detail}</div>
-          </div>
-          <Spark values={series(d.word ?? "")} />
-          <div className="choice">
-            <Segmented
-              label={`${d.word} amount`}
-              value={keep[d.key!] ?? "keep"}
-              onChange={(v) => setKeep((k) => ({ ...k, [d.key!]: v }))}
-              options={[
-                { value: "keep", label: `Keep ${d.to} ${unitText(d.unit ?? undefined)}` },
-                { value: "back", label: `Back to ${d.from} ${unitText(d.unit ?? undefined)}` },
-              ]}
-            />
-          </div>
-        </div>
-      ))}
-      {cost && (
-        <div className="dr">
-          <div>
-            <div className="t">{cost.text}</div>
-            <div className="s">
-              {cost.detail}
-              {limit !== null && cost.to! <= limit ? ` Still under your ${eur(limit)}.` : ""}
-              {limit !== null && cost.to! > limit ? ` Above your ${eur(limit)}: you approve the cart.` : ""}
-            </div>
-          </div>
-        </div>
-      )}
-      <div className="f">
-        <span>Everything else looks like always.</span>
-        <span className="spacer" />
-        <Button variant="primary" small disabled={busy} onClick={() => void go()}>{busy ? "Saving…" : "Order the usual"}</Button>
-      </div>
-    </section>
   );
 }

@@ -47,11 +47,6 @@
 .kt .usual .m { font-size: 12px; color: var(--ink3); }
 .kt .usual .qty { font-size: 13px; color: var(--ink2); text-align: right; font-variant-numeric: tabular-nums; }
 @media (max-width: 560px) { .kt .usual { grid-template-columns: 80px minmax(0, 1fr); } .kt .usual .qty { grid-column: 2; text-align: left; } }
-.kt .sources { display: flex; gap: 10px; padding: 4px 20px 18px; overflow-x: auto; }
-.kt .src { flex: none; width: 120px; display: grid; gap: 6px; font-size: 12px; align-content: start; }
-.kt .src .th { height: 90px; border-radius: 10px; background: var(--surface); padding: 8px; overflow: hidden; display: grid; place-items: center; }
-.kt .src .th img { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; }
-.kt .src .th.n { font-size: 22px; font-weight: 800; }
 
 /* add rule / permission forms */
 .kt .addrule { padding: 14px 20px; border-top: 1px solid var(--line); display: grid; gap: 10px; background: var(--surface); }
@@ -137,18 +132,29 @@
 .l-ev .q { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink2); white-space: nowrap; }
 .l-ev .none .q { color: var(--ink3); }
 
-/* 2e: drift before the usual order */
-.kt .drift-card { border: 2px solid var(--auto); box-shadow: var(--shadow); border-radius: 20px; overflow: hidden; background: var(--bg); scroll-margin-top: 90px; }
-.kt .drift-card .h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 16px 20px; background: var(--auto-soft); }
-.kt .drift-card .h h2 { font-size: 17px; font-weight: 700; }
-.kt .drift-card .h .chip { background: var(--bg); color: var(--auto); }
-.kt .drift-card .h p { width: 100%; font-size: 13px; color: var(--ink2); }
-.kt .drift-card .dr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 16px; align-items: center; padding: 14px 20px; border-top: 1px solid var(--line); }
-.kt .drift-card .h + .dr { border-top: 0; }
-.kt .drift-card .dr .t { font-weight: 600; font-size: 14.5px; }
-.kt .drift-card .dr .s { font-size: 12.5px; color: var(--ink3); margin-top: 2px; }
-.kt .drift-card .spark { color: var(--auto); }
-.kt .drift-card .choice { grid-column: 1 / -1; }
-.kt .drift-card .seg { font-size: 13px; padding: 3px; border-radius: 10px; }
-.kt .drift-card .seg button { padding: 5px 12px; border-radius: 8px; }
-.kt .drift-card .f { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 20px; background: var(--surface); font-size: 13px; color: var(--ink3); }
+/* To check: everything waiting for a yes (documents and orders), above both views */
+.kt .to-check { border: 2px solid var(--accent); }
+.kt .to-check .n { color: var(--accent); }
+
+/* the two views: what I know (learned) / what I may do (signed) */
+.kt .views { display: inline-flex; justify-self: start; gap: 2px; padding: 4px; border-radius: 14px; background: var(--surface); }
+.kt .views button { height: 38px; padding: 0 18px; border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 600; color: var(--ink2); }
+.kt .views button[aria-selected="true"] { background: var(--bg); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+.kt .views .sub { font-size: 12.5px; font-weight: 500; color: var(--ink3); }
+@media (max-width: 560px) { .kt .views { display: flex; justify-self: stretch; } .kt .views button { flex: 1; justify-content: center; padding: 0 8px; white-space: nowrap; } .kt .views .sub { display: none; } }
+.kt .signnote { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink3); }
+
+/* sources: one line at the end of About, documents in a drawer */
+.kt .srcline { width: 100%; display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--ink2); text-align: left; }
+.kt .srcline:hover { background: var(--surface); }
+.kt .srcline .thumbs { display: flex; }
+.kt .srcline .thumbs span { width: 24px; height: 30px; margin-left: -8px; border-radius: 4px; background: var(--paper); border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+.kt .srcline .thumbs span:first-child { margin-left: 0; transform: rotate(-5deg); }
+.kt .srcline .thumbs span:nth-child(3) { transform: rotate(4deg); }
+.src-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.src-grid .src { display: grid; gap: 6px; font-size: 13px; align-content: start; }
+.src-grid .th { height: 120px; border-radius: 12px; background: var(--surface); padding: 8px; overflow: hidden; display: grid; place-items: center; }
+.src-grid .th img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+.src-nums { display: flex; gap: 12px; }
+.src-nums > div { flex: 1; padding: 12px; border-radius: 12px; background: var(--surface); font-size: 13px; color: var(--ink3); }
+.src-nums b { display: block; font-size: 22px; color: var(--ink); }
