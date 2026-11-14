@@ -47,18 +47,29 @@ def rule_coverage(rule: dict, category: str | None = None) -> dict:
     return out
 
 
-def categories(query: str, limit: int = 5) -> list[dict]:
-    """Category codes for a plain word ('milk', 'fish'), learned from product names. Used to turn
-    'only Finnish fish' into applies_to: category in [...]."""
+# Group words that never appear in product names, as the product words they stand for.
+GROUP_WORDS = {
+    "dairy": "milk cheese yoghurt cream butter quark", "meat": "meat beef pork mince",
+    "poultry": "chicken turkey", "seafood": "fish shrimp salmon", "vegetables": "potato carrot onion cabbage tomato",
+    "veg": "potato carrot onion cabbage tomato", "fruit": "apple banana orange pear", "bread": "bread rolls",
+}
+
+
+def categories(query: str, limit: int = 8) -> list[dict]:
+    """Category codes for a plain word ('milk', 'fish', 'dairy'), learned from product names. Used to turn
+    'only Finnish fish' into applies_to: category in [...]. Each word adds its best categories."""
     cat = catalog()
+    q = " ".join(GROUP_WORDS.get(w, w) for w in query.lower().split())
     found: dict[str, float] = {}
-    for alts in cat._terms(query):
-        for c, share in cat.affinity(tuple(alts)).items():
-            found[c] = max(found.get(c, 0.0), share)
-    if not found:
-        return []
-    top = max(found.values())
-    keep = sorted(((c, s) for c, s in found.items() if s >= max(0.2, top * 0.75)), key=lambda t: -t[1])[:limit]
+    for alts in cat._terms(q):
+        aff = cat.affinity(tuple(alts))
+        if not aff:
+            continue
+        top = max(aff.values())
+        for c, share in aff.items():
+            if share >= max(0.2, top * 0.75):
+                found[c] = max(found.get(c, 0.0), share)
+    keep = sorted(found.items(), key=lambda t: -t[1])[:limit]
     out = []
     for c, s in keep:
         names = [p.name for p in cat.products.values() if p.category == c][:3]

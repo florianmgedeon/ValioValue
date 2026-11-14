@@ -133,6 +133,8 @@ Guidance:
 - country is lower-case ISO alpha-2 ('fi').
 - Labels and claims: use a value from 'Values seen'.
 - If the rule is only for some products, set product_type to a plain English word; do not invent category codes.
+- Number attributes (delivery_reliability 0 to 1, co2_kg_per_kg): use only a threshold the buyer states.
+  "Low CO2" or "reliable" without a number: cannot_draft and ask for the number.
 - Do not combine several rules. If the sentence has several, cannot_draft and say which ones to add one by one."""
 
 
