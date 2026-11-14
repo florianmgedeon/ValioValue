@@ -337,12 +337,12 @@ export function OnboardingView() {
 function DocCard({ doc, highlight }: { doc: Doc; highlight?: Learned }) {
   const reading = doc.status === "reading" || doc.status === "uploading";
   return (
-    <div className="grid gap-2.5">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2.5">
       <div
-        className={`relative aspect-[4/5] max-w-full overflow-hidden rounded-[18px] bg-surface p-[18px] shadow-card transition-shadow ${highlight ? "ring-3 ring-ink3" : ""}`}
+        className={`relative aspect-[4/5] min-h-0 max-w-full overflow-hidden rounded-[18px] bg-surface p-[18px] shadow-card transition-shadow ${highlight ? "ring-3 ring-ink3" : ""}`}
       >
         {doc.preview.kind === "image" ? (
-          <img src={doc.preview.src} alt={doc.title} className="size-full rounded-md object-cover shadow-card" />
+          <img src={doc.preview.src} alt={doc.title} className="absolute inset-[18px] size-[calc(100%-36px)] rounded-md object-cover shadow-card" />
         ) : doc.preview.kind === "pdf" ? (
           <Paper variant="inv">
             <div className="grid h-full place-content-center gap-3 text-center">
