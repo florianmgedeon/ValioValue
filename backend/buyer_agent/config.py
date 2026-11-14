@@ -14,7 +14,9 @@ BACKEND_PORT = int(os.getenv("BACKEND_PORT", "8000"))
 MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:8001/mcp")
 MCP_BASE_URL = MCP_SERVER_URL.rsplit("/mcp", 1)[0]
 APPROVER_TOKEN = os.getenv("APPROVER_TOKEN", "dev-approver-token")
-DEFAULT_BUYER_ID = os.getenv("DEFAULT_BUYER_ID", "hotel-chain-helsinki")
+DEFAULT_BUYER_ID = os.getenv("DEFAULT_BUYER_ID", "juvenes")
+DATA_DIR = Path(os.getenv("DATA_DIR", REPO_ROOT / "data"))
+KEYS_DIR = Path(os.getenv("KEYS_DIR", DATA_DIR / "keys"))
 
 # anthropic | openai | gemini | openai_compatible | scripted
 LLM_PROVIDER = (os.getenv("LLM_PROVIDER") or "").strip().lower()

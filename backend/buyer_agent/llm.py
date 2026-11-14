@@ -221,7 +221,8 @@ def parse_request(text: str, today: date) -> dict:
 
 
 class ScriptedProvider:
-    """Deterministic planner: search -> check_offer -> place_order. Keeps the demo alive without an LLM key."""
+    """Deterministic planner without an LLM key:
+    new request -> propose_intent and stop. Confirmed intent -> search -> check_offer -> place_order."""
 
     name = "scripted"
 
@@ -230,32 +231,47 @@ class ScriptedProvider:
 
     async def complete(self, system, history, tools):
         users = [m for m in history if m["role"] == "user"]
-        req = parse_request(users[-1]["text"], self.today) if users else {}
+        text = users[-1]["text"] if users else ""
         last_user = max(i for i, m in enumerate(history) if m["role"] == "user")
         results = {m["name"]: json.loads(m["content"]) for m in history[last_user:] if m["role"] == "tool"}
         cid = f"call_{uuid.uuid4().hex[:8]}"
+        confirmed = re.search(r"signed intent (int_\w+)", text)
+
+        if not confirmed:
+            if "propose_intent" in results:
+                return AssistantTurn(None)
+            req = parse_request(text, self.today)
+            t = text.lower()
+            rules = []
+            if re.search(r"(milk|dairy) allerg|allergic to (milk|dairy)", t):
+                rules.append({"rule": "exclude_allergen", "allergen": "milk",
+                              "strictness": "contains_or_may_contain"})
+            return AssistantTurn(None, [ToolCall(cid, "propose_intent", {
+                "original_request": text, "product_query": req["query"], "quantity": req["quantity"],
+                "quantity_unit": req["unit"], "deliver_by": req["date"], "hard_rules": rules})])
+
+        intent_id = confirmed.group(1)
+        m = re.search(r"Product: (.+?)\. Go ahead", text)
+        query = m.group(1) if m else "products"
         if "search_products" not in results:
-            return AssistantTurn(
-                f"Looking for **{req['quantity']:g} {req['unit'].replace('SALES_UNIT', 'units')} {req['query']}** "
-                f"for delivery on **{req['date']}**.",
-                [ToolCall(cid, "search_products", {"query": req["query"], "limit": 12})])
+            return AssistantTurn(f"Searching for **{query}** against your confirmed intent.",
+                                 [ToolCall(cid, "search_products", {"query": query, "intent_id": intent_id, "limit": 12})])
         if "check_offer" not in results:
             ids = [p["product_id"] for p in results["search_products"].get("products", [])][:10]
             if not ids:
-                return AssistantTurn(f"I found nothing in the Valio Aimo catalog for '{req['query']}'.")
-            return AssistantTurn(None, [ToolCall(cid, "check_offer", {
-                "product_ids": ids, "requested_date": req["date"], "quantity": req["quantity"],
-                "quantity_unit": req["unit"]})])
+                return AssistantTurn(f"Nothing in the Valio Aimo catalog for '{query}' meets every rule of your intent.")
+            return AssistantTurn(None, [ToolCall(cid, "check_offer", {"product_ids": ids, "intent_id": intent_id})])
         if "place_order" not in results:
             offers = results["check_offer"].get("offers", [])
             best = next((o for o in offers if o.get("can_fulfil")), None)
             if not best:
                 return AssistantTurn("None of the matching products can deliver the full quantity on time. "
                                      "Tell me whether a later date or a partial delivery works.")
-            reason = (f"Cheapest offer that delivers the full {best['quantity']:g} {best['sales_unit']} "
-                      f"by {best['requested_date']}"
+            reason = (f"Cheapest offer that meets every rule and delivers the full {best['quantity']:g} "
+                      f"{best['sales_unit']} by {best['requested_date']}"
                       + (f", delivery reliability {best['delivery_reliability']:.0%}" if best.get("delivery_reliability") else ""))
-            return AssistantTurn(None, [ToolCall(cid, "place_order", {"quote_id": best["quote_id"], "reason": reason})])
+            return AssistantTurn(None, [ToolCall(cid, "place_order", {"quote_id": best["quote_id"],
+                                                                      "intent_id": intent_id, "reason": reason})])
         return AssistantTurn("Done.")
 
 

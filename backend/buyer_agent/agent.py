@@ -36,6 +36,8 @@ class Session:
     events: list[dict] = field(default_factory=list)
     subscribers: set[asyncio.Queue] = field(default_factory=set)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    intent: dict | None = None          # latest intent shown to the buyer
+    excluded: list[dict] = field(default_factory=list)  # rejected options from the last search
 
     def emit(self, type_: str, **payload: Any) -> dict:
         evt = {"type": type_, "session_id": self.id, "timestamp": now_iso(), **payload}
@@ -47,6 +49,7 @@ class Session:
 
 SESSIONS: dict[str, Session] = {}
 ORDER_SESSION: dict[str, str] = {}
+INTENT_SESSION: dict[str, str] = {}
 
 
 def get_or_create_session(session_id: str | None, buyer_id: str | None) -> Session:
@@ -81,11 +84,14 @@ def tool_payload(result: Any) -> dict:
 # --------------------------------------------------------------------------- UI labels
 
 def label(tool: str, args: dict) -> str:
+    if tool == "propose_intent":
+        return "Writing down exactly what you asked for"
     if tool == "search_products":
         return f"Searching the Valio Aimo catalog for {args.get('query', 'products')}"
     if tool == "check_offer":
         n = len(args.get("product_ids", []))
-        return f"Checking price and availability for {n} product{'s' * (n != 1)} for {args.get('requested_date')}"
+        when = f" for {args['requested_date']}" if args.get("requested_date") else " against your intent"
+        return f"Getting signed prices and availability for {n} product{'s' * (n != 1)}{when}"
     if tool == "place_order":
         return "Placing the order with Valio Aimo"
     if tool == "get_order_status":
@@ -96,8 +102,14 @@ def label(tool: str, args: dict) -> str:
 def summary(tool: str, res: dict) -> str:
     if res.get("error"):
         return str(res["error"])
+    if tool == "propose_intent":
+        it = res.get("intent") or {}
+        q = it.get("questions") or []
+        return f"{len(q)} question(s) before I can start" if q else "Ready for your confirmation"
     if tool == "search_products":
-        return f"Found {res.get('total_matches', 0)} matching products, shortlisted {res.get('returned', 0)}"
+        ex = res.get("excluded_count")
+        return (f"Found {res.get('total_matches', 0)} matching products, shortlisted {res.get('returned', 0)}"
+                + (f", {ex} excluded by your rules" if ex else ""))
     if tool == "check_offer":
         offers = res.get("offers", [])
         full = sum(1 for o in offers if o.get("can_fulfil"))
@@ -105,7 +117,7 @@ def summary(tool: str, res: dict) -> str:
     if tool == "place_order":
         return {"confirmed": f"Order {res.get('order_id')} confirmed",
                 "pending_approval": f"Order {res.get('order_id')} needs human approval",
-                "rejected": f"Order rejected: {res.get('message', '')}"}.get(res.get("status"), str(res.get("status")))
+                "rejected": f"Blocked: {res.get('message') or res.get('error', '')}"}.get(res.get("status"), str(res.get("status")))
     return "ok"
 
 
@@ -118,14 +130,18 @@ def unit_word(unit: str) -> str:
 def system_prompt(session: Session) -> str:
     today = datetime.now(TZ)
     return f"""You are the purchasing agent of buyer '{session.buyer_id}', ordering from Valio Aimo, a Finnish foodservice wholesaler, through its MCP tools.
-Now is {today:%A %Y-%m-%d %H:%M} ({config.TIMEZONE}). Quote expiry and order cut-off times are in the same time zone. "By Monday" means the next Monday after today, as YYYY-MM-DD.
+Now is {today:%A %Y-%m-%d %H:%M} ({config.TIMEZONE}). "By Monday" means the next Monday after today, as YYYY-MM-DD.
+
+Accuracy rule: you only ever buy what the buyer confirmed. Valio Aimo checks every order against the confirmed intent, field by field. You never decide whether a product meets a rule, the data does.
 
 How to work:
-1. search_products with a short product query in English (e.g. "lactose-free milk") and filters that reflect hard requirements (lactose-free, allergens, origin).
-2. check_offer with ALL search results that match the request (up to 10 product ids, different pack sizes included, since price per litre differs), the delivery date, and the quantity in the unit the buyer used (L or KG are converted to sales units by Valio). Leave out only products that clearly are something else.
-3. Pick the offer that exactly matches the request and can deliver in full on time (can_fulfil=true). Default preference: lowest total price, then higher delivery reliability. Offers come sorted best first, rank 'best' is usually right. Never pick a product that violates a stated requirement. Only call something cheapest if it is cheapest among the offers you checked.
-4. place_order with that single quote_id and a one-sentence reason a human approver can understand.
-5. After place_order, do not call any more tools. Tell the buyer the outcome in 1 to 3 sentences: product, quantity, total, delivery date, and if pending_approval, why it waits for their approval. You cannot approve orders and must not re-order to get around a limit.
+A) New request: call propose_intent FIRST, nothing else. original_request = the buyer's message verbatim. Quantity and unit exactly as the buyer said them. hard_rules only for what the buyer actually required (lactose-free -> lactose_free, an allergy -> exclude_allergen). Never guess: if "non-dairy", an allergy or anything else is ambiguous, put it in open_questions. Then stop. The buyer checks the read-back and confirms in the app. You cannot confirm.
+B) After the buyer confirmed an intent (they tell you the intent_id):
+   1. search_products with a short English product query and the intent_id. Only products proven safe come back.
+   2. check_offer with ALL returned product ids (up to 10) and the intent_id. Quantity, unit and date come from the intent.
+   3. place_order with the offer ranked 'best' (can_fulfil=true), its quote_id, the intent_id and a one-sentence reason.
+   4. If place_order is 'rejected' (blocked), say which rule blocked it in one sentence and try the next offer with can_fulfil=true once. If none, explain and ask.
+   5. After 'confirmed' or 'pending_approval' do not call more tools. Tell the outcome in 1 to 3 sentences.
 If nothing can deliver in full, explain the best options (partial, later date) and ask; do not order.
 Keep messages short, use markdown, mention price, quantity in sales units and delivery date."""
 
@@ -190,11 +206,14 @@ async def _loop(session: Session) -> None:
                                  result=res, duration_ms=round((time.perf_counter() - t0) * 1000))
                     stop = _side_events(session, call.name, call.args, res)
                     if stop:
-                        order_res = res
+                        order_res = res | {"_tool": call.name}
                 session.history.append({"role": "tool", "tool_call_id": call.id, "name": call.name,
                                         "content": json.dumps(res, ensure_ascii=False)[:15000]})
             if stop:
-                await _wrap_up(session, provider, think, order_res)
+                if order_res.get("_tool") == "propose_intent":
+                    _intent_message(session, order_res["intent"])
+                else:
+                    await _wrap_up(session, provider, think, order_res)
                 return
         session.emit("message", role="assistant", text="I stopped after too many steps. Please refine the request.")
 
@@ -214,6 +233,32 @@ async def _wrap_up(session: Session, provider, think, order_res: dict) -> None:
     session.emit("message", role="assistant", text=text)
 
 
+def _intent_message(session: Session, it: dict) -> None:
+    """Fixed text, no LLM: the read-back comes from Valio Aimo, not from the model."""
+    if it.get("questions"):
+        text = "Before I search, please answer:\n" + "\n".join(f"- {q}" for q in it["questions"])
+    else:
+        text = f"Here is what I understood: **{it['readback']}**. Check it and confirm, then I search and order exactly this."
+    session.history.append({"role": "assistant", "text": text, "tool_calls": []})
+    session.emit("message", role="assistant", text=text)
+
+
+async def on_intent_confirmed(session: Session, it: dict) -> None:
+    session.intent = it
+    session.emit("intent_confirmed", intent=it)
+    await run_turn(session, f"I checked and signed intent {it['intent_id']}: {it['readback']}. "
+                            f"Product: {it['product']['query']}. Go ahead: search, compare and order against "
+                            f"intent_id {it['intent_id']}.")
+
+
+def on_intent_revised(session: Session, it: dict) -> None:
+    session.intent = it
+    INTENT_SESSION[it["intent_id"]] = session.id
+    session.emit("intent_proposed", intent=it)
+    _intent_message(session, it)
+    session.emit("done")
+
+
 def _usage(u: dict | None) -> dict | None:
     if not u:
         return None
@@ -223,12 +268,22 @@ def _usage(u: dict | None) -> dict | None:
 
 
 def _side_events(session: Session, tool: str, args: dict, res: dict) -> bool:
-    """Emit rich UI events. Returns True when the turn should end (order placed)."""
+    """Emit rich UI events. Returns True when the turn should end (intent shown or order placed)."""
+    if tool == "propose_intent" and res.get("intent"):
+        session.intent = res["intent"]
+        INTENT_SESSION[res["intent"]["intent_id"]] = session.id
+        session.emit("intent_proposed", intent=res["intent"])
+        return True
+    if tool == "search_products" and res.get("excluded") is not None:
+        session.excluded = res["excluded"]
     if tool == "check_offer" and res.get("offers") is not None:
-        session.emit("offers",
-                     request_summary=f"{args.get('quantity', 0):,.0f} {unit_word(args.get('quantity_unit', 'SALES_UNIT'))}, "
-                                     f"delivery {args.get('requested_date')}",
-                     offers=res["offers"], recommended_product_id=res.get("recommended_product_id"))
+        it = session.intent or {}
+        q = it.get("quantity") or {}
+        summary_ = (f"{q.get('amount', args.get('quantity', 0)):,.0f} {unit_word(q.get('unit') or args.get('quantity_unit', 'SALES_UNIT'))}, "
+                    f"delivery by {res.get('requested_date')}")
+        session.emit("offers", request_summary=summary_, offers=res["offers"],
+                     recommended_product_id=res.get("recommended_product_id"), excluded=session.excluded,
+                     intent_id=args.get("intent_id"))
     if tool == "place_order" and res.get("order_id"):
         ORDER_SESSION[res["order_id"]] = session.id
         if res.get("status") == "pending_approval":
@@ -237,8 +292,12 @@ def _side_events(session: Session, tool: str, args: dict, res: dict) -> bool:
         if res.get("status") == "confirmed":
             session.emit("order_confirmed", order_id=res["order_id"], status="confirmed", lines=res["lines"],
                          total_price=res["total_price"], currency=res["currency"],
-                         delivery_date=res["delivery_date"], approved_by=None)
+                         delivery_date=res["delivery_date"], approved_by=None, tier=res.get("tier"),
+                         diff=res.get("diff"), receipt=res.get("receipt"), fingerprint=res.get("fingerprint"))
             return True
+        if res.get("status") == "rejected":
+            session.emit("order_rejected", order_id=res["order_id"], tier=res.get("tier", "block"),
+                         diff=res.get("diff"), message=res.get("message") or res.get("error"))
     return False
 
 
@@ -249,7 +308,8 @@ def _order_message(res: dict) -> str:
     if res.get("status") == "pending_approval":
         return (f"Order **{res['order_id']}** for {what} ({money}, delivery {res.get('delivery_date')}) "
                 f"is waiting for your approval: {res['approval']['reason']}.")
-    return f"Order **{res['order_id']}** confirmed: {what}, {money}, delivery {res.get('delivery_date')}."
+    return (f"Order **{res['order_id']}** confirmed: {what}, {money}, delivery {res.get('delivery_date')}. "
+            f"0 deviations from your intent, receipt {res.get('fingerprint')}.")
 
 
 # --------------------------------------------------------------------------- after a human decision
@@ -262,9 +322,11 @@ def on_decision(order: dict, approval: dict) -> None:
     if order["status"] == "confirmed":
         session.emit("order_confirmed", order_id=order["order_id"], status="confirmed", lines=order["lines"],
                      total_price=order["total_price"], currency=order["currency"],
-                     delivery_date=order["delivery_date"], approved_by=order.get("approved_by"))
+                     delivery_date=order["delivery_date"], approved_by=order.get("approved_by"),
+                     tier=order.get("tier"), diff=order.get("diff"), receipt=order.get("receipt"),
+                     fingerprint=order.get("fingerprint"))
         text = (f"Order **{order['order_id']}** confirmed for {order['delivery_date']}. "
-                f"Approved by {order.get('approved_by')}.")
+                f"Approved and signed by {order.get('approved_by')}, receipt {order.get('fingerprint')}.")
     elif order["status"] == "quote_expired":
         text = f"Approval came after the quote expired. Order **{order['order_id']}** needs a fresh offer."
     else:

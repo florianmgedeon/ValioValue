@@ -176,7 +176,10 @@ async def search_products(
     it, err = _confirmed_intent(intent_id)
     if err:
         return {"error": err}
-    pool, total = catalog().search(query, lactose_free=f.lactose_free, exclude_allergens=f.exclude_allergens,
+    # With an intent the hard rules are checked below from data, with evidence, so the name-based shortcut is off
+    # and excluded products are reported instead of silently missing.
+    pool, total = catalog().search(query, lactose_free=False if it else f.lactose_free,
+                                   exclude_allergens=None if it else f.exclude_allergens,
                                    category=f.category, country_of_origin=f.country_of_origin,
                                    limit=200 if it else limit)
     hits, excluded = pool, []

@@ -14,7 +14,7 @@ from pathlib import Path
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 
-from . import agent, config
+from . import agent, config, signing
 from .llm import make_provider, simplify_schema
 
 app = FastAPI(title="ValioValue buyer agent")
@@ -32,6 +32,13 @@ class ApprovalDecision(BaseModel):
     decision: str
     comment: str | None = None
     decided_by: str | None = None
+    cart_hash: str | None = None  # the hash the human was shown
+
+
+class IntentConfirm(BaseModel):
+    intent_hash: str
+    confirmed_by: str | None = None
+    edits: dict | None = None
 
 
 async def _valio(method: str, path: str, **kw) -> httpx.Response:
@@ -121,11 +128,59 @@ async def list_approvals(status: str | None = None):
 
 @app.post("/approvals/{approval_id}")
 async def decide(approval_id: str, body: ApprovalDecision):
+    """Approve signs exactly the cart_hash the human was shown. If the cart changed, Valio answers 409."""
     if body.decision not in ("approve", "reject"):
         raise HTTPException(422, "decision must be approve or reject")
-    res = _passthrough(await _valio("POST", f"/internal/approvals/{approval_id}", json=body.model_dump()))
+    payload = body.model_dump()
+    if body.decision == "approve":
+        appr = next((a for a in _passthrough(await _valio("GET", "/internal/approvals"))
+                     if a["approval_id"] == approval_id), None)
+        if not appr:
+            raise HTTPException(404, "unknown approval")
+        if not body.cart_hash:
+            # v0.1 frontends do not send the hash yet. Sign the one on file and say so in the audit comment.
+            payload["cart_hash"] = appr.get("cart_hash")
+            payload["comment"] = ((body.comment or "") + " [client did not echo cart_hash]").strip()
+        payload["signature"] = signing.sign(appr["intent"]["buyer_id"], payload["cart_hash"] or "")
+    res = _passthrough(await _valio("POST", f"/internal/approvals/{approval_id}", json=payload))
     agent.on_decision(res["order"], res["approval"])
     return res["approval"]
+
+
+@app.post("/intents/{intent_id}/confirm")
+async def confirm_intent(intent_id: str, body: IntentConfirm):
+    """With edits: returns a revised intent (new hash) to be confirmed. Without: signs the hash the human saw,
+    Valio confirms, and the agent continues in the same stream."""
+    sid = agent.INTENT_SESSION.get(intent_id)
+    session = agent.SESSIONS.get(sid) if sid else None
+    if body.edits:
+        new = _passthrough(await _valio("POST", f"/internal/intents/{intent_id}/revise", json={"edits": body.edits}))
+        if session:
+            agent.on_intent_revised(session, new)
+        return new
+    it = _passthrough(await _valio("GET", f"/internal/intents/{intent_id}"))
+    if body.intent_hash != it["intent_hash"]:
+        raise HTTPException(409, {"error": "The intent changed since it was shown. Check it again.",
+                                  "intent": it})
+    confirmed = _passthrough(await _valio("POST", f"/internal/intents/{intent_id}/confirm", json={
+        "intent_hash": body.intent_hash, "signature": signing.sign(it["buyer_id"], body.intent_hash),
+        "confirmed_by": body.confirmed_by or "buyer.human"}))
+    if session:
+        task = asyncio.create_task(agent.on_intent_confirmed(session, confirmed))
+        _tasks.add(task)
+        task.add_done_callback(_tasks.discard)
+    return confirmed
+
+
+@app.get("/orders/{order_id}/verify")
+async def verify(order_id: str):
+    async with httpx.AsyncClient(timeout=20) as c:
+        return (await c.get(f"{config.MCP_BASE_URL}/verify/{order_id}")).json()
+
+
+@app.get("/mandate")
+async def mandate(buyer_id: str | None = None):
+    return _passthrough(await _valio("GET", f"/internal/mandate/{buyer_id or config.DEFAULT_BUYER_ID}"))
 
 
 @app.get("/orders/{order_id}/audit")
