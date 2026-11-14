@@ -18,6 +18,7 @@ from . import agent, config, signing, valio
 from .llm import make_provider, simplify_schema
 from .routes_kitchen import router as kitchen_router
 from .routes_orders import router as orders_router
+from .routes_rules import router as rules_router
 from .routes_uploads import router as uploads_router
 
 app = FastAPI(title="ValioValue buyer agent")
@@ -25,6 +26,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 app.include_router(uploads_router)   # 1a photos and phone pairing
 app.include_router(kitchen_router)   # 1b kitchen profile and ingest
 app.include_router(orders_router)    # 2b order list and autonomy level
+app.include_router(rules_router)     # 3.1 / 3.2: POST /mandate/draft, POST /mandate/coverage
 _tasks: set[asyncio.Task] = set()
 
 

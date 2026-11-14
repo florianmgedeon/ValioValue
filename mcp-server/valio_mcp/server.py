@@ -17,6 +17,8 @@ Human-only REST endpoints (bearer token, NOT MCP tools, so an agent cannot confi
   GET  /internal/mandate/{buyer_id}/history      all versions
   GET  /internal/mandate/{buyer_id}/cedar        the Cedar policies Valio Aimo enforces
   GET  /internal/policy-catalog                  attributes, operators and examples for policy editors
+  POST /internal/rule-coverage                   {rule, category?} -> checked / known / safe / excluded / unknown
+  GET  /internal/categories?q=fish               category codes for a plain word
 
 Public, read-only:
   GET  /verify/{order_id}    recompute hashes, check all signatures
@@ -36,7 +38,7 @@ from pydantic import BaseModel, Field
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from . import config, constraints, diff, intent as intents, mandate as mandates, policy, trust, valio_api
+from . import config, constraints, coverage, diff, intent as intents, mandate as mandates, policy, trust, valio_api
 from .catalog import catalog
 from .intent import HardRuleIn, ItemIn
 from .store import TransitionError, iso, new_id, now, store
@@ -864,6 +866,30 @@ async def policy_catalog(request: Request) -> JSONResponse:
     if not _authorised(request):
         return _deny()
     return JSONResponse(policy.catalog_info())
+
+
+@mcp.custom_route("/internal/rule-coverage", methods=["POST"])
+async def rule_coverage(request: Request) -> JSONResponse:
+    """{rule, category?} -> how many catalog products the rule can decide from data. Read-only."""
+    if not _authorised(request):
+        return _deny()
+    body, err = await _mandate_body(request)
+    if err:
+        return err
+    if not isinstance(body.get("rule"), dict):
+        return JSONResponse({"error": "rule is required"}, status_code=422)
+    try:
+        return JSONResponse(coverage.rule_coverage(body["rule"], body.get("category") or None))
+    except policy.RuleError as e:
+        return JSONResponse({"error": str(e)}, status_code=422)
+
+
+@mcp.custom_route("/internal/categories", methods=["GET"])
+async def find_categories(request: Request) -> JSONResponse:
+    """?q=fish -> category codes whose product names match, for rules like 'only Finnish fish'."""
+    if not _authorised(request):
+        return _deny()
+    return JSONResponse(coverage.categories(request.query_params.get("q", "")))
 
 
 # --------------------------------------------------------------------------- public verification

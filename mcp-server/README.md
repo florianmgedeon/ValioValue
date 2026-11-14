@@ -67,6 +67,8 @@ GET  /internal/mandate/{buyer_id}            current mandate (Must, Prefer, Auto
 POST /internal/mandate/{buyer_id}/preview    validate, next version, hash to sign, Cedar
 PUT  /internal/mandate/{buyer_id}            {"mandate", "mandate_hash", "signature", "updated_by"}   409 hash, 403 signature, 422 invalid
 GET  /internal/mandate/{buyer_id}/history    /internal/mandate/{buyer_id}/cedar    /internal/policy-catalog
+POST /internal/rule-coverage                 {"rule", "category"?} -> {checked, known, safe, excluded, unknown}  read-only, cached
+GET  /internal/categories?q=fish             category codes for a product word (for "only Finnish fish")
 ```
 
 Public: `GET /verify/{order_id}` recomputes every hash and checks every signature. `GET /keys` returns Valio Aimo's public key.
