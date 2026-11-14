@@ -1,6 +1,8 @@
-import { createContext, useCallback, useContext, useRef, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import { uploadFile } from "../api/kitchen";
 import type { UploadMeta } from "../api/types";
+import { ingestSummary, ingestUpload } from "../features/camera/ingestPhoto";
+import { PhoneCameraModal } from "../features/camera/PhoneCameraModal";
 import { useToast } from "../ui";
 
 /** Where a photo goes (decision W2): an order photo starts a chat, kitchen/onboard photos are only learned from. */
@@ -8,7 +10,7 @@ export type CameraTarget = "order" | "kitchen" | "onboard";
 export type PhotoHandler = (upload: UploadMeta) => void;
 
 interface PhoneCameraApi {
-  /** Open the phone camera flow (QR pairing). F3 replaces the stub modal. */
+  /** Open the phone camera flow: QR pairing on a desktop, the device camera on a phone. */
   open: (where: CameraTarget) => void;
   /** Pick a file on this device and upload it. */
   upload: (where: CameraTarget) => void;
@@ -16,11 +18,16 @@ interface PhoneCameraApi {
   onPhoto: (where: CameraTarget, handler: PhotoHandler) => () => void;
   /** Called by the camera modal / upload when a photo arrived. */
   deliver: (where: CameraTarget, upload: UploadMeta) => void;
-  /** F3's modal registers how `open` works. Without it, `open` falls back to the file picker. */
+  /** Replace how `open` works (tests, demos). `null` restores the phone modal. */
   setOpener: (opener: ((where: CameraTarget) => void) | null) => void;
 }
 
 const Ctx = createContext<PhoneCameraApi | null>(null);
+
+/** A phone (touch, narrow) takes the photo itself; a desktop pairs a phone via QR. */
+function isPhone() {
+  return window.matchMedia("(pointer: coarse)").matches && window.innerWidth < 900;
+}
 
 export function PhoneCameraProvider({ children }: { children: ReactNode }) {
   const toast = useToast();
@@ -28,11 +35,17 @@ export function PhoneCameraProvider({ children }: { children: ReactNode }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const pending = useRef<CameraTarget>("order");
   const opener = useRef<((where: CameraTarget) => void) | null>(null);
+  const [modal, setModal] = useState<CameraTarget | null>(null);
 
   const deliver = useCallback((where: CameraTarget, upload: UploadMeta) => {
     const h = handlers.current.get(where);
-    if (h) h(upload);
-    else toast(`Photo received, but nothing handles "${where}" photos yet.`);
+    if (h) return h(upload);
+    if (where === "order") return toast("Photo received, but the Order tab is not open.");
+    // Kitchen and onboarding photos are learned from (W2), also when no screen handles them itself.
+    toast("Reading your document…");
+    ingestUpload(upload)
+      .then((out) => toast(ingestSummary(out)))
+      .catch((e: Error) => toast(`Could not read it: ${e.message}`));
   }, [toast]);
 
   const upload = useCallback((where: CameraTarget) => {
@@ -51,17 +64,20 @@ export function PhoneCameraProvider({ children }: { children: ReactNode }) {
     opener.current = o;
   }, []);
 
-  const api: PhoneCameraApi = {
-    open: (where) => (opener.current ?? upload)(where),
-    upload,
-    onPhoto,
-    deliver,
-    setOpener,
-  };
+  const open = useCallback((where: CameraTarget) => {
+    if (opener.current) return opener.current(where);
+    if (isPhone()) return upload(where);
+    setModal(where);
+  }, [upload]);
+
+  const closeModal = useCallback(() => setModal(null), []);
+
+  const api = useMemo<PhoneCameraApi>(() => ({ open, upload, onPhoto, deliver, setOpener }), [open, upload, onPhoto, deliver, setOpener]);
 
   return (
     <Ctx.Provider value={api}>
       {children}
+      <PhoneCameraModal where={modal} onClose={closeModal} onPhoto={deliver} onUpload={upload} />
       <input
         ref={fileInput}
         type="file"

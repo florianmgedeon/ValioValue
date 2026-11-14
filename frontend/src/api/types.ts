@@ -17,6 +17,9 @@ export type OrderSummary = Schema["OrderSummary"];
 export type AutonomyState = Schema["AutonomyState"];
 export type Verification = Schema["Verification"];
 export type RuleCoverage = Schema["RuleCoverage"];
+export type Suggestion = Schema["Suggestion"];
+export type IngestResult = Schema["IngestResult"];
+export type IngestResponse = { buyer_id?: string; results?: IngestResult[] };
 
 export type ChatStreamEvent =
   | Schema["UserMessageEvent"]
