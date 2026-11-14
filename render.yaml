@@ -17,7 +17,7 @@ services:
         value: claude-haiku-5-5
       - key: LLM_API_KEY         # secret, set in the dashboard. Empty = scripted agent (no LLM, no cost)
         sync: false
-      - key: DEFAULT_BUYER_ID
-        value: school-kitchen-espoo
+      - key: DEFAULT_BUYER_ID    # juvenes: empty kitchen, the UI starts with onboarding.
+        value: juvenes           # school-kitchen-espoo: pre-filled demo kitchen, starts on the order page
       - key: VALIO_API_KEY       # secret, set in the dashboard. Empty = offline fake Valio API
         sync: false
