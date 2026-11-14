@@ -1,0 +1,55 @@
+frontend/src/features/kitchen/Learned.tsx
+  s_ae66a622cb7c07::t_ae8d47b128dd8c 7,48,92,121,126,137
+frontend/src/features/kitchen/KitchenView.tsx
+  s_ae66a622cb7c07::t_e7b6a2a0eec772 4,21,31-33,45-46,49-50,231,244-258,300,337
+  s_ae66a622cb7c07::t_819ad2c38bb782 47-48
+  s_ae66a622cb7c07::t_f44b268de8af4a 322-323
+frontend/src/api/kitchen.ts
+  s_ae66a622cb7c07::t_ae8d47b128dd8c 34-43
+backend/buyer_agent/routes_kitchen.py
+  s_ae66a622cb7c07::t_3cc8d78d67adda 4-5
+  s_ae66a622cb7c07::t_96fa6a1d67513d 9,161-162,177-257,335-336,338-343,345-346,348,351-356
+frontend/src/features/kitchen/Profile.tsx
+  s_ae66a622cb7c07::t_f44b268de8af4a 104
+frontend/src/api/generated.d.ts
+  s_ae66a622cb7c07::t_ae2d59d3508b09 1546-1552,1559-1633
+  s_ae66a622cb7c07::t_5e98a7843b0520 1545,1553-1558
+contracts/backend-api.yaml
+  s_ae66a622cb7c07::t_ae2d59d3508b09 625-669
+frontend/mockup/substitutes-placement.html
+  s_ae66a622cb7c07::t_ea28342574c3cc 1-167,171-410,412-465
+  s_ae66a622cb7c07::t_896a1f094b9eab 168-170,411
+backend/buyer_agent/autonomy.py
+  s_ae66a622cb7c07::t_9d5bc77dba057b 16,157-175
+  s_ae66a622cb7c07::t_82d721c91fbd5a 176-177
+backend/buyer_agent/kitchen.py
+  s_ae66a622cb7c07::t_9d5bc77dba057b 223-261
+backend/buyer_agent/ingest.py
+  s_ae66a622cb7c07::t_9a089d6e8444de 111-114
+  s_ae66a622cb7c07::t_3c1c7891bc329b 262-263,265,287-298,333,335-337
+  s_ae66a622cb7c07::t_82512d400f5ce3 37-41,283-286
+backend/tests/test_substitutes_signed.py
+  s_ae66a622cb7c07::t_3c1c7891bc329b 128-150
+  s_ae66a622cb7c07::t_9a089d6e8444de 151-162
+  s_ae66a622cb7c07::t_dac4a1f0dc74e5 1-127
+frontend/src/features/kitchen/Substitutes.tsx
+  s_ae66a622cb7c07::t_099797e6debd82 3-4,10-11,15-16,24,28,33,35-82,85-157,161,164,180,182-186,188,191,198,201-202,212,214,222-224,251-253,262
+frontend/src/features/kitchen/kitchen.css
+  s_ae66a622cb7c07::t_f44b268de8af4a 53-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "91ef8e7f893407ec0dddde51cf19264a7026ea0f",
+  "prompts": {},
+  "sessions": {
+    "s_ae66a622cb7c07": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "17c77e78-e3e9-4493-a5a6-ee29ba1d8552",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
