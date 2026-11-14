@@ -1,0 +1,32 @@
+frontend/src/ui/index.ts
+  s_dbf7609225a270::t_27b0d2eae0a41b 4
+frontend/src/ui/Chip.tsx
+  s_dbf7609225a270::t_27b0d2eae0a41b 3,11-24,38-43
+frontend/src/features/onboarding/LearnCard.tsx
+  s_dbf7609225a270::t_27b0d2eae0a41b 2,61,75
+frontend/src/app/App.tsx
+  s_dbf7609225a270::t_27b0d2eae0a41b 14,41-43
+frontend/src/features/onboarding/DemoMenu.tsx
+  s_dbf7609225a270::t_271e4bc25fedc6 2,10-13
+frontend/src/features/tour/Tour.tsx
+  s_dbf7609225a270::t_b0432c8bffbe1d 141-147,175-176,180,196
+  s_dbf7609225a270::t_271e4bc25fedc6 15-16,33,43,45-47,50-52,54-63,67,89-96,134
+frontend/src/features/kitchen/KitchenView.tsx
+  s_dbf7609225a270::t_271e4bc25fedc6 294-295
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b601dc4f2ce04fd9e7d2dcef610293abf5fb9148",
+  "prompts": {},
+  "sessions": {
+    "s_dbf7609225a270": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0c1280e-3ea2-4c75-8768-667b1c274479",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
