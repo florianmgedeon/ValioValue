@@ -1,5 +1,5 @@
 import { apiRequest, apiUrl } from "./client";
-import type { IngestResponse, KitchenProfile, Pairing, PairingStreamEvent, UploadMeta, UsualOrder } from "./types";
+import type { Drift, IngestResponse, KitchenProfile, Pairing, PairingStreamEvent, UploadMeta, UsualOrder } from "./types";
 
 export function getKitchenProfile(buyerId?: string): Promise<KitchenProfile> {
   const query = buyerId ? `?buyer_id=${encodeURIComponent(buyerId)}` : "";
@@ -108,3 +108,13 @@ export function getUsualOrder(buyerId?: string): Promise<UsualOrder> {
   const query = buyerId ? `?buyer_id=${encodeURIComponent(buyerId)}` : "";
   return apiRequest<UsualOrder>(`/kitchen/usual-order${query}`);
 }
+
+/** POST /kitchen/usual-order/drift (2e): keep the new amount or go back; the same value is not flagged again. */
+export function decideDrift(
+  decisions: { key: string; keep?: boolean; value: number; back_to?: number | null }[],
+  by?: string,
+): Promise<KitchenProfile> {
+  return apiRequest<KitchenProfile>("/kitchen/usual-order/drift", { method: "POST", json: { decisions, by } });
+}
+
+export type { Drift };

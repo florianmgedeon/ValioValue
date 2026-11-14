@@ -97,7 +97,7 @@ export interface paths {
          * Server-sent events stream of the agent's progress
          * @description `text/event-stream`. Each SSE message has `event: <type>` and `data: <json>`.
          *     Types: user_message, reasoning, message, intent_proposed, intent_confirmed, tool_call, tool_result,
-         *     offers, approval_required, order_confirmed, order_rejected, autonomy_progress, error, done.
+         *     offers, approval_required, order_confirmed, order_rejected, autonomy_progress, context_suggestion, error, done.
          *     Ignore unknown types.
          */
         get: {
@@ -117,7 +117,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/event-stream": components["schemas"]["ReasoningEvent"] | components["schemas"]["MessageEvent"] | components["schemas"]["ToolCallEvent"] | components["schemas"]["ToolResultEvent"] | components["schemas"]["OffersEvent"] | components["schemas"]["ApprovalRequiredEvent"] | components["schemas"]["OrderConfirmedEvent"] | components["schemas"]["IntentProposedEvent"] | components["schemas"]["IntentConfirmedEvent"] | components["schemas"]["OrderRejectedEvent"] | components["schemas"]["ErrorEvent"] | components["schemas"]["DoneEvent"] | components["schemas"]["UserMessageEvent"] | components["schemas"]["AutonomyProgressEvent"];
+                        "text/event-stream": components["schemas"]["ReasoningEvent"] | components["schemas"]["MessageEvent"] | components["schemas"]["ToolCallEvent"] | components["schemas"]["ToolResultEvent"] | components["schemas"]["OffersEvent"] | components["schemas"]["ApprovalRequiredEvent"] | components["schemas"]["OrderConfirmedEvent"] | components["schemas"]["IntentProposedEvent"] | components["schemas"]["IntentConfirmedEvent"] | components["schemas"]["OrderRejectedEvent"] | components["schemas"]["ErrorEvent"] | components["schemas"]["DoneEvent"] | components["schemas"]["UserMessageEvent"] | components["schemas"]["AutonomyProgressEvent"] | components["schemas"]["ContextSuggestionEvent"];
                     };
                 };
             };
@@ -277,6 +277,74 @@ export interface paths {
                     content: {
                         "application/json": components["schemas"]["AuditEntry"][];
                     };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/{order_id}/story": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What happened to one order and why, in plain sentences (Activity tab, package 2c)
+         * @description Built from the order, its intent and its audit trail. `why` sentences come from templates, never from an LLM, and contain no hashes, rule ids or grant ids. Steps: asked, understood, searched, decided, confirmed, learned (an accepted suggestion whose source is this order, 2a). Fixture: contracts/fixtures/order-story.json. `funnel` per searched item is catalog → after your musts → can deliver → picked (only recorded counts).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    order_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The story */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            order_id: string;
+                            /** @example Ordered alone */
+                            label: string;
+                            /** @enum {string} */
+                            tier: "auto" | "ask" | "block";
+                            total?: number;
+                            mandate?: {
+                                version?: number;
+                                grants_used?: string[];
+                            };
+                            /** @description Kitchen profile version the agent read when it proposed the intent. Only while the backend knows it. */
+                            kitchen_profile_version?: number;
+                            steps: ({
+                                /** @enum {string} */
+                                kind: "asked" | "understood" | "searched" | "decided" | "confirmed" | "learned";
+                                at?: string;
+                            } & {
+                                [key: string]: unknown;
+                            })[];
+                        };
+                    };
+                };
+                /** @description Unknown order */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
             };
         };
@@ -1137,6 +1205,104 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/kitchen/usual-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * "Your usual order" card (2c): usual products, usual amounts, last price paid
+         * @description Active usual products with a product and a typical amount. last_unit_price = price per usual unit (L, kg, piece) from the newest confirmed order line with that product; none yet → last_unit_price and estimate null. "Order the usual" sends POST /chat {"message": "Order the usual"}: the agent uses the same profile amounts.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    buyer_id?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The usual order */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UsualOrder"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/kitchen/usual-order/drift": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 2e: the buyer decided on a drift (keep the new amount or go back); the same value is not flagged again */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        buyer_id?: string;
+                        by?: string;
+                        decisions: {
+                            /** @example quantity:milk */
+                            key: string;
+                            /** @default true */
+                            keep?: boolean;
+                            /**
+                             * @description The drift's `to`
+                             * @example 120
+                             */
+                            value: number;
+                            /**
+                             * @description The drift's `from`, used when keep=false
+                             * @example 100
+                             */
+                            back_to?: number | null;
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description The updated kitchen profile */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/kitchen/history": {
@@ -2098,6 +2264,11 @@ export interface components {
             args?: {
                 [key: string]: unknown;
             };
+            /**
+             * @description valio = Valio Aimo MCP tool; buyer = runs in this backend and only creates suggestions (2a)
+             * @enum {string}
+             */
+            side?: "valio" | "buyer";
         };
         ToolResultEvent: components["schemas"]["EventBase"] & {
             /** @constant */
@@ -2111,6 +2282,8 @@ export interface components {
                 [key: string]: unknown;
             };
             duration_ms?: number;
+            /** @enum {string} */
+            side?: "valio" | "buyer";
         };
         OffersEvent: components["schemas"]["EventBase"] & {
             /** @constant */
@@ -2207,6 +2380,100 @@ export interface components {
             offer_next?: boolean;
             level?: number;
             name?: string;
+        };
+        /** @description 2a: the agent proposes something to remember (status proposed, nothing is active). after_order: at most one per order, "Remember" = POST /kitchen/suggestions/accept, "Just this time" = POST /kitchen/suggestions/{id}/reject. from_chat: remember_about_kitchen. from_photo: learn_from_document. Must / prefer need a signature on accept. */
+        ContextSuggestionEvent: components["schemas"]["EventBase"] & {
+            /** @constant */
+            type?: "context_suggestion";
+            /** @enum {string} */
+            reason?: "after_order" | "from_chat" | "from_photo";
+            /** @description Only for after_order */
+            order_id?: string;
+            suggestions?: components["schemas"]["Suggestion"][];
+        };
+        UsualOrder: {
+            items?: {
+                /** @example milk */
+                word?: string;
+                product_id?: string;
+                product_name?: string | null;
+                /** @example 120 */
+                quantity?: number;
+                /** @example L */
+                unit?: string;
+                /** @example 1.09 */
+                last_unit_price?: number | null;
+                /** @example 130.8 */
+                estimate?: number | null;
+                /** @description 2e: the last 8 weeks, oldest first. quantity in the usual unit, 0 = not ordered. */
+                weeks?: {
+                    /**
+                     * Format: date
+                     * @description Monday of the week
+                     */
+                    week?: string;
+                    /** @example 120 */
+                    quantity?: number;
+                    products?: string[];
+                }[];
+            }[];
+            /** @description Sum of the known estimates */
+            estimate_total?: number | null;
+            /** @description Every item has an estimate */
+            estimate_complete?: boolean;
+            /**
+             * Format: date
+             * @description Next Monday
+             */
+            deliver_by?: string;
+            /** @example your usual amounts per week */
+            based_on?: string;
+            kitchen_profile_version?: number;
+            /** @description 2e: what the weeks and the drift are based on (confirmed orders + imported history) */
+            history?: {
+                /** @example 7 */
+                orders?: number;
+                /**
+                 * @description Weeks with at least one delivery
+                 * @example 7
+                 */
+                weeks?: number;
+                /** Format: date */
+                since?: string | null;
+            };
+            /** @description 2e: what drifted before "Order the usual". quantity: the last two ordered weeks both >= 15 % off the median of the earlier weeks. cost: mean of the last 4 weeks >= 5 % off the 4 before (weeks without a delivery left out). Sentences are built by code. Hidden once decided (POST /kitchen/usual-order/drift). */
+            drift?: components["schemas"]["Drift"][];
+            still_learning?: {
+                /** @example cheese */
+                word?: string;
+                /** @example 3 */
+                orders?: number;
+                /** @example 3 */
+                products?: number;
+            }[];
+        };
+        Drift: {
+            /** @example quantity:milk */
+            key?: string;
+            /** @enum {string} */
+            kind?: "quantity" | "cost";
+            word?: string | null;
+            usual_id?: string | null;
+            unit?: string | null;
+            /** @example 100 */
+            from?: number;
+            /** @example 120 */
+            to?: number;
+            /** @example 20 */
+            pct?: number;
+            /** Format: date */
+            since?: string;
+            /** @description cost: the words that changed it most */
+            words?: string[];
+            /** @example Milk crept up: 100 → 120 L a week */
+            text?: string;
+            /** @example +20 % since 26 Oct. */
+            detail?: string;
         };
         PairedEvent: {
             /** @constant */
@@ -2410,6 +2677,8 @@ export interface components {
             label?: string;
             clean?: boolean;
             clean_reason?: string;
+            /** @description 2c, only while the backend knows it */
+            kitchen_profile_version?: number;
         };
         AutonomyState: {
             /** @enum {integer} */

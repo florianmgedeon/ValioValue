@@ -149,3 +149,4 @@
   .verify-row { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
   .verify-row small { display: block; color: var(--ink3); font-size: 12.5px; overflow-wrap: anywhere; }
 }
+.drift-note { color: var(--auto); font-weight: 600; display: flex; align-items: center; gap: 8px; }

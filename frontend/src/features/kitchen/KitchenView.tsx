@@ -13,7 +13,9 @@ import { Button, Drawer, Icon, Typing, useToast } from "../../ui";
 import { AutonomySection, LEVELS } from "./Autonomy";
 import "./kitchen.css";
 import { applyOps, nextId, plural, ruleLabel, upsert, type Grant, type HardRule, type LevelChange, type Op, type Preference, type RuleGroup } from "./model";
-import { About, Sources, Suggestions, TeachCard, UsualSection } from "./Profile";
+import { DriftCard, isFromOrder, LearnedSection } from "./Learned";
+import { About, Sources, Suggestions, TeachCard } from "./Profile";
+import { levelLimit, useUsualOrder } from "../order/data";
 import { errText, MustSection, PreferSection, type RowFlags } from "./Rules";
 
 type Suggestion = Schema["Suggestion"];
@@ -31,6 +33,7 @@ export default function KitchenView() {
   const mandate = useMandate();
   const autonomy = useAutonomy();
   const orders = useQuery({ queryKey: [...keys.orders, "all"], queryFn: () => listOrders({ limit: 200 }) });
+  const usualOrder = useUsualOrder();
 
   const [ops, setOps] = useState<Op[]>([]);
   const [levelChange, setLevelChange] = useState<LevelChange | null>(null);
@@ -241,6 +244,10 @@ export default function KitchenView() {
   };
 
   const proposed = (profile.suggestions ?? []).filter((s) => s.status === "proposed");
+  const fromDocs = proposed.filter((s) => !isFromOrder(s, profile));
+  const fromOrders = proposed.filter((s) => isFromOrder(s, profile));
+  const drift = usualOrder.data?.drift ?? [];
+  const limit = levelLimit(m);
   const name = m.display_name || "Your kitchen";
   const learnedSomething = (profile.sources ?? []).length > 0;
   return (
@@ -256,7 +263,9 @@ export default function KitchenView() {
 
       {!learnedSomething && <TeachCard onPhone={() => camera.open("kitchen")} onUpload={() => camera.upload("kitchen")} busy={reading} />}
 
-      <Suggestions items={proposed} sources={profile.sources ?? []} onAccept={(s) => void accept(s)} onReject={(s) => void reject(s)} busy={busy} />
+      {drift.length > 0 && <DriftCard drift={drift} usualOrder={usualOrder.data} limit={limit} />}
+
+      <Suggestions items={fromDocs} sources={profile.sources ?? []} onAccept={(s) => void accept(s)} onReject={(s) => void reject(s)} busy={busy} />
 
       <AutonomySection
         autonomy={a}
@@ -278,7 +287,16 @@ export default function KitchenView() {
         <PreferSection rules={view.preferences} flags={flags} onToggle={toggleRule("prefer")} onWeight={weightRule} onAdd={addRule("prefer")} />
       </div>
 
-      <UsualSection profile={profile} />
+      <LearnedSection
+        profile={profile}
+        usualOrder={usualOrder.data}
+        limit={limit}
+        question={fromOrders[0]}
+        onAccept={(s) => void accept(s)}
+        onReject={(s) => void reject(s)}
+        busy={busy}
+        drift={drift}
+      />
 
       <div className="k-grid">
         <About profile={profile} onSave={saveAbout} />

@@ -102,3 +102,53 @@
 .k-hist { display: grid; gap: 2px; }
 .k-hist > div { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; }
 .k-hist .when { font-size: 12px; color: var(--ink3); }
+
+/* 2e: what I learned from your orders */
+.kt .l-ask { margin: 0 20px 14px; padding: 14px 16px; border-radius: 16px; background: var(--accent-soft); display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; }
+.kt .l-ask .ic { width: 34px; height: 34px; border-radius: 10px; background: var(--bg); color: var(--accent); display: grid; place-items: center; }
+.kt .l-ask .t { font-weight: 600; }
+.kt .l-ask .s { font-size: 12.5px; color: var(--ink3); margin-top: 2px; }
+.kt .l-ask .acts { grid-column: 2; display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.kt .l-ask .btn-ghost { background: var(--bg); }
+.kt .l-row { width: 100%; text-align: left; display: grid; grid-template-columns: 110px minmax(0, 1fr) auto 16px; gap: 4px 16px; align-items: center; padding: 12px 20px; border-top: 1px solid var(--line); transition: background 0.15s; }
+.kt .l-row:hover { background: var(--surface); }
+.kt .l-row .w { font-family: var(--hand); font-size: 22px; line-height: 1; color: var(--usual); overflow-wrap: anywhere; }
+.kt .l-row .p { font-weight: 600; font-size: 14.5px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.kt .l-row .m { display: block; font-size: 12.5px; color: var(--ink3); }
+.kt .l-row .r { display: grid; justify-items: end; gap: 6px; }
+.kt .l-row .qty { font-size: 13px; color: var(--ink2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.kt .l-row .chev { color: var(--ink3); width: 16px; height: 16px; }
+.kt .l-row .bars { display: block; color: var(--usual); }
+.kt .l-row .bars .gap { fill: var(--surface2); }
+.kt .l-row.drift .bars, .kt .up { color: var(--auto); }
+.kt .up { font-weight: 600; }
+@media (max-width: 600px) {
+  .kt .l-row { grid-template-columns: 76px minmax(0, 1fr) 16px; }
+  .kt .l-row .r { grid-column: 2; grid-row: 2; justify-items: start; grid-auto-flow: column; align-items: center; gap: 10px; }
+}
+.kt .l-still, .kt .l-empty { padding: 12px 20px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink3); }
+.kt .l-still b { color: var(--ink2); }
+.l-dw { font-family: var(--hand); font-size: 26px; line-height: 1; color: var(--usual); }
+.l-ev { display: grid; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.l-ev > div { display: flex; gap: 12px; padding: 9px 14px; font-size: 14px; border-top: 1px solid var(--line); }
+.l-ev > div:first-child { border-top: 0; }
+.l-ev .d { width: 56px; flex: none; color: var(--ink3); }
+.l-ev .o { color: var(--ink3); font-size: 12.5px; min-width: 0; }
+.l-ev .q { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink2); white-space: nowrap; }
+.l-ev .none .q { color: var(--ink3); }
+
+/* 2e: drift before the usual order */
+.kt .drift-card { border: 2px solid var(--auto); box-shadow: var(--shadow); border-radius: 20px; overflow: hidden; background: var(--bg); scroll-margin-top: 90px; }
+.kt .drift-card .h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 16px 20px; background: var(--auto-soft); }
+.kt .drift-card .h h2 { font-size: 17px; font-weight: 700; }
+.kt .drift-card .h .chip { background: var(--bg); color: var(--auto); }
+.kt .drift-card .h p { width: 100%; font-size: 13px; color: var(--ink2); }
+.kt .drift-card .dr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 16px; align-items: center; padding: 14px 20px; border-top: 1px solid var(--line); }
+.kt .drift-card .h + .dr { border-top: 0; }
+.kt .drift-card .dr .t { font-weight: 600; font-size: 14.5px; }
+.kt .drift-card .dr .s { font-size: 12.5px; color: var(--ink3); margin-top: 2px; }
+.kt .drift-card .spark { color: var(--auto); }
+.kt .drift-card .choice { grid-column: 1 / -1; }
+.kt .drift-card .seg { font-size: 13px; padding: 3px; border-radius: 10px; }
+.kt .drift-card .seg button { padding: 5px 12px; border-radius: 8px; }
+.kt .drift-card .f { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 20px; background: var(--surface); font-size: 13px; color: var(--ink3); }

@@ -8,7 +8,7 @@ import { SIGNER_NAME } from "../../app/queries";
 import { navigate } from "../../app/route";
 import { useSignedChange } from "../../app/signing";
 import { Button, Card, CardFooter, CardHeader, Chip, Cond, Icon, KindTag, Typing, eur, useToast, type Kind } from "../../ui";
-import { fmtDay, unitLabel, useKitchenContext } from "./data";
+import { fmtDay, unitLabel, useKitchenContext, useUsualOrder } from "./data";
 import { lineDeviations, mergeFunnel, type Block, type ItemIssue, type LocalAction, type UsualExcluded } from "./orderReducer";
 
 type Check = ReturnType<typeof lineDeviations>[number];
@@ -127,6 +127,12 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
   const requestRules = it.hard_rules.filter((r) => !mandateRules.includes(r));
   const anyUsual = it.items.some((i) => i.usual?.name);
   const questions = it.questions ?? [];
+  // 2e (D4): one sentence when a usual amount drifted and this order has that product
+  const usualOrder = useUsualOrder();
+  const driftNote = (usualOrder.data?.drift ?? []).filter((d) => d.kind === "quantity").map((d) => {
+    const item = it.items.find((i) => (i.product?.query ?? "").toLowerCase().includes(d.word ?? "\u0000"));
+    return item ? `${d.text} (${(d.detail ?? "").replace(/\.$/, "")}). This order has ${item.quantity?.amount} ${unitLabel(item.quantity?.unit)}.` : null;
+  }).filter(Boolean)[0];
 
   const sign = async () => {
     if (!it.intent_hash) return;
@@ -180,6 +186,7 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
         </div>
       )}
       {(it.notes ?? []).length > 0 && <div className="applied">{it.notes!.join(" · ")}</div>}
+      {driftNote && <div className="applied drift-note"><Icon name="flag" />{driftNote}</div>}
       <CardFooter>
         <div className="fore">
           {questions.length ? (

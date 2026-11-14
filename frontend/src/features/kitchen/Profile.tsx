@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiUrl } from "../../api/client";
 import type { KitchenProfile, Schema } from "../../api/types";
-import { useComposerText } from "../../app/composer";
-import { navigate } from "../../app/route";
-import { Button, Chip, Icon, KindTag, Mark, Paper, YesNo, eur, type Kind } from "../../ui";
-import { useKitchenContext, useUsualOrder } from "../order/data";
+import { Button, Chip, Icon, KindTag, Mark, Paper, YesNo, type Kind } from "../../ui";
 
 type Suggestion = Schema["Suggestion"];
 type Source = Schema["Source"];
@@ -166,48 +163,6 @@ export function About({ profile, onSave }: { profile: KitchenProfile; onSave: (t
 
 export function unitText(u?: string) {
   return u === "KG" ? "kg" : u === "SALES_UNIT" ? "packs" : u ?? "";
-}
-
-/** The usual products and amounts in one block, with "Order the usual" (opens `#order/usual` in the Order tab). */
-export function UsualSection({ profile }: { profile: KitchenProfile }) {
-  const setText = useComposerText();
-  const usual = useUsualOrder();
-  const k = useKitchenContext();
-  const items = (profile.usual ?? []).filter((u) => (u.status ?? "active") === "active");
-  const src = (id?: string) => profile.sources?.find((x) => x.id === id)?.title;
-  const est = usual.data?.estimate_total ?? null;
-  const fits = est !== null && k.limit !== null ? est <= k.limit : null;
-  const canOrder = items.some((u) => u.typical_qty != null);
-  return (
-    <section className="sec usual-sec">
-      <div className="sec-h">
-        <h2>Your usual products</h2>
-        <p>When you say the word, I pick this product. With the usual amounts they make your usual order.</p>
-      </div>
-      {items.length === 0 && <div className="rule"><span className="muted text-sm">Nothing yet. Show me an invoice or a delivery note and I'll learn them.</span></div>}
-      {items.map((u) => (
-        <div key={u.id} className="usual">
-          <span className="w">{u.word}</span>
-          <div>
-            <div className="p">{u.product_name || <span className="muted">no product yet</span>}</div>
-            {src(u.source_id) && <div className="m">from {src(u.source_id)}</div>}
-          </div>
-          <span className="qty">{u.typical_qty != null ? `${u.typical_qty} ${unitText(u.unit)} / ${u.per || "week"}` : ""}</span>
-        </div>
-      ))}
-      {canOrder && (
-        <div className="usual-foot">
-          <span className="est">
-            {est !== null ? <>The usual order ≈ <b className="num">{eur(est)}</b>. </> : null}
-            {fits === true && "Inside your limit: I can order it alone."}
-            {fits === false && "Above your limit: you approve the cart."}
-          </span>
-          <Button small onClick={() => { navigate("order"); setText("the usual, but "); }}>Adjust</Button>
-          <Button variant="primary" small onClick={() => navigate("order", "usual")}>Order the usual</Button>
-        </div>
-      )}
-    </section>
-  );
 }
 
 function SourceThumb({ s }: { s: Source }) {
