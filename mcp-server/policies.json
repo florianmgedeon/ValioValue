@@ -1,13 +1,34 @@
 {
-  "_doc": "Buyer mandates enforced by the Valio Aimo MCP server on every place_order. Amounts are net (VAT excluded).",
+  "_doc": "Buyer mandates enforced by the Valio Aimo MCP server on every place_order. Amounts are net (VAT excluded). mandatory_rules are added to every intent of this buyer and cannot be edited away. allowed_categories null = all.",
   "default": {
     "display_name": "Default buyer",
     "currency": "EUR",
-    "spend_limit": 500.0
+    "spend_limit": 500.0,
+    "allowed_categories": null,
+    "mandatory_rules": []
   },
   "hotel-chain-helsinki": {
     "display_name": "Hotel chain, Helsinki",
     "currency": "EUR",
-    "spend_limit": 500.0
+    "spend_limit": 500.0,
+    "allowed_categories": null,
+    "mandatory_rules": []
+  },
+  "juvenes": {
+    "display_name": "Juvenes student restaurants, Tampere",
+    "currency": "EUR",
+    "spend_limit": 1000.0,
+    "allowed_categories": null,
+    "mandatory_rules": []
+  },
+  "school-kitchen-espoo": {
+    "display_name": "School kitchen, Espoo (strict allergen rules)",
+    "currency": "EUR",
+    "spend_limit": 300.0,
+    "allowed_categories": null,
+    "mandatory_rules": [
+      {"rule": "exclude_allergen", "allergen": "peanuts", "strictness": "contains_or_may_contain"},
+      {"rule": "exclude_allergen", "allergen": "tree nuts", "strictness": "contains_or_may_contain"}
+    ]
   }
 }

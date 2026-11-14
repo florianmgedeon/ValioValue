@@ -82,6 +82,8 @@ class Product:
     country: str | None
     allergens_contains: list[str] = field(default_factory=list)
     allergens_free_from: list[str] = field(default_factory=list)
+    allergens_may_contain: list[str] = field(default_factory=list)
+    has_allergen_data: bool = False
     labels: list[str] = field(default_factory=list)
     claims: list[str] = field(default_factory=list)
     lactose_free: bool = False
@@ -102,6 +104,7 @@ class Product:
             "country_of_origin": self.country,
             "lactose_free": self.lactose_free,
             "allergens": self.allergens_contains,
+            "may_contain": self.allergens_may_contain,
             "free_from": self.allergens_free_from,
             "certificates": self.labels,
             "claims": self.claims,
@@ -115,14 +118,25 @@ def _parse(raw: dict) -> Product:
     sd = raw.get("synkkaData") or {}
     names = sd.get("names") or []
     name = _text(names) or raw["id"]
-    contains, free_from, labels, claims = [], [], [], []
+    contains, free_from, may_contain, labels, claims = [], [], [], [], []
+    has_allergen_data = False
     for group in sd.get("classifications") or []:
         gname = group.get("name")
         for v in group.get("values") or []:
             code = v.get("synkkaId") or v.get("id") or ""
             if gname == "allergen":
+                # GS1 level of containment: CONTAINS, MAY_CONTAIN, FREE_FROM, UNDECLARED
                 readable = GS1_ALLERGENS.get(code.upper(), code.lower())
-                (free_from if v.get("unit") == "FREE_FROM" else contains).append(readable)
+                level = (v.get("unit") or "CONTAINS").upper().replace(" ", "_")
+                if level == "UNDECLARED":
+                    continue
+                has_allergen_data = True
+                if level == "FREE_FROM":
+                    free_from.append(readable)
+                elif level.startswith("MAY"):
+                    may_contain.append(readable)
+                else:
+                    contains.append(readable)
             elif gname == "nonAllergen" and v.get("unit") == "FREE_FROM":
                 free_from.append(GS1_ALLERGENS.get(code.upper(), code.lower()))
             elif gname == "packagingMarkedLabel":
@@ -149,6 +163,8 @@ def _parse(raw: dict) -> Product:
         country=raw.get("countryOfOrigin"),
         allergens_contains=sorted(set(contains)),
         allergens_free_from=sorted(set(free_from)),
+        allergens_may_contain=sorted(set(may_contain)),
+        has_allergen_data=has_allergen_data,
         labels=sorted(set(labels)),
         claims=sorted(set(claims)),
         lactose_free=lactose_free,
@@ -203,6 +219,17 @@ class Catalog:
                     counts[p.category] = counts.get(p.category, 0) + 1
             self._affinity[alts] = {c: n / self._cat_size[c] for c, n in counts.items() if self._cat_size[c] >= 3}
         return self._affinity[alts]
+
+    def matching_ids(self, query: str) -> set[str]:
+        """Every product the catalog search accepts for this query. Used to check deterministically that an
+        ordered product is the kind of product the buyer asked for."""
+        if not hasattr(self, "_match_cache"):
+            self._match_cache: dict[str, set[str]] = {}
+        key = query.lower().strip()
+        if key not in self._match_cache:
+            hits, _ = self.search(query, limit=len(self.products) or 1)
+            self._match_cache[key] = {p.id for p in hits}
+        return self._match_cache[key]
 
     def get(self, product_id: str) -> Product | None:
         return self.products.get(str(product_id))

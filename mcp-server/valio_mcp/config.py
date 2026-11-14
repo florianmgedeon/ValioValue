@@ -25,6 +25,11 @@ APPROVER_TOKEN = os.getenv("APPROVER_TOKEN", "dev-approver-token")
 DB_PATH = Path(os.getenv("MCP_DB_PATH", DATA_DIR / "valio_mcp.db"))
 POLICY_FILE = Path(os.getenv("POLICY_FILE", REPO_ROOT / "mcp-server" / "policies.json"))
 
+KEYS_DIR = Path(os.getenv("KEYS_DIR", DATA_DIR / "keys"))
+# A confirmed intent can be ordered against for this long.
+INTENT_TTL_HOURS = int(os.getenv("INTENT_TTL_HOURS", "24"))
+PUBLIC_BASE_URL = os.getenv("MCP_PUBLIC_BASE_URL", f"http://localhost:{os.getenv('MCP_PORT', '8001')}")
+
 # How long a quote binds the price if the order cut-off is further away.
 QUOTE_TTL_MINUTES = int(os.getenv("QUOTE_TTL_MINUTES", "30"))
 

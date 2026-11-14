@@ -21,10 +21,30 @@ CREATE TABLE IF NOT EXISTS orders (
   data TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS approvals (
   approval_id TEXT PRIMARY KEY, order_id TEXT NOT NULL, status TEXT NOT NULL, data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS intents (
+  intent_id TEXT PRIMARY KEY, status TEXT NOT NULL, data TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS audit (
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, session TEXT, order_id TEXT,
   actor TEXT NOT NULL, action TEXT NOT NULL, summary TEXT NOT NULL, reason TEXT, data TEXT);
 """
+
+
+# Allowed state changes. Anything else is a bug and raises.
+INTENT_FLOW = {"proposed": {"confirmed", "superseded", "expired"},
+               "confirmed": {"consumed", "expired"},
+               "consumed": {"confirmed"},  # only when the human rejects the order that used it
+               "superseded": set(), "expired": set()}
+ORDER_FLOW = {"pending_approval": {"confirmed", "rejected", "quote_expired"},
+              "confirmed": set(), "rejected": set(), "quote_expired": set()}
+
+
+class TransitionError(ValueError):
+    pass
+
+
+def check_transition(flow: dict, old: str, new: str) -> None:
+    if new != old and new not in flow.get(old, set()):
+        raise TransitionError(f"illegal transition {old} -> {new}")
 
 
 def now() -> datetime:
@@ -62,6 +82,21 @@ class Store:
         row = self._exec("SELECT * FROM quotes WHERE quote_id=?", (quote_id,)).fetchone()
         return dict(row) | {"data": json.loads(row["data"])} if row else None
 
+    # ---- intents
+    def save_intent(self, intent: dict) -> None:
+        self._exec("INSERT INTO intents VALUES (?,?,?,?)",
+                   (intent["intent_id"], intent["status"], json.dumps(intent), iso()))
+
+    def get_intent(self, intent_id: str) -> dict | None:
+        row = self._exec("SELECT data FROM intents WHERE intent_id=?", (intent_id,)).fetchone()
+        return json.loads(row["data"]) if row else None
+
+    def update_intent(self, intent: dict) -> None:
+        old = self.get_intent(intent["intent_id"])
+        check_transition(INTENT_FLOW, old["status"], intent["status"])
+        self._exec("UPDATE intents SET status=?, data=?, updated_at=? WHERE intent_id=?",
+                   (intent["status"], json.dumps(intent), iso(), intent["intent_id"]))
+
     # ---- orders
     def save_order(self, order: dict, session: str | None, buyer_id: str) -> None:
         self._exec("INSERT INTO orders VALUES (?,?,?,?,?,?,?,?)",
@@ -69,6 +104,8 @@ class Store:
                     json.dumps(order), iso(), iso()))
 
     def update_order(self, order: dict) -> None:
+        old = self.get_order(order["order_id"])
+        check_transition(ORDER_FLOW, old["status"], order["status"])
         self._exec("UPDATE orders SET status=?, data=?, updated_at=? WHERE order_id=?",
                    (order["status"], json.dumps(order), iso(), order["order_id"]))
 
@@ -107,10 +144,12 @@ class Store:
         """Everything tied to the order, plus the agent's earlier steps in the same session."""
         order = self.get_order(order_id)
         session = order.get("_session") if order else None
+        intent_id = (order or {}).get("intent_id")
         rows = self._exec(
-            "SELECT * FROM audit WHERE order_id=? OR (session IS NOT NULL AND session=? AND order_id IS NULL "
+            "SELECT * FROM audit WHERE order_id=? OR (? IS NOT NULL AND json_extract(data, '$.intent_id')=?) "
+            "OR (session IS NOT NULL AND session=? AND order_id IS NULL "
             "AND id <= (SELECT MAX(id) FROM audit WHERE order_id=?)) ORDER BY id",
-            (order_id, session, order_id)).fetchall()
+            (order_id, intent_id, intent_id, session, order_id)).fetchall()
         return [{"timestamp": r["ts"], "actor": r["actor"], "action": r["action"], "summary": r["summary"],
                  "reason": r["reason"], "data": json.loads(r["data"] or "{}")} for r in rows]
 
