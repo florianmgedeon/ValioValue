@@ -1,5 +1,6 @@
 import { apiRequest } from "./client";
-import type { AuditEntry, OrderSummary, Verification } from "./types";
+import { mock, MOCK, orderStory } from "./mock";
+import type { AuditEntry, OrderStory, OrderSummary, Verification } from "./types";
 
 export interface ListOrdersOptions {
   buyerId?: string;
@@ -24,4 +25,10 @@ export function verifyOrder(orderId: string): Promise<Verification> {
   return apiRequest<Verification>(
     `/orders/${encodeURIComponent(orderId)}/verify`,
   );
+}
+
+/** GET /orders/{id}/story (2c). Mocked with VITE_MOCK=1 until 2c is built. */
+export function getOrderStory(orderId: string): Promise<OrderStory> {
+  if (MOCK) return mock.delay(orderStory(orderId));
+  return apiRequest<OrderStory>(`/orders/${encodeURIComponent(orderId)}/story`);
 }

@@ -1,5 +1,6 @@
 import { apiRequest } from "./client";
-import type { Mandate, RuleCoverage } from "./types";
+import { grantDraft, mock, MOCK } from "./mock";
+import type { DraftGrantResponse, Mandate, RuleCoverage } from "./types";
 
 export interface MandateUpdate {
   mandate: Record<string, unknown>;
@@ -60,4 +61,10 @@ export function checkMandateCoverage(
     method: "POST",
     json: request,
   });
+}
+
+/** POST /mandate/draft {kind: "grant"} (2d): a sentence -> an extra permission. Mocked with VITE_MOCK=1 until 2d. */
+export function draftGrant(text: string, buyerId?: string): Promise<DraftGrantResponse> {
+  if (MOCK) return mock.delay(grantDraft(text), 500);
+  return apiRequest<DraftGrantResponse>("/mandate/draft", { method: "POST", json: { text, kind: "grant", buyer_id: buyerId } });
 }

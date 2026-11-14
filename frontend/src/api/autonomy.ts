@@ -1,9 +1,17 @@
 import { apiRequest } from "./client";
-import type { AutonomyState } from "./types";
+import { extraGrants, MOCK } from "./mock";
+import type { AutonomyState, AutonomyView } from "./types";
 
-export function getAutonomyState(buyerId?: string): Promise<AutonomyState> {
+export async function getAutonomyState(buyerId?: string): Promise<AutonomyView> {
   const query = buyerId ? `?buyer_id=${encodeURIComponent(buyerId)}` : "";
-  return apiRequest<AutonomyState>(`/autonomy${query}`);
+  const state = await apiRequest<AutonomyView>(`/autonomy${query}`);
+  if (!MOCK || state.recommended_next !== undefined) return state;
+  // Mock until 2d: new-style fields on top of the built endpoint.
+  return {
+    ...state,
+    recommended_next: state.offer_next ?? false,
+    grants: [...(state.grants ?? []).map((g) => ({ ...g, kind: "level" as const, enabled: true })), ...extraGrants],
+  };
 }
 
 export interface SetAutonomyLevelRequest {
@@ -23,6 +31,7 @@ export function setAutonomyLevel(
   });
 }
 
+// TODO(2d): remove with /autonomy/sync-usual.
 export function syncUsualProducts(
   request: { buyer_id?: string; by?: string; mandate_hash?: string } = {},
 ): Promise<AutonomyState> {

@@ -1,6 +1,6 @@
 # F0 · Frontend foundation: tokens, shell, primitives, signing
 
-Status: open · Frontend wave A: first, alone. F1–F4 start when F0 is merged · Shared rules: [Frontend packages in `README.md`](README.md#frontend-packages-f0f4).
+Status: done 14 Nov 2026 · Frontend wave A: first, alone. F1–F4 start when F0 is merged · Shared rules: [Frontend packages in `README.md`](README.md#frontend-packages-f0f4).
 
 ## Why
 
@@ -86,3 +86,12 @@ await sign({ call: (mandate_hash?) => setAutonomyLevel({ level: 2, mandate_hash 
 * A storybook-like page `#ui` (dev only) shows every primitive in every variant, so F1–F4 can look things up.
 * `useSignedChange` works end to end against the backend: change the level on `#ui` → sign modal → new mandate version.
 * `npm run build`, `lint`, `typecheck` pass.
+
+## Built (14 Nov)
+
+* `src/styles.css`: tokens + dark mode, `@theme inline` (`bg-must-soft`, `text-ink3`, `font-hand`, `shadow-card` …), component classes from the mockup in `@layer components`.
+* `src/ui/`: `Icon`, `Button`, `Chip`/`KindTag`/`SignedTag`/`Cond`/`Tier`, `Card`, `Toggle`/`Segmented`/`Weight`/`YesNo`/`Typing`, `Modal`/`Drawer`, `ToastProvider`/`useToast`, `HashRow`/`CedarBlock`/`DiffList`, `Paper`/`Mark`, `eur()`. One barrel: `src/ui/index.ts`.
+* `src/app/`: `useHashRoute` / `navigate` (`#order`, `#activity/<id>`, `#kitchen`, `#onboard`, `#ui`), `Header` (tabs, autonomy pill, kitchen name from `mandate.display_name`), `Composer` + `useComposer(config)` (each screen registers submit, hints, placeholder, camera target) + `useComposerText()` (prefill), `PhoneCameraProvider` (`open`, `upload`, `onPhoto(where, handler)`, `deliver`, `setOpener` for F3's modal; until then `open` = file picker), `SignProvider` + `useSignedChange` (`call` mode for 409 endpoints, `mandate` mode = preview + `PUT /mandate`), `queries.ts` (`useAutonomy`, `useKitchen`, `useMandate`, `keys`, `invalidateMandateViews`), placeholders per screen in `App.tsx`.
+* `src/api/mock/`: `VITE_MOCK=1` → `getUsualOrder`, `getOrderStory`, `draftGrant`, and `getAutonomyState` adds `recommended_next` + `grants[].kind` + extra grant g2. New types in `src/api/types.ts` (`UsualOrder`, `OrderStory`, `AutonomyView`, `ExtraGrant`, `DraftGrantResponse`).
+* `npm run lint`, `npm run typecheck`, `npm run build` pass. Checked in the browser against the current backend (scripted provider): `#ui` → Level 1 → sign modal with backend diff, Cedar and hash → mandate v2, pill updates. 375 px: no horizontal scroll.
+* Note: the backend must be the current main (wave 1). An older backend answers 404 on `/kitchen` and `/autonomy`.

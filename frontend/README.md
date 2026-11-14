@@ -33,3 +33,20 @@ Commit generated type changes together with the corresponding contract changes.
 REST wrappers live under `src/api/`; the chat and camera pairing SSE streams are
 handled there as well. The UI should consume those wrappers rather than calling
 `fetch` or `EventSource` directly.
+
+## Structure
+
+```
+src/api/        wrappers per backend area (+ mock/ for endpoints not built yet)
+src/ui/         shared primitives, import from "../../ui"
+src/app/        shell: routing, header, composer, signing, camera, queries
+src/features/   one folder per package (F1 order, F2 kitchen, F3 onboarding + camera, F4 activity)
+```
+
+* `#ui` (dev only) shows every primitive and a live signing round trip.
+* `VITE_MOCK=1` answers endpoints that are not built yet (2a, 2c, 2d) from `src/api/mock/`.
+* Screens register the composer with `useComposer({ onSubmit, hints, placeholder, camera })`.
+* Every mandate change goes through `useSignedChange()` (see `src/app/signing.tsx`).
+* `npm run lint` and `npm run typecheck` before every commit.
+
+Packages and rules: `docs/work-packages/F0-*.md` to `F4-*.md` and the frontend section of `docs/work-packages/README.md`.

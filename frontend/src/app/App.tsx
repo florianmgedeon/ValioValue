@@ -1,23 +1,64 @@
+import { QueryClientProvider } from "@tanstack/react-query";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { ToastProvider } from "../ui";
+import { Composer, ComposerProvider } from "./composer";
+import { Header } from "./Header";
+import { PhoneCameraProvider } from "./PhoneCamera";
+import { queryClient, useKitchen } from "./queries";
+import { navigate, useHashRoute, type Route } from "./route";
+import { SignProvider } from "./signing";
+import { Placeholder } from "./Placeholder";
+
+const UiGallery = import.meta.env.DEV ? lazy(() => import("./UiGallery")) : null;
+
+/** One line per screen. F1–F4 replace their Placeholder with the real view. */
+function Screen({ route }: { route: Route }): ReactNode {
+  switch (route.tab) {
+    case "order":
+      return <Placeholder pkg="F1" title="Order" />;
+    case "activity":
+      return <Placeholder pkg="F4" title="Activity" note={route.param ? `Order ${route.param}` : undefined} />;
+    case "kitchen":
+      return <Placeholder pkg="F2" title="Kitchen" />;
+    case "onboard":
+      return <Placeholder pkg="F3" title="Let me get to know your kitchen." composer={false} />;
+    case "ui":
+      return UiGallery ? <Suspense fallback={null}><UiGallery /></Suspense> : null;
+  }
+}
+
+function Shell() {
+  const route = useHashRoute();
+  const kitchen = useKitchen();
+
+  // A kitchen without a profile version has not been onboarded yet (F3).
+  const needsOnboarding = kitchen.isSuccess && !kitchen.data.version;
+  useEffect(() => {
+    if (needsOnboarding && (route.tab === "order" || route.tab === "kitchen")) navigate("onboard");
+  }, [needsOnboarding, route.tab]);
+
+  const showTabs = route.tab !== "onboard";
+  return (
+    <>
+      <Header tab={route.tab} showTabs={showTabs} />
+      <Screen route={route} />
+      <Composer />
+    </>
+  );
+}
+
 export default function App() {
   return (
-    <main className="min-h-screen bg-stone-50 px-6 py-16 text-stone-900">
-      <section className="mx-auto max-w-3xl rounded-3xl border border-stone-200 bg-white p-8 shadow-sm sm:p-12">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-800">
-          ValioValue · Trusted purchasing
-        </p>
-        <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-          A clearer way to buy for your kitchen.
-        </h1>
-        <p className="mt-5 max-w-2xl text-lg leading-8 text-stone-600">
-          The React and TypeScript workspace is ready to connect to the buyer
-          backend. The next UI work can build on the typed API and event stream
-          clients.
-        </p>
-        <div className="mt-8 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-900">
-          <span className="size-2 rounded-full bg-emerald-600" />
-          Frontend foundation ready
-        </div>
-      </section>
-    </main>
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <SignProvider>
+          <PhoneCameraProvider>
+            <ComposerProvider>
+              <Shell />
+            </ComposerProvider>
+          </PhoneCameraProvider>
+        </SignProvider>
+      </ToastProvider>
+    </QueryClientProvider>
   );
 }
