@@ -127,7 +127,8 @@ async def propose_intent(
     it = intents.build(buyer_id=mandate["buyer_id"], mandate=mandate, session=session,
                        original_request=original_request, product_query=product_query, quantity=quantity,
                        quantity_unit=quantity_unit, deliver_by=deliver_by,
-                       hard_rules=[r.model_dump() for r in hard_rules], optimise=optimise,
+                       hard_rules=[r.model_dump() if hasattr(r, 'model_dump') else HardRuleIn(**r).model_dump()
+                                   for r in hard_rules], optimise=optimise,
                        origin_preference=origin_preference, budget_max_total=budget_max_total,
                        max_over_pct=max_over_pct, allow_under=allow_under, agent_questions=open_questions)
     store().save_intent(it)
