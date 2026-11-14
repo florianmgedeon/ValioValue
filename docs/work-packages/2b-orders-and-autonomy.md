@@ -6,7 +6,7 @@ Status: open · Wave 1 (it does not depend on the other packages) · Shared cont
 
 Autonomy is earned and shown: one level, not twenty switches (ux-concept "Autonomy: one ladder"). The header shows "Level 1 · Usual products · 6/10", the Kitchen tab shows the ladder, and the start screen lists recent orders with their outcome (ordered alone / you decided / blocked). Today there is no way to list orders, nothing counts clean orders, and "level" exists only as grants in the mandate.
 
-Mockup moments: header autonomy pill, Kitchen tab → Autonomy (ladder with 4 levels, progress bar, grants g1/g2 with "Change"), start screen "Recent orders", toast "Clean order. 7 of 10 towards level 2".
+Mockup moments: header autonomy pill, Kitchen tab → Autonomy (ladder with 4 levels, progress bar, grant g1 with "Change"), Activity tab (order list with badges), start screen "Recent orders", toast "Clean order. 7 of 10 towards level 2".
 
 ## What exists
 
@@ -40,31 +40,30 @@ Mockup moments: header autonomy pill, Kitchen tab → Autonomy (ladder with 4 le
 
 Definition (write it into `docs/ux-concept.md` too): an order is **clean** if it is `confirmed`, its intent was not revised after it was proposed, and no line needed a human decision other than approving the cart unchanged. A blocked line, a changed product or a revised intent makes it not clean. Counting runs over the most recent orders since the last level change; the counter resets when the level changes.
 
-Level from the current mandate (no new mandate field):
+Level from the current mandate (no new mandate field). **Changed 14 Nov (UI review):** the level measures *which deviations* the agent may decide alone, not *which products*. Any product that passes every must may be ordered alone; a product-id scope on a grant is allowed but optional and is not a level.
 
-| Level | Name | Mandate shape |
-|---|---|---|
-| 0 | Suggest | no grants |
-| 1 | Usual products | every grant has a scope with `product_id in [...]` (usual products) |
-| 2 | Within mandate | at least one grant without a `product_id` scope |
-| 3 | Standing orders | not built; shown locked |
+| Level | Name | Agent may order alone | Mandate shape |
+|---|---|---|---|
+| 0 | Suggest | nothing, the buyer signs every order | no grants |
+| 1 | Within your rules | anything that passes every must, with no deviation, up to the limit | grants with `limits` but no `accepts` |
+| 2 | Small deviations | as 1, plus small deviations | at least one grant with `accepts` (quantity ≤ 5 %, delivery ≤ 1 day late, preference misses) |
+| 3 | Standing orders | reorders the usual order on a schedule | not built; shown locked |
 
 `GET /autonomy?buyer_id=`:
 
 ```json
-{"level": 1, "name": "Usual products", "clean_orders": 6, "needed": 10, "offer_next": false,
- "grants": [{"id": "g1", "label": "Usual products", "summary": "up to €600 an order · accepts +5 % from pack rounding"}],
- "usual_scope": {"in_sync": false, "missing": ["463038"], "extra": []}}
+{"level": 1, "name": "Within your rules", "clean_orders": 6, "needed": 10, "offer_next": false,
+ "next": {"level": 2, "name": "Small deviations", "would_accept": ["quantity +5 % from pack rounding", "delivery 1 day late", "a missed preference"]},
+ "grants": [{"id": "g1", "label": "Within your rules", "summary": "up to €600 an order · no deviations"}]}
 ```
 
 * `needed` = 10 (config `AUTONOMY_CLEAN_ORDERS`). `offer_next` = clean ≥ needed and level < 2.
-* `usual_scope`: compares the `product_id in [...]` scope of the level-1 grant with the active usual products in the kitchen profile (read `DATA_DIR/kitchen/{buyer_id}.json` directly or via 1b's `kitchen.load`; if no profile exists, `in_sync: true`).
 
 `POST /autonomy/level` `{buyer_id?, level, max_order_total?, by, mandate_hash?}`:
 
-* Builds the new mandate: level 0 removes all grants; level 1 = one grant `g1` with scope `product_id in <usual ids>`, `limits.max_order_total` (default: keep the current one), `accepts: [{"check": "quantity", "max_over_pct": 5}]`, and keeps other grants that are already product-scoped (e.g. g2 "Finnish fruit & vegetables" is category-scoped: decide, document); level 2 = g1 without the product scope.
+* Builds the new mandate: level 0 removes all grants. Level 1 = grant `g1` with `limits.max_order_total` (default: keep the current one) and no `accepts`. Level 2 = g1 plus `accepts: [{"check": "quantity", "max_over_pct": 5}, {"check": "delivery_date", "max_days_late": 1}, {"check": "preference"}]`. Other grants the buyer made by hand (with scopes) are kept as they are.
 * Same signature round trip as 1b's accept: without `mandate_hash` → `409 {needs_signature, preview}`; with it → `PUT /mandate`.
-* `POST /autonomy/sync-usual` does the same for level 1 with the current usual list (button "Update your usual products in the grant").
+* No `usual_scope` check and no `/autonomy/sync-usual` (dropped with the level change).
 
 ### 4. Event on clean order
 
@@ -72,7 +71,7 @@ After `order_confirmed` in the chat stream, the backend emits `autonomy_progress
 
 ### 5. Contract
 
-`contracts/backend-api.yaml`: `/orders`, `/autonomy`, `/autonomy/level`, `/autonomy/sync-usual`, event `autonomy_progress`. Fixtures for each.
+`contracts/backend-api.yaml`: `/orders`, `/autonomy`, `/autonomy/level`, event `autonomy_progress`. Fixtures for each.
 
 ## Not in this package
 
@@ -82,7 +81,7 @@ After `order_confirmed` in the chat stream, the backend emits `autonomy_progress
 ## Done when
 
 * After a demo run, `GET /orders` lists the orders with correct labels.
-* `GET /autonomy` returns level 1 for a mandate with only a product-scoped g1, level 0 without grants, level 2 with an unscoped grant.
+* `GET /autonomy` returns level 0 without grants, level 1 for grants without `accepts`, level 2 when a grant accepts deviations.
 * Ten clean orders in a test → `offer_next: true`. A revised intent or a blocked line does not count.
 * `POST /autonomy/level` round trip creates a new mandate version; Cedar shows the new grant (`GET /mandate/cedar`).
 * Tests: mcp-server list route; backend clean-order rules and level detection with a faked Valio API.

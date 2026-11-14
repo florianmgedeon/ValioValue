@@ -19,6 +19,8 @@ Read first, in this order:
 | 1c | [`1c-usual-products-in-orders.md`](1c-usual-products-in-orders.md) | Agent uses the profile; usual product ranked first; funnel per rule | 1 |
 | 2b | [`2b-orders-and-autonomy.md`](2b-orders-and-autonomy.md) | Order list, clean-order counter, autonomy level | 1 |
 | 2a | [`2a-learning-in-chat.md`](2a-learning-in-chat.md) | Learning from orders and chat, buyer-side agent tools | 2 (after 1a, 1b, 1c) |
+| 2c | [`2c-activity-and-usual-order.md`](2c-activity-and-usual-order.md) | Activity tab: what the agent did and why, per order; "Your usual order" card | 2 (after 1b, 1c, 2b) |
+| 2d | [`2d-permissions-and-levels.md`](2d-permissions-and-levels.md) | Extra permissions (own grants, e.g. organic up to €200) from a sentence; levels by deviations, rework of 2b's built level logic | 3 (after 2b, 3.1) |
 | 3 | [`3-polish.md`](3-polish.md) | Rule from a sentence, rule coverage, forecast before signing | 2 |
 
 Wave 1 packages run in parallel, each in its own session and branch. Wave 2 starts when wave 1 is merged.
@@ -27,7 +29,9 @@ Wave 1 packages run in parallel, each in its own session and branch. Wave 2 star
 1a photos ──┐
 1b kitchen ─┼──> 2a learning in chat
 1c usual ───┘
-2b orders/autonomy ──> (3 polish uses 2b's order list for price estimates, optional)
+2b orders/autonomy ─┬> 2c activity + usual order (also needs 1b, 1c)
+                    ├> (3 polish uses 2b's order list for price estimates, optional)
+                    └> 2d extra permissions + levels by deviations (also needs 3.1)
 ```
 
 ## Decisions already made (do not reopen in a package)
@@ -38,7 +42,7 @@ Wave 1 packages run in parallel, each in its own session and branch. Wave 2 star
 | W2 | **Where a photo goes is decided by where it is taken.** Onboarding and the Kitchen tab send photos to `POST /kitchen/ingest` (learn, never order). The order composer sends them to `POST /chat` (order; from 2a on the agent may also turn context photos into suggestions). |
 | W3 | **The kitchen profile lives on the buyer side** (backend), not at Valio Aimo. Valio Aimo only learns the usual product per order item via `preferred_product_id` on the intent. |
 | W4 | **Signed things stay in the mandate.** Must, Prefer and Autonomy are mandate entries (`PUT /mandate`, versioned, signed, Cedar). About, Usual, Sources and Suggestions are the kitchen profile (versioned, not signed). Accepting a Must, Prefer or Autonomy suggestion writes a new mandate version. |
-| W5 | **"Usual products alone" needs no new Valio rule kind.** Grant scope `{"attr": "product_id", "op": "in", "value": [<usual product ids>]}` already works (`rules.py`). |
+| W5 | **Autonomy levels measure deviations, not products** (changed 14 Nov). Level 1 = the agent may order anything that passes every must, without deviation, up to the limit. Level 2 = it may also accept small deviations. A `product_id in [...]` grant scope still works but is optional. Details in 2b. |
 | W6 | **We may change the mcp-server** (order list, `preferred_product_id`, funnel counts). Keep the trust boundary: no MCP tool may change the mandate or confirm anything. |
 | W7 | **Nothing the agent learns becomes active without a human.** Every learned item is a suggestion with status `proposed` until accepted via REST. |
 | W8 | Demo kitchen: `school-kitchen-espoo`. UI language: English. |
@@ -144,6 +148,7 @@ Until 1b is merged, 1c reads the JSON file directly and falls back to `contracts
 | `POST /kitchen/ingest` | 1b |
 | `POST /kitchen/suggestions/accept`, `POST /kitchen/suggestions/{id}/reject` | 1b |
 | `GET /orders`, `GET /autonomy`, `POST /autonomy/level` | 2b |
+| `GET /orders/{order_id}/story`, `GET /kitchen/usual-order` | 2c |
 | `POST /mandate/draft`, `POST /mandate/coverage` | 3 |
 
 All take `buyer_id` (query or body), default `config.DEFAULT_BUYER_ID`. For the demo set `DEFAULT_BUYER_ID=school-kitchen-espoo` in `.env`.
