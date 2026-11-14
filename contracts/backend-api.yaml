@@ -217,6 +217,76 @@ paths:
       responses:
         "200": { description: Catalog }
 
+  /mandate/draft:
+    post:
+      summary: "Rule from a sentence (3.1). Nothing is saved."
+      description: |
+        One LLM call proposes {attr, op, value} from the attributes of /policy-catalog. Valio's mandate preview
+        validates it on a copy of the current mandate. Label and explanation are built from the validated rule.
+        Product words ("only Finnish fish") become applies_to: category in [...]; `scope` shows which categories.
+        The UI adds `rule` to its draft and signs it with PUT /mandate. Scripted provider: "No <allergen>"
+        and "Only Finnish <products>" only, else 422 "Please use the form".
+        Example: contracts/fixtures/mandate-draft-sesame.json
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, example: "No sesame, not even traces" }
+                kind: { type: string, enum: [must, prefer], default: must }
+                buyer_id: { type: string }
+      responses:
+        "200":
+          description: The drafted rule
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kind: { type: string, enum: [must, prefer] }
+                  rule:
+                    type: object
+                    description: "A must (with if_unknown) or preference (with weight), ready for the mandate draft."
+                  label: { type: string, example: "No sesame, incl. may contain" }
+                  explanation: { type: string }
+                  product_type: { type: string, nullable: true }
+                  scope:
+                    type: array
+                    nullable: true
+                    items: { type: object, properties: { category: { type: string }, share: { type: number },
+                                                          products: { type: integer }, examples: { type: array, items: { type: string } } } }
+                  coverage: { $ref: "#/components/schemas/RuleCoverage" }
+                  provider: { type: string }
+        "422": { description: "{error}: not one rule, invalid rule, or no LLM and the regexes did not match" }
+
+  /mandate/coverage:
+    post:
+      summary: "How many catalog products a rule can decide from data (3.2)"
+      description: |
+        With `rule`: its coverage. Without: coverage for every must of the current mandate.
+        Products the rule's applies_to does not match are not counted. Unknown is never counted as safe.
+        Offer attributes (prices) return checked 0 and a note.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rule: { type: object, description: "A condition or must, V2 shorthands accepted" }
+                category: { type: string, description: "Only products of this category code" }
+                buyer_id: { type: string }
+      responses:
+        "200":
+          description: "RuleCoverage, or {mandate_id, musts: [{id, label, enabled, coverage: RuleCoverage}]}"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuleCoverage" }
+        "422": { description: Invalid rule }
+
   /intents/{intent_id}/confirm:
     post:
       summary: Human confirms (or edits and confirms) the order intent. Signed by the buyer key.
@@ -369,6 +439,20 @@ components:
 
 
     # ---------- v0.2 trust objects ----------
+    RuleCoverage:
+      type: object
+      description: "Verdicts of one rule over the catalog. checked = known + unknown, known = safe + excluded."
+      properties:
+        label: { type: string }
+        checked: { type: integer, example: 17546 }
+        known: { type: integer, example: 9300 }
+        safe: { type: integer, example: 8544 }
+        excluded: { type: integer, example: 756 }
+        unknown: { type: integer, example: 8246 }
+        category: { type: string, nullable: true }
+        if_unknown: { type: string, enum: [exclude, ask] }
+        rule_hash: { type: string, description: "Cache key" }
+        note: { type: string, description: "Only for rules that need a price" }
     Condition:
       type: object
       description: |

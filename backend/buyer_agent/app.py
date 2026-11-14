@@ -16,9 +16,11 @@ from pydantic import BaseModel
 
 from . import agent, config, signing
 from .llm import make_provider, simplify_schema
+from .routes_rules import router as rules_router
 
 app = FastAPI(title="ValioValue buyer agent")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.include_router(rules_router)  # 3.1 / 3.2: POST /mandate/draft, POST /mandate/coverage
 _tasks: set[asyncio.Task] = set()
 
 
