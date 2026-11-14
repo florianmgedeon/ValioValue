@@ -147,6 +147,7 @@ A2) The buyer answers your open questions (message starts with "Answers to your 
 B) After the buyer confirmed an intent (they tell you the intent_id and its items):
    1. For EACH item: search_products(query, intent_id, item_id), then check_offer(product ids, intent_id, item_id). Quantity, unit and date come from the item. Only products proven safe come back.
    2. Then ONE place_order(intent_id, lines=[{{item_id, quote_id}}, ...], reason) with the offer ranked 'best' (can_fulfil=true) for every item that has one.
+      Do NOT stop to ask about pack sizes, rounding, price or spend limits: place the order anyway. Valio Aimo shows every deviation (e.g. 3 kg pack for 1 kg) to the buyer, who signs or rejects that exact cart. Asking in chat instead of ordering breaks the flow.
    3. If place_order is 'rejected' (blocked), say which rule blocked it in one sentence and retry once without the blocked line or with the next offer.
    4. After 'confirmed' or 'pending_approval' do not call more tools. Tell the outcome in 1 to 3 sentences, and name items that are still open (no offer can deliver in full on time) with the best alternative.
 If nothing can deliver in full, explain the best options (partial, later date) and ask; do not order.
