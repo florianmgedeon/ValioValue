@@ -82,7 +82,7 @@ export function KitchenPanel() {
         {k.prefers.length > 0 && <div>{k.prefers.map((p) => <Chip key={p.id ?? p.label} kind="prefer">{p.label ?? p.id}</Chip>)}</div>}
         <div><Chip kind="usual">{k.usualCount} usual product{k.usualCount === 1 ? "" : "s"}</Chip></div>
         {k.level !== null && (
-          <div><Chip kind="auto" icon="lock">Level {k.level}{k.limit !== null ? ` · alone up to ${eur(k.limit)}` : k.levelName ? ` · ${k.levelName}` : ""}</Chip></div>
+          <div><Chip kind="auto" icon="lock">{k.level === 0 ? "I ask before every order" : `${k.level === 1 ? "Usual products alone" : "Orders alone"}${k.limit !== null ? ` · up to ${eur(k.limit)}` : ""}`}</Chip></div>
         )}
       </div>
       <button className="link justify-self-start text-[13px]" onClick={() => navigate("kitchen")}>Open kitchen profile</button>

@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { apiUrl } from "../../api/client";
 import type { KitchenProfile, Schema } from "../../api/types";
-import { Button, Chip, Icon, KindTag, Mark, Paper, YesNo, type Kind } from "../../ui";
+import { useComposerText } from "../../app/composer";
+import { navigate } from "../../app/route";
+import { Button, Chip, Icon, KindTag, Mark, Paper, YesNo, eur, type Kind } from "../../ui";
+import { useKitchenContext, useUsualOrder } from "../order/data";
 
 type Suggestion = Schema["Suggestion"];
 type Source = Schema["Source"];
@@ -120,11 +123,10 @@ export function About({ profile, onSave }: { profile: KitchenProfile; onSave: (t
   return (
     <section className="sec">
       <div className="sec-h">
-        <KindTag kind="about" />
-        <h2>About us</h2>
+        <h2>About your kitchen</h2>
         <span className="spacer" />
         <Button variant="link" className="text-[13px]" onClick={() => setEditing((e) => !e)}>{editing ? "Cancel" : "Edit"}</Button>
-        <p>Shapes how I read your requests. Not enforced.</p>
+        <p>Helps me read your requests and plan amounts.</p>
       </div>
       {editing ? (
         <div className="grid gap-2.5 px-5 pb-4">
@@ -166,18 +168,23 @@ export function unitText(u?: string) {
   return u === "KG" ? "kg" : u === "SALES_UNIT" ? "packs" : u ?? "";
 }
 
-export function Usual({ profile }: { profile: KitchenProfile }) {
+/** The usual products and amounts in one block, with "Order the usual" (opens `#order/usual` in the Order tab). */
+export function UsualSection({ profile }: { profile: KitchenProfile }) {
+  const setText = useComposerText();
+  const usual = useUsualOrder();
+  const k = useKitchenContext();
   const items = (profile.usual ?? []).filter((u) => (u.status ?? "active") === "active");
   const src = (id?: string) => profile.sources?.find((x) => x.id === id)?.title;
+  const est = usual.data?.estimate_total ?? null;
+  const fits = est !== null && k.limit !== null ? est <= k.limit : null;
+  const canOrder = items.some((u) => u.typical_qty != null);
   return (
-    <section className="sec">
+    <section className="sec usual-sec">
       <div className="sec-h">
-        <KindTag kind="usual" />
-        <h2>Usual products</h2>
-        <span className="spacer" />
-        <span className="muted text-[13px]">{items.length} words I know</span>
-        <p>When you say the word, I pick this product. Together with the usual amounts they make your usual order.</p>
+        <h2>Your usual products</h2>
+        <p>When you say the word, I pick this product. With the usual amounts they make your usual order.</p>
       </div>
+      {items.length === 0 && <div className="rule"><span className="muted text-sm">Nothing yet. Show me an invoice or a delivery note and I'll learn them.</span></div>}
       {items.map((u) => (
         <div key={u.id} className="usual">
           <span className="w">{u.word}</span>
@@ -188,6 +195,17 @@ export function Usual({ profile }: { profile: KitchenProfile }) {
           <span className="qty">{u.typical_qty != null ? `${u.typical_qty} ${unitText(u.unit)} / ${u.per || "week"}` : ""}</span>
         </div>
       ))}
+      {canOrder && (
+        <div className="usual-foot">
+          <span className="est">
+            {est !== null ? <>The usual order ≈ <b className="num">{eur(est)}</b>. </> : null}
+            {fits === true && "Inside your limit: I can order it alone."}
+            {fits === false && "Above your limit: you approve the cart."}
+          </span>
+          <Button small onClick={() => { navigate("order"); setText("the usual, but "); }}>Adjust</Button>
+          <Button variant="primary" small onClick={() => navigate("order", "usual")}>Order the usual</Button>
+        </div>
+      )}
     </section>
   );
 }
@@ -204,9 +222,7 @@ export function Sources({ profile, orders }: { profile: KitchenProfile; orders: 
   return (
     <section className="sec">
       <div className="sec-h">
-        <h2>Sources</h2>
-        <span className="spacer" />
-        <span className="muted text-[13px]">everything I learned from</span>
+        <h2>What I learned from</h2>
       </div>
       <div className="sources">
         {docs.map((s) => {

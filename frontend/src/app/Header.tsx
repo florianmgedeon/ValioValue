@@ -18,8 +18,12 @@ export function Header({ tab, showTabs }: { tab: Tab; showTabs: boolean }) {
   const kitchenName = mandate.data?.display_name || "Your kitchen";
   const a = autonomy.data;
   const level = a?.level ?? 0;
-  const clean = a?.clean_orders ?? 0;
-  const needed = a?.needed ?? 10;
+  const grants = mandate.data?.autonomy?.grants ?? [];
+  const limit = (grants.find((g) => g.id === "g1") ?? grants[0])?.limits?.max_order_total;
+  const amount = limit != null ? `€${limit.toLocaleString("en-GB")}` : "";
+  // What the agent may order alone, in a few words (the full sentence is on the Kitchen tab).
+  const long = level === 0 ? "I ask before every order" : level === 1 ? `Usual products alone · up to ${amount}` : `Orders alone · up to ${amount}`;
+  const short = level === 0 ? "Asks first" : amount;
 
   return (
     <header
@@ -49,25 +53,15 @@ export function Header({ tab, showTabs }: { tab: Tab; showTabs: boolean }) {
         {showTabs && a && (
           <button
             className="flex h-9 items-center gap-2.5 rounded-full bg-auto-soft pr-3 pl-2.5 text-[13px] font-semibold whitespace-nowrap text-auto"
-            title="How autonomous your agent is"
+            title="What I may order without you"
             onClick={() => {
               navigate("kitchen");
               window.setTimeout(() => document.getElementById("autonomy")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
             }}
           >
             <Icon name="hand" className="hidden sm:block" />
-            <span className="hidden md:inline">Level {level} · {a.name}</span>
-            <span className="md:hidden">L{level}</span>
-            {level < 2 && (
-              <>
-                <span className="hidden gap-0.5 sm:flex" aria-hidden="true">
-                  {Array.from({ length: needed }, (_, i) => (
-                    <i key={i} className="h-2.5 w-1.5 rounded-[2px]" style={{ background: i < clean ? "var(--auto)" : "color-mix(in srgb, var(--auto) 25%, transparent)" }} />
-                  ))}
-                </span>
-                <span className="num">{clean}/{needed}</span>
-              </>
-            )}
+            <span className="hidden md:inline">{long}</span>
+            <span className="md:hidden">{short}</span>
           </button>
         )}
         <div className="flex h-9 items-center gap-2 rounded-full border-line text-[13px] font-semibold whitespace-nowrap sm:border sm:pr-1 sm:pl-3">

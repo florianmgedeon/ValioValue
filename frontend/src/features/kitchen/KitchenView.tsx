@@ -2,9 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { setAutonomyLevel } from "../../api/autonomy";
 import { acceptKitchenSuggestions, getKitchenHistory, ingestKitchenDocuments, patchKitchenProfile, rejectKitchenSuggestion } from "../../api/kitchen";
-import { checkMandateCoverage, getMandateHistory } from "../../api/mandate";
+import { getMandateHistory } from "../../api/mandate";
 import { listOrders } from "../../api/orders";
-import type { KitchenProfile, Mandate, RuleCoverage, Schema, UploadMeta } from "../../api/types";
+import type { KitchenProfile, Mandate, Schema, UploadMeta } from "../../api/types";
 import { useComposer } from "../../app/composer";
 import { usePhoneCamera } from "../../app/PhoneCamera";
 import { keys, queryClient, SIGNER_NAME, useAutonomy, useKitchen, useMandate } from "../../app/queries";
@@ -13,11 +13,12 @@ import { Button, Drawer, Icon, Typing, useToast } from "../../ui";
 import { AutonomySection, LEVELS } from "./Autonomy";
 import "./kitchen.css";
 import { applyOps, nextId, plural, ruleLabel, upsert, type Grant, type HardRule, type LevelChange, type Op, type Preference, type RuleGroup } from "./model";
-import { UsualCard } from "../order/UsualCard";
-import { About, Sources, Suggestions, TeachCard, Usual } from "./Profile";
+import { About, Sources, Suggestions, TeachCard, UsualSection } from "./Profile";
 import { errText, MustSection, PreferSection, type RowFlags } from "./Rules";
 
 type Suggestion = Schema["Suggestion"];
+
+const IMPORTANCE_TEXT: Record<number, string> = { 1: "nice to have", 2: "important", 3: "very important" };
 
 const shortDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "");
 
@@ -29,11 +30,6 @@ export default function KitchenView() {
   const kitchen = useKitchen();
   const mandate = useMandate();
   const autonomy = useAutonomy();
-  const coverage = useQuery({
-    queryKey: [...keys.mandate, "coverage"],
-    queryFn: () => checkMandateCoverage({}) as unknown as Promise<{ musts?: { id: string; coverage: RuleCoverage }[] }>,
-    staleTime: 60_000,
-  });
   const orders = useQuery({ queryKey: [...keys.orders, "all"], queryFn: () => listOrders({ limit: 200 }) });
 
   const [ops, setOps] = useState<Op[]>([]);
@@ -79,7 +75,6 @@ export default function KitchenView() {
     }
     return { changed, fresh };
   }, [ops]);
-  const covMap = useMemo(() => new Map((coverage.data?.musts ?? []).map((m) => [m.id, m.coverage])), [coverage.data]);
 
   if (kitchen.isLoading || mandate.isLoading || autonomy.isLoading) {
     return <main className="kt"><Typing /></main>;
@@ -119,14 +114,14 @@ export default function KitchenView() {
     const orig = original("must", r.id) as HardRule | undefined;
     setOps((o) => upsert(o, {
       key: `must:${r.id}:if_unknown`, t: "patchRule", group: "must", id: r.id!, patch: { if_unknown: v },
-      text: `${ruleLabel(r)}: if unknown, ${v === "ask" ? "ask me" : "exclude"}`, kind: "chg",
+      text: `${ruleLabel(r)}: if the label doesn’t say, ${v === "ask" ? "ask me" : "leave it out"}`, kind: "chg",
     }, !!orig && (orig.if_unknown ?? "exclude") === v));
   };
   const weightRule = (r: Preference, w: number) => {
     const orig = original("prefer", r.id) as Preference | undefined;
     setOps((o) => upsert(o, {
       key: `prefer:${r.id}:weight`, t: "patchRule", group: "prefer", id: r.id!, patch: { weight: w },
-      text: `${ruleLabel(r)}: weight ${w}${orig ? ` (was ${orig.weight ?? 1})` : ""}`, kind: "chg",
+      text: `${ruleLabel(r)}: ${IMPORTANCE_TEXT[w] ?? w}${orig ? ` (was ${IMPORTANCE_TEXT[orig.weight ?? 1] ?? orig.weight})` : ""}`, kind: "chg",
     }, !!orig && (orig.weight ?? 1) === w));
   };
   const addRule = (group: RuleGroup) => (rule: HardRule | Preference, label: string) => {
@@ -164,7 +159,7 @@ export default function KitchenView() {
     const limChanged = limit != null && limit !== currentLimit;
     if (!lvlChanged && !limChanged) return null;
     const parts = [];
-    if (lvlChanged) parts.push(`Autonomy: level ${n} · ${LEVELS[n]?.name} (was level ${level})`);
+    if (lvlChanged) parts.push(`I may order alone: ${LEVELS[n]!.name} (was: ${LEVELS[level]!.name})`);
     if (limChanged) parts.push(`Limit: up to €${(limit as number).toLocaleString("en-GB")} an order (was €${(currentLimit ?? 0).toLocaleString("en-GB")})`);
     return { level: n, max_order_total: limChanged ? limit : undefined, text: parts.join(" · "), kind: lvlChanged ? (n > level ? "add" : "del") : "chg" };
   };
@@ -247,27 +242,24 @@ export default function KitchenView() {
 
   const proposed = (profile.suggestions ?? []).filter((s) => s.status === "proposed");
   const name = m.display_name || "Your kitchen";
+  const learnedSomething = (profile.sources ?? []).length > 0;
   return (
     <main className="kt">
       <div className="k-head">
         <div>
           <h1>{name}</h1>
-          <p>
-            Last changed by {m.updated_by || "you"}{m.updated_at ? `, ${shortDate(m.updated_at)}` : ""} · Valio Aimo checks every{" "}
-            <Icon name="lock" size={13} style={{ verticalAlign: -2 }} /> rule on every order
-          </p>
+          <p>{reading ? "Reading…" : "What I know about your kitchen. Teach me more with a photo or a sentence below."}</p>
         </div>
         <span className="spacer" />
-        <Button small onClick={() => setHistoryOpen(true)}>History</Button>
+        <Button small variant="ghost" onClick={() => setHistoryOpen(true)}>History</Button>
       </div>
 
-      <TeachCard onPhone={() => camera.open("kitchen")} onUpload={() => camera.upload("kitchen")} busy={reading} />
+      {!learnedSomething && <TeachCard onPhone={() => camera.open("kitchen")} onUpload={() => camera.upload("kitchen")} busy={reading} />}
 
       <Suggestions items={proposed} sources={profile.sources ?? []} onAccept={(s) => void accept(s)} onReject={(s) => void reject(s)} busy={busy} />
 
       <AutonomySection
         autonomy={a}
-        mandateVersion={m.version ?? 0}
         g1={g1}
         extras={extras}
         musts={view.mandatory_rules}
@@ -282,16 +274,15 @@ export default function KitchenView() {
       />
 
       <div className="k-grid">
-        <div className="grid gap-5">
-          <About profile={profile} onSave={saveAbout} />
-          <UsualCard />
-          <Usual profile={profile} />
-          <Sources profile={profile} orders={orders.data?.length ?? null} />
-        </div>
-        <div className="grid gap-5">
-          <MustSection rules={view.mandatory_rules} flags={flags} coverage={covMap} onToggle={toggleRule("must")} onUnknown={unknownRule} onAdd={addRule("must")} />
-          <PreferSection rules={view.preferences} flags={flags} onToggle={toggleRule("prefer")} onWeight={weightRule} onAdd={addRule("prefer")} />
-        </div>
+        <MustSection rules={view.mandatory_rules} flags={flags} onToggle={toggleRule("must")} onUnknown={unknownRule} onAdd={addRule("must")} />
+        <PreferSection rules={view.preferences} flags={flags} onToggle={toggleRule("prefer")} onWeight={weightRule} onAdd={addRule("prefer")} />
+      </div>
+
+      <UsualSection profile={profile} />
+
+      <div className="k-grid">
+        <About profile={profile} onSave={saveAbout} />
+        <Sources profile={profile} orders={orders.data?.length ?? null} />
       </div>
 
       {pendingCount > 0 && (

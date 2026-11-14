@@ -3,7 +3,7 @@ import { Icon, type IconName } from "./Icon";
 
 /** The five things the agent knows: signed musts and autonomy, ranking preferences, usual products, kitchen facts. */
 export type Kind = "must" | "prefer" | "usual" | "about" | "auto";
-export const KIND_LABEL: Record<Kind, string> = { must: "MUST", prefer: "PREFER", usual: "USUAL", about: "ABOUT", auto: "AUTONOMY" };
+export const KIND_LABEL: Record<Kind, string> = { must: "RULE", prefer: "PREFER", usual: "USUAL", about: "ABOUT", auto: "ORDER ALONE" };
 /** Kinds that live in the signed mandate. Changing them needs a signature. */
 export const SIGNED_KINDS: ReadonlySet<Kind> = new Set<Kind>(["must", "auto"]);
 

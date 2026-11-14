@@ -2,20 +2,24 @@ import { useState } from "react";
 import { draftGrant } from "../../api/mandate";
 import type { AutonomyView, DraftGrantResponse } from "../../api/types";
 import { navigate } from "../../app/route";
-import { Button, Chip, Cond, Icon, KindTag, Modal, SignedTag, Toggle, DiffList } from "../../ui";
-import { acceptsText, condText, limitText, ruleLabel, scopeText, type Grant, type HardRule, type LevelChange } from "./model";
+import { Button, Chip, Cond, Icon, Modal, Toggle, DiffList } from "../../ui";
+import { acceptsText, condText, limitText, ruleLabel, type Grant, type HardRule, type LevelChange } from "./model";
 import { errText } from "./Rules";
 
-export const LEVELS: { n: 0 | 1 | 2 | 3; name: string; text: (limit: number) => string }[] = [
-  { n: 0, name: "Suggest", text: () => "I prepare, you approve every order" },
-  { n: 1, name: "Within your rules", text: (l) => `I order alone whatever passes every must, no deviations, up to €${l.toLocaleString("en-GB")}` },
-  { n: 2, name: "Small deviations", text: () => "Also pack rounding up to +5 %, 1 day late, a missed preference" },
-  { n: 3, name: "Standing orders", text: () => "I reorder your usual order on a schedule" },
+const eur = (n: number) => `€${n.toLocaleString("en-GB")}`;
+
+/**
+ * The three choices, in the backend's meaning (autonomy.py): 0 no grants, 1 g1 scoped to the usual products,
+ * 2 g1 for anything that passes the musts. Level 3 (standing orders) is not built and not shown.
+ */
+export const LEVELS: { n: 0 | 1 | 2; name: string; text: (limit: number) => string; now: (limit: number) => string }[] = [
+  { n: 0, name: "Ask me first", text: () => "I prepare every order. You approve each one.", now: () => "Nothing. I ask you before every order." },
+  { n: 1, name: "My usual products", text: (l) => `I order your usual products alone, up to ${eur(l)} an order.`, now: (l) => `Your usual products, up to ${eur(l)} an order.` },
+  { n: 2, name: "Anything within my rules", text: (l) => `I order any product that passes your rules alone, up to ${eur(l)} an order.`, now: (l) => `Anything that passes your rules, up to ${eur(l)} an order.` },
 ];
 
 export interface AutonomyProps {
   autonomy: AutonomyView;
-  mandateVersion: number;
   g1: Grant | undefined;
   extras: { grant: Grant; inMandate: boolean; summary?: string; source?: string }[];
   musts: HardRule[];
@@ -29,157 +33,122 @@ export interface AutonomyProps {
   locked: (msg: string) => void;
 }
 
+/** "What may I order without you?": one sentence for today, the choices behind "Change", extras folded away. */
 export function AutonomySection(p: AutonomyProps) {
   const { autonomy: a, g1 } = p;
-  const level = a.level ?? 0;
+  const level = (a.level ?? 0) as 0 | 1 | 2;
   const clean = a.clean_orders ?? 0;
   const needed = a.needed ?? 10;
   const limit = p.pendingLevel?.max_order_total ?? g1?.limits?.max_order_total ?? 600;
   const recommended = a.recommended_next ?? a.offer_next ?? false;
+  const shown = (p.pendingLevel?.level ?? level) as 0 | 1 | 2;
+  const [open, setOpen] = useState(false);
   const [askLevel2, setAskLevel2] = useState(false);
-  const [limitOpen, setLimitOpen] = useState(false);
   const [limitValue, setLimitValue] = useState(String(limit));
   const [permOpen, setPermOpen] = useState(false);
-  const shown = p.pendingLevel?.level ?? level;
+  const accepts = shown > 0 && g1?.accepts?.length ? acceptsText(g1.accepts).replace(/^accepts /, "") : null;
 
-  const pick = (n: 0 | 1 | 2 | 3) => {
-    if (n === 3) return p.locked("Standing orders are not built yet.");
+  const pick = (n: 0 | 1 | 2) => {
     if (n === 2 && level < 2 && !recommended && p.pendingLevel?.level !== 2) return setAskLevel2(true);
     p.onLevel(n);
+  };
+  const setLimit = () => {
+    const v = Number(limitValue.replace(",", "."));
+    if (v > 0) p.onLimit(v);
   };
 
   return (
     <section className="sec" id="autonomy">
       <div className="sec-h">
-        <KindTag kind="auto" />
-        <h2>How autonomous I am</h2>
-        <SignedTag />
+        <h2>What may I order without you?</h2>
         <span className="spacer" />
         <Button variant="link" className="text-[13px]" onClick={() => navigate("activity")}>See what I decided</Button>
-        <p>I only ever order what passes every must. The level decides how many small deviations I may accept without you. You decide every step up.</p>
       </div>
-      <div className="ladder" role="radiogroup" aria-label="Autonomy level">
-        {LEVELS.map((l) => {
-          const cur = l.n === level;
-          const pend = p.pendingLevel?.level === l.n && !cur;
-          const lock = l.n === 3;
-          const tag = cur ? "CURRENT" : pend ? "TO SIGN" : lock ? "NOT YET" : "";
+
+      <div className={`auto-now ${p.pendingLevel ? "changed" : ""}`}>
+        <span className="ic"><Icon name="hand" /></span>
+        <div className="grid gap-0.5">
+          <b>{LEVELS[shown]!.now(limit)}</b>
+          <span className="muted text-[13px]">
+            {shown > 0 ? "Your musts always apply." : "You can let me order alone once you trust me."}
+            {accepts ? ` Small differences I accept: ${accepts}.` : ""}
+          </span>
+        </div>
+        <Button small onClick={() => { setLimitValue(String(limit)); setOpen((o) => !o); }}>{open ? "Close" : "Change"}</Button>
+      </div>
+
+      {open && (
+        <div className="auto-opts">
+          <div className="grid gap-2" role="radiogroup" aria-label="What I may order alone">
+            {LEVELS.map((l) => (
+              <button key={l.n} type="button" role="radio" aria-checked={shown === l.n} className="lvl" onClick={() => pick(l.n)}>
+                <span className="radio" />
+                <span className="grid gap-0.5">
+                  <b>{l.name}{l.n === level ? <span className="muted font-normal"> · now</span> : null}</b>
+                  <span className="muted text-[13px]">{l.text(limit)}</span>
+                  {l.n === 2 && level < 2 && !recommended && <span className="rec">I suggest this after {needed} orders without a correction.</span>}
+                </span>
+              </button>
+            ))}
+          </div>
+          {shown > 0 && (
+            <form className="frow" onSubmit={(e) => { e.preventDefault(); setLimit(); }}>
+              <span className="text-sm">Up to €</span>
+              <input className="field" style={{ width: 110 }} inputMode="decimal" value={limitValue} onChange={(e) => setLimitValue(e.target.value)} aria-label="Limit per order in euro" />
+              <span className="text-sm">an order</span>
+              <Button type="submit" small disabled={Number(limitValue.replace(",", ".")) === limit}>Set limit</Button>
+            </form>
+          )}
+        </div>
+      )}
+
+      {level < 2 && (
+        <p className="auto-hint">
+          {clean} of {needed} orders went through without a correction. After {needed} I'll suggest letting me do more.
+        </p>
+      )}
+
+      <details className="auto-more" open={permOpen || p.extras.some((x) => x.grant.id && (p.freshGrants.has(x.grant.id) || p.changedGrants.has(x.grant.id))) || undefined}>
+        <summary>Extra permissions{p.extras.length ? ` (${p.extras.length})` : ""}</summary>
+        <p className="muted text-[12.5px]">On top of the above: products I may order alone with their own limit. Your musts still apply.</p>
+        {p.extras.map(({ grant: g, inMandate, summary, source }) => {
+          const cls = [g.enabled === false ? "off" : "", g.id && p.freshGrants.has(g.id) ? "fresh rise" : g.id && p.changedGrants.has(g.id) ? "changed" : ""].join(" ");
           return (
-            <button key={l.n} type="button" role="radio" aria-checked={cur} className={`rung ${cur ? "cur" : ""} ${pend ? "pend" : ""} ${lock ? "locked" : ""}`} onClick={() => pick(l.n)}>
-              <span className="lv">LEVEL {l.n}{tag ? ` · ${tag}` : ""}</span>
-              <b>{l.name}</b>
-              <span>{l.text(limit)}</span>
-              {l.n === 2 && level < 2 && !recommended && <span className="rec">Recommended after {needed} clean orders</span>}
-            </button>
+            <div key={g.id} className={`grant ${cls}`}>
+              <div>
+                <b>{g.label || "Permission"}</b>
+                <div className="mt-0.5 text-[12.5px] text-ink3">
+                  {inMandate ? `${limitText(g.limits)} · ${acceptsText(g.accepts)}` : summary}{source ? ` · ${source}` : ""}
+                </div>
+              </div>
+              <Toggle
+                checked={g.enabled !== false}
+                onChange={() => (inMandate ? p.onToggleGrant(g) : p.locked("This permission is only an example and can't be changed yet."))}
+                label={`Permission on: ${g.label ?? ""}`}
+              />
+            </div>
           );
         })}
-      </div>
-      <div className="progress">
-        {level < 2 ? (
-          <>
-            <div>{clean} of {needed} orders without a correction. At {needed} I'll suggest level 2. You can switch earlier yourself.</div>
-            <div className="track"><i style={{ width: `${Math.min(100, (clean / needed) * 100)}%` }} /></div>
-          </>
+        {permOpen ? (
+          <PermForm musts={p.musts} levelLimit={limit} onAdd={(g) => { p.onAddGrant(g); setPermOpen(false); }} />
         ) : (
-          <div>Level 2 is on. Every deviation I accept alone is marked in Activity, so you can see what I decided.</div>
+          <Button variant="link" className="justify-self-start text-[13px]" onClick={() => setPermOpen(true)}>+ Add permission</Button>
         )}
-      </div>
+      </details>
 
-      {shown > 0 ? (
-        <div className={`grant ${p.pendingLevel ? "changed" : ""}`}>
-          <span className="gid"><Icon name="check" size={12} /></span>
-          <div>
-            <b>{shown >= 2 ? "Within your rules + small deviations" : "Within your rules"}</b>
-            <div className="muted text-[12.5px]">
-              {shown >= 2 ? "any product that passes every must" : scopeText(g1?.scope)} · up to €{limit.toLocaleString("en-GB")} an order · {g1 ? acceptsText(g1.accepts) : "no deviations"}
-            </div>
-            {limitOpen && (
-              <form
-                className="frow mt-2"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const v = Number(limitValue.replace(",", "."));
-                  if (v > 0) {
-                    p.onLimit(v);
-                    setLimitOpen(false);
-                  }
-                }}
-              >
-                <span className="text-sm">Up to €</span>
-                <input className="field" style={{ width: 110 }} inputMode="decimal" value={limitValue} onChange={(e) => setLimitValue(e.target.value)} aria-label="Limit per order in euro" autoFocus />
-                <span className="text-sm">an order</span>
-                <Button type="submit" variant="primary" small>Set limit</Button>
-              </form>
-            )}
-          </div>
-          <Button variant="link" className="text-[13px]" onClick={() => { setLimitValue(String(limit)); setLimitOpen((o) => !o); }}>{limitOpen ? "Cancel" : "Change limit"}</Button>
-        </div>
-      ) : (
-        <div className="grant">
-          <span className="gid">—</span>
-          <div><b>Nothing alone</b><div className="muted text-[12.5px]">I prepare every order, you approve every order</div></div>
-        </div>
-      )}
-
-      <div className="perm-h">
-        <b>Extra permissions</b>
-        <span className="spacer" />
-        <Button variant="link" className="text-[13px]" onClick={() => setPermOpen((o) => !o)}>{permOpen ? "Close" : "+ Add permission"}</Button>
-        <p>On top of your level: products I may order alone with their own limit. Musts still block, whatever a permission says.</p>
-      </div>
-      {p.extras.map(({ grant: g, inMandate, summary, source }) => {
-        const cls = [g.enabled === false ? "off" : "", g.id && p.freshGrants.has(g.id) ? "fresh rise" : g.id && p.changedGrants.has(g.id) ? "changed" : ""].join(" ");
-        return (
-          <div key={g.id} className={`grant ${cls}`}>
-            <span className="gid x"><Icon name="check" size={12} /></span>
-            <div>
-              <b>{g.label || g.id}</b>
-              <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[12.5px] text-ink3">
-                {inMandate ? (
-                  <>
-                    <span>{limitText(g.limits)} · {acceptsText(g.accepts)}{source ? ` · ${source}` : ""}</span>
-                  </>
-                ) : (
-                  <span>{summary}{source ? ` · ${source}` : ""} · example</span>
-                )}
-              </div>
-            </div>
-            {inMandate ? (
-              <Toggle checked={g.enabled !== false} onChange={() => p.onToggleGrant(g)} label={`Permission on: ${g.label ?? g.id}`} />
-            ) : (
-              <Toggle checked={g.enabled !== false} onChange={() => p.locked("This permission is only an example and can't be changed yet.")} label={`Permission on: ${g.label ?? g.id}`} />
-            )}
-          </div>
-        );
-      })}
-      {p.extras.length === 0 && !permOpen && <div className="grant"><span className="gid x">—</span><span className="muted text-[13px]">None yet.</span><span /></div>}
-      {permOpen && (
-        <PermForm
-          musts={p.musts}
-          levelLimit={limit}
-          onAdd={(g) => {
-            p.onAddGrant(g);
-            setPermOpen(false);
-          }}
-        />
-      )}
-
-      <Modal open={askLevel2} onClose={() => setAskLevel2(false)} width={600} label="Level 2 recommendation">
-        <div className="eyebrow" style={{ color: "var(--auto)" }}>Level 2 · Small deviations</div>
-        <h2>We recommend waiting a little.</h2>
-        <p className="text-ink3">{clean} of {needed} orders have gone through without a correction so far. After {needed} we know your kitchen well enough to suggest this step. You can still unlock it now.</p>
+      <Modal open={askLevel2} onClose={() => setAskLevel2(false)} width={560} label="Let me order more alone">
+        <h2>Let me order anything within your rules?</h2>
+        <p className="text-ink3">{clean} of {needed} orders have gone through without a correction so far. After {needed} I'd suggest this myself. You can still do it now.</p>
         <DiffList
           lines={[
-            { kind: "add", text: "I may then accept alone: pack rounding up to +5 %" },
-            { kind: "add", text: "a delivery 1 day later than asked" },
-            { kind: "add", text: "a product that misses a preference (e.g. not Finnish)" },
-            { kind: "chg", text: `Unchanged: every must still blocks, the €${limit.toLocaleString("en-GB")} limit still holds` },
+            { kind: "add", text: "I may then order any product that passes your musts, not only your usual ones" },
+            { kind: "chg", text: `Unchanged: every must still applies, the ${eur(limit)} limit still holds` },
           ]}
         />
-        <p className="text-[13px] text-ink3">Like every rule change, you confirm it first. You can go back to level 1 at any time.</p>
+        <p className="text-[13px] text-ink3">You confirm the change before it applies, and you can go back at any time.</p>
         <div className="flex flex-wrap justify-end gap-2.5">
-          <Button onClick={() => setAskLevel2(false)}>Keep level {level}</Button>
-          <Button variant="primary" onClick={() => { setAskLevel2(false); p.onLevel(2); }}>Unlock anyway</Button>
+          <Button onClick={() => setAskLevel2(false)}>Not yet</Button>
+          <Button variant="primary" onClick={() => { setAskLevel2(false); p.onLevel(2); }}>Yes, do it</Button>
         </div>
       </Modal>
     </section>

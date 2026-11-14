@@ -31,17 +31,6 @@
   .photo-card .btn-primary { background: var(--bg); color: var(--ink); }
   .photo-card .btn-ghost { background: color-mix(in srgb, var(--bg) 14%, transparent); color: var(--bg); }
   .or-chat { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 18px; font-size: 14px; color: var(--ink3); font-weight: 600; }
-  .usual-card { display: grid; gap: 12px; padding: 22px; border-radius: 22px; background: var(--usual-soft); align-content: start; }
-  .usual-card h2 { font-size: 22px; font-weight: 800; }
-  .usual-card .head p { font-size: 13px; color: var(--ink2); }
-  .ulist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 18px; }
-  @media (max-width: 480px) { .ulist { grid-template-columns: minmax(0, 1fr); } }
-  .ulist div { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid color-mix(in srgb, var(--usual) 18%, transparent); font-size: 14px; }
-  .ulist .w { font-family: var(--hand); font-size: 21px; line-height: 1; color: var(--usual); }
-  .ulist .q { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .usual-card .foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .usual-card .est { flex: 1; min-width: 160px; font-size: 13px; color: var(--ink2); }
-  .usual-card .est b { font-size: 18px; color: var(--ink); }
 
   /* thread */
   .orderbar { display: flex; align-items: center; gap: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }

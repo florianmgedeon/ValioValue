@@ -63,29 +63,29 @@
 .kt .k-head p .icon { display: inline-block; }
 .kt .err { border-radius: 12px; background: var(--must-soft); color: var(--must); padding: 10px 14px; font-size: 13px; }
 
-/* autonomy */
-.kt .ladder { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 6px 20px 16px; }
-@media (max-width: 560px) { .kt .ladder { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.kt .rung { border-radius: 14px; padding: 12px; background: var(--surface); display: grid; gap: 4px; align-content: start; text-align: left; border: 2px solid transparent; }
-.kt .rung .lv { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; color: var(--ink3); }
-.kt .rung b { font-size: 14px; }
-.kt .rung > span:not(.lv) { font-size: 12px; color: var(--ink3); }
-.kt .rung .rec { font-size: 11px !important; font-weight: 700; color: var(--auto) !important; }
-.kt .rung.cur { border-color: var(--auto); background: var(--auto-soft); }
-.kt .rung.cur .lv { color: var(--auto); }
-.kt .rung.pend { border-color: var(--accent); border-style: dashed; }
-.kt .rung.locked { opacity: 0.6; }
-.kt .progress { padding: 0 20px 16px; display: grid; gap: 6px; font-size: 13px; color: var(--ink2); }
-.kt .progress .track { height: 8px; border-radius: 4px; background: var(--surface2); overflow: hidden; }
-.kt .progress .track i { display: block; height: 100%; background: var(--auto); border-radius: 4px; transition: width 0.8s; }
-.kt .grant { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--line); align-items: center; }
+/* autonomy: one sentence for today, the choices behind "Change", extras folded away */
+.kt .auto-now { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; margin: 0 20px 16px; padding: 14px 16px; border-radius: 16px; background: var(--auto-soft); }
+.kt .auto-now.changed { box-shadow: 0 0 0 2px var(--accent); }
+.kt .auto-now .ic { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--bg); color: var(--auto); }
+.kt .auto-now b { font-size: 16px; }
+.kt .auto-opts { display: grid; gap: 12px; padding: 0 20px 16px; }
+.kt .lvl { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 12px; align-items: start; text-align: left; padding: 12px 14px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--bg); }
+.kt .lvl[aria-checked="true"] { border-color: var(--auto); box-shadow: 0 0 0 1px var(--auto); }
+.kt .lvl .radio { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--ink3); margin-top: 1px; }
+.kt .lvl[aria-checked="true"] .radio { border: 6px solid var(--auto); }
+.kt .lvl .rec { font-size: 12px; font-weight: 600; color: var(--auto); }
+.kt .auto-hint { padding: 0 20px 14px; font-size: 13px; color: var(--ink3); }
+.kt .auto-more { border-top: 1px solid var(--line); }
+.kt .auto-more > summary { cursor: pointer; padding: 12px 20px; font-size: 14px; font-weight: 600; color: var(--ink2); }
+.kt .auto-more > p { padding: 0 20px 8px; }
+.kt .auto-more > .link, .kt .auto-more > button.btn { margin: 4px 20px 14px; }
+.kt .grant { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--line); align-items: center; }
 .kt .grant b { font-size: 14.5px; }
 .kt .grant.off b { color: var(--ink3); text-decoration: line-through; }
-.kt .gid { font-family: var(--mono); font-size: 11px; font-weight: 600; background: var(--auto-soft); color: var(--auto); padding: 3px 7px; border-radius: 6px; }
-.kt .gid.x { background: var(--accent-soft); color: var(--accent); }
-.kt .perm-h { display: flex; align-items: baseline; gap: 10px; padding: 16px 20px 4px; border-top: 1px solid var(--line); flex-wrap: wrap; }
-.kt .perm-h b { font-size: 15px; }
-.kt .perm-h p { font-size: 12.5px; color: var(--ink3); width: 100%; }
+.kt .usual-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 20px; border-top: 1px solid var(--line); background: var(--usual-soft); }
+.kt .usual-foot .est { flex: 1; min-width: 180px; font-size: 13px; color: var(--ink2); }
+.kt .usual-foot .est b { font-size: 16px; color: var(--ink); }
+.kt .rule .link { font-size: 12.5px; }
 .kt .permform { margin: 6px 20px 16px; padding: 16px; border-radius: 16px; background: var(--surface); display: grid; gap: 14px; }
 .kt .pf { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; align-items: start; font-size: 14px; }
 .kt .pf > span:first-child { color: var(--ink3); font-size: 13px; padding-top: 6px; }
