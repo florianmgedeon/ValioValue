@@ -34,6 +34,11 @@ Kinds and payloads (examples):
   e.g. title "Primary school, about 420 lunches a day, Mon–Fri", quote "420 lunches / day"
 - usual: what the kitchen's word means as a product. {"word": "milk", "aliases": ["maito"], "product_query": "Valio Eila kevytmaitojuoma 10 l novobox", "typical_qty": 120, "unit": "L", "per": "week"}
   unit is L, KG or SALES_UNIT. product_query = the product name as written on the document (invoice line).
+  What to take when a usual product is out of stock is a usual suggestion too, for the existing word, without
+  product_query when the product itself stays: {"word": "milk", "substitutes": [{"product_query": "Valio Eila luomu 1 l"}], "fallback_mode": "only_listed"}
+  substitutes are in the order the kitchen wants them tried. fallback_mode: "only_listed" (only these, nothing else),
+  "ask_any" (these first, then ask before anything else), "none" (never substitute, then substitutes is []).
+  e.g. title "Milk: if it is out, take Valio Eila luomu 1 l, nothing else"
 - must: a rule nothing may break. {"attr": "allergens", "op": "not_contains", "value": "peanuts", "if_unknown": "exclude", "label": "No peanuts incl. may contain"}
 - prefer: what is better, weight 1 to 3. {"attr": "labels", "op": "contains", "value": "HYVAA_SUOMESTA", "weight": 3}
 - autonomy: when the agent may order alone. {"scope": "usual", "limits": {"max_order_total": 600}, "accepts": [{"check": "quantity", "max_over_pct": 5}]}
@@ -73,29 +78,55 @@ async def search_products(buyer_id: str, query: str, limit: int = 5) -> list[dic
     return res.get("products") or []
 
 
-async def resolve_usual(buyer_id: str, payload: dict) -> dict:
-    """Fill product_id and product_name. Top hit if its name matches closely (token overlap ≥ 0.6), else
-    product_id None and up to 3 candidates for the UI to choose."""
+async def resolve_substitutes(buyer_id: str, subs: list | None) -> list[dict]:
+    """Resolve each substitute entry (product_id/product_name or product_query) against the catalog."""
+    out: list[dict] = []
+    for raw in subs or []:
+        item = {"product_id": raw} if isinstance(raw, str) else dict(raw or {})
+        if item.get("product_id") and item.get("product_name"):
+            out.append({"product_id": str(item["product_id"]), "product_name": item["product_name"]})
+            continue
+        q = item.get("product_query") or item.get("product_name") or item.get("product_id") or ""
+        resolved = await _resolve_product_entry(buyer_id, dict(item, product_query=q))
+        out.append(resolved)
+    return out
+
+
+async def _resolve_product_entry(buyer_id: str, payload: dict) -> dict:
     out = dict(payload)
     if out.get("product_id") and out.get("product_name"):
         return out
-    query = out.get("product_query") or out.get("product_name") or out.get("word") or ""
+    query = out.get("product_query") or out.get("product_name") or out.get("word") or out.get("product_id") or ""
     try:
-        hits = await search_products(buyer_id, query, 5)
+        hits = await search_products(buyer_id, str(query), 5)
     except Exception:  # noqa: BLE001 - keep the suggestion, the buyer chooses later
         log.exception("product search failed for %r", query)
         hits = []
     if out.get("product_id"):
-        hit = next((h for h in hits if h["product_id"] == out["product_id"]), None)
+        pid = str(out["product_id"])
+        hit = next((h for h in hits if h["product_id"] == pid), None)
+        out["product_id"] = pid
         out["product_name"] = out.get("product_name") or (hit or {}).get("name")
         return out
-    best = hits[0] if hits else None
-    if best and overlap(query, best["name"]) >= 0.6:
+    # The hit that covers the query best and adds the fewest other words ("Valio butter 4x5 kg unsalted" is not
+    # "Valio Eila butter for laminating 4x5 kg unsalted lactose free"); ties keep the search order.
+    best = max(hits, key=lambda h: (overlap(str(query), h["name"]), -len(_tokens(h["name"]) - _tokens(str(query))))) \
+        if hits else None
+    if best and overlap(str(query), best["name"]) >= 0.6:
         out |= {"product_id": best["product_id"], "product_name": best["name"]}
         out.pop("candidates", None)
     else:
         out |= {"product_id": None, "product_name": None,
                 "candidates": [{"product_id": h["product_id"], "name": h["name"]} for h in hits[:3]]}
+    return out
+
+
+async def resolve_usual(buyer_id: str, payload: dict) -> dict:
+    """Fill product_id and product_name (plus substitutes if given). Top hit if its name matches closely
+    (token overlap ≥ 0.6), else product_id None and up to 3 candidates for the UI to choose."""
+    out = await _resolve_product_entry(buyer_id, payload)
+    if "substitutes" in out:
+        out["substitutes"] = await resolve_substitutes(buyer_id, out.get("substitutes"))
     return out
 
 
@@ -228,8 +259,10 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "").lower()).strip(" .!\"'“”")
 
 
-async def validate(buyer_id: str, raw: list[dict], profile: dict, mandate: dict, doc_text: str | None) -> list[dict]:
+async def validate(buyer_id: str, raw: list[dict], profile: dict, mandate: dict, doc_text: str | None,
+                   notes: list[str] | None = None) -> list[dict]:
     out = []
+    notes = notes if notes is not None else []
     for s in raw or []:
         kind = s.get("kind")
         if kind == "auto":
@@ -247,7 +280,22 @@ async def validate(buyer_id: str, raw: list[dict], profile: dict, mandate: dict,
         if kind == "usual":
             if not s["payload"].get("word"):
                 continue
-            s["payload"] = await resolve_usual(buyer_id, s["payload"])
+            mode = s["payload"].get("fallback_mode")
+            if mode is not None and mode not in kitchen.FALLBACK_MODES:
+                s["payload"].pop("fallback_mode")
+            s["payload"] = await resolve_usual(buyer_id, kitchen.merge_with_existing(profile, s["payload"]))
+            # A substitute must be one exact catalog product: an unresolved one would turn "only these" into
+            # "never substitute" without anyone noticing. Drop it and say so; the buyer picks it in the Kitchen tab.
+            subs = s["payload"].get("substitutes")
+            if subs:
+                found = [x for x in subs if x.get("product_id")]
+                missing = [x.get("product_query") or "a product" for x in subs if not x.get("product_id")]
+                if missing:
+                    notes.append(f"I couldn't find {', '.join(f'“{m}”' for m in missing)} in the Valio Aimo catalog. "
+                                 f"Pick the substitute under What I may do.")
+                if not found and s["payload"].get("fallback_mode") != "none":
+                    continue
+                s["payload"]["substitutes"] = found
         if kind in kitchen.SIGNED_KINDS:
             new, _ = mandate_with(mandate, [s | {"source_id": None}], profile)
             _, err = await valio.preview(buyer_id, new)
@@ -282,8 +330,11 @@ async def ingest_one(buyer_id: str, *, upload_id: str | None = None, text: str |
             ans = {"document_type": "other", "suggestions": []}
             note = f"I could not read this document: {e}"
     doc_type = ans.get("document_type") if ans.get("document_type") in DOC_TYPES else "other"
+    notes: list[str] = []
     suggestions = await validate(buyer_id, ans.get("suggestions") or [], profile, mandate,
-                                 text if stype == "text" else None)
+                                 text if stype == "text" else None, notes)
+    if notes:
+        note = " ".join(([note] if note else []) + notes)
     src = {"type": stype, "title": title or ans.get("title") or (meta or {}).get("filename") or "Typed note",
            "upload_id": upload_id, "document_type": doc_type}
     if stype == "text":

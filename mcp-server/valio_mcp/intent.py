@@ -43,6 +43,12 @@ class ItemIn(BaseModel):
     preferred_product_id: str | None = Field(None, description=(
         "The buyer's usual product for this item, from their kitchen profile. Only if the buyer's word matches "
         "a usual product. Valio Aimo ranks it first if it meets every rule"))
+    substitute_product_ids: list[str] = Field(default_factory=list, description=(
+        "Ordered fallback product ids from the buyer's kitchen profile, tried in order when preferred_product_id "
+        "cannot deliver in full or breaks a rule"))
+    allow_other_substitutes: bool = Field(True, description=(
+        "When False, ONLY preferred_product_id and substitute_product_ids are allowed; Valio Aimo never searches "
+        "or orders any other catalog product for this item"))
 
 
 UNIT_WORDS = {"l": "L", "litre": "L", "litres": "L", "liter": "L", "liters": "L", "litra": "L", "litraa": "L",
@@ -139,21 +145,49 @@ def intent_hash(intent: dict) -> str:
     return trust.digest(binding(intent))
 
 
-def _product(query: str, it: dict, notes: list[str]) -> tuple[dict, dict | None]:
-    """The item's product: the buyer's words, plus their usual product if the agent set one. The usual product
-    is part of the signed binding ("your usual Valio Eila"). An unknown id is dropped with a note, never fails."""
+def _product(query: str, it: dict, notes: list[str]) -> tuple[dict, dict | None, list[dict]]:
+    """The item's product: the buyer's words, plus their usual product and ordered substitutes if set.
+    All of these are part of the signed binding. Unknown catalog ids are dropped with a note, never fail."""
     from .catalog import catalog
     prod = it.get("product") if isinstance(it.get("product"), dict) else {}
-    pid = it.get("preferred_product_id") or prod.get("preferred_product_id")
-    out = {"query": query.strip()}
-    if not pid:
-        return out, None
-    p = catalog().get(str(pid))
-    if not p:
-        notes.append(f"'{query.strip()}': usual product {pid} is not in the catalog, ignored")
-        return out, None
-    out["preferred_product_id"] = p.id
-    return out, {"product_id": p.id, "name": p.name}
+    pid = it.get("preferred_product_id") if "preferred_product_id" in it else prod.get("preferred_product_id")
+    raw_subs = it.get("substitute_product_ids") if "substitute_product_ids" in it else prod.get("substitute_product_ids")
+    allow_other = it.get("allow_other_substitutes")
+    if allow_other is None:
+        allow_other = prod.get("allow_other_substitutes", True)
+    allow_other = bool(allow_other)
+
+    out: dict[str, Any] = {"query": query.strip()}
+    cat = catalog()
+    usual = None
+    if pid:
+        p = cat.get(str(pid))
+        if p:
+            out["preferred_product_id"] = p.id
+            usual = {"product_id": p.id, "name": p.name}
+        else:
+            notes.append(f"'{query.strip()}': usual product {pid} is not in the catalog, ignored")
+
+    subs: list[dict] = []
+    seen_subs: set[str] = {usual["product_id"]} if usual else set()
+    for sid in raw_subs or []:
+        if not sid:
+            continue
+        sid_s = str(sid)
+        if sid_s in seen_subs:
+            continue
+        sp = cat.get(sid_s)
+        if not sp:
+            notes.append(f"'{query.strip()}': substitute product {sid_s} is not in the catalog, ignored")
+            continue
+        seen_subs.add(sp.id)
+        subs.append({"product_id": sp.id, "name": sp.name})
+
+    if subs:
+        out["substitute_product_ids"] = [s["product_id"] for s in subs]
+    if not allow_other and (usual or subs):
+        out["allow_other_substitutes"] = False
+    return out, usual, subs
 
 
 def build(*, buyer_id: str, mandate: dict, session: str | None, original_request: str, items: list[dict],
@@ -181,7 +215,7 @@ def build(*, buyer_id: str, mandate: dict, session: str | None, original_request
         query = ((it.get("product") or {}).get("query") if isinstance(it.get("product"), dict)
                  else it.get("product_query")) or ""
         iid = it.get("item_id") or f"i{n}"
-        product, usual = _product(query, it, notes)
+        product, usual, substitutes = _product(query, it, notes)
         rules = _clean_rules([r for r in it.get("hard_rules") or [] if r.get("source") != "mandate"],
                              prefix=f"{iid}_r", questions=questions)
         # The buyer's own words win: "lactose-free" in the text or the item name becomes a rule.
@@ -189,6 +223,7 @@ def build(*, buyer_id: str, mandate: dict, session: str | None, original_request
                 LACTOSE_FREE.search(query.lower()) or (len(items) == 1 and LACTOSE_FREE.search(text))):
             rules.append(R.rule({"rule": "lactose_free"}, source="request_text", rid=f"{iid}_r{len(rules) + 1}"))
         norm_items.append({"item_id": iid, "product": product, "usual": usual,
+                           **({"substitutes": substitutes} if substitutes else {}),
                            "quantity": {"amount": amount, "unit": unit, "max_over_pct": pct, "allow_under": under},
                            "hard_rules": rules, "note": it.get("note"),
                            "status": "open", "order_id": None})
@@ -277,8 +312,17 @@ def readback(intent: dict, d: date | None) -> tuple[str, list[dict]]:
         own = [rule_label(r) for r in i["hard_rules"] if r["rule"] != "lactose_free"
                or "lactose" not in i["product"]["query"].lower()]
         usual = i.get("usual")
+        subs = i.get("substitutes") or []
+        allow_other = i["product"].get("allow_other_substitutes", True)
+        sub_txt = ""
+        if subs and not allow_other:
+            sub_txt = f" [fallback only: {', '.join(s['name'] for s in subs)}]"
+        elif subs:
+            sub_txt = f" [fallback: {', '.join(s['name'] for s in subs)}]"
+        elif usual and not allow_other:
+            sub_txt = " [no substitutes allowed]"
         return f"{fmt_qty(i['quantity']['amount'], i['quantity']['unit'])} {i['product']['query']}" + (
-            f" → your usual: {usual['name']}" if usual else "") + (f" ({', '.join(own)})" if own else "")
+            f" → your usual: {usual['name']}" if usual else "") + sub_txt + (f" ({', '.join(own)})" if own else "")
 
     head = item_text(items[0]) if len(items) == 1 else f"{len(items)} items: " + "; ".join(item_text(i) for i in items)
     parts = [head, f"delivered by {when}"]
@@ -297,7 +341,10 @@ def readback(intent: dict, d: date | None) -> tuple[str, list[dict]]:
     parts += intent.get("notes") or []
 
     chips = [{"field": f"items.{i['item_id']}", "label": item_text(i), "locked": False}
-             | ({"usual": i["usual"]} if i.get("usual") else {}) for i in items]
+             | ({"usual": i["usual"]} if i.get("usual") else {})
+             | ({"substitutes": i["substitutes"]} if i.get("substitutes") else {})
+             | ({"allow_other_substitutes": False} if i["product"].get("allow_other_substitutes") is False else {})
+             for i in items]
     chips.append({"field": "deliver_by", "label": f"by {when}", "locked": False})
     chips += [{"field": "hard_rules", "label": rule_label(r), "locked": r.get("source") == "mandate"}
               for r in intent["hard_rules"]]
@@ -339,13 +386,20 @@ def apply_edits(intent: dict, edits: dict[str, Any]) -> dict:
         if "product" in e or "product_query" in e:
             new_q = e["product_query"] if "product_query" in e else e["product"].get("query", base["product"]["query"])
             keep = dict(base["product"]) if new_q == base["product"]["query"] else {}
-            pref = (e.get("product") or {}).get("preferred_product_id", keep.get("preferred_product_id"))
-            if "preferred_product_id" in e:
-                pref = e["preferred_product_id"]
-            base["product"] = {"query": new_q} | ({"preferred_product_id": pref} if pref else {})
-        elif "preferred_product_id" in e:
-            base["product"] = {k: v for k, v in base["product"].items() if k != "preferred_product_id"} | (
-                {"preferred_product_id": e["preferred_product_id"]} if e["preferred_product_id"] else {})
+            ep = e.get("product") or {}
+            pref = e["preferred_product_id"] if "preferred_product_id" in e else ep.get("preferred_product_id", keep.get("preferred_product_id"))
+            subs = e["substitute_product_ids"] if "substitute_product_ids" in e else ep.get("substitute_product_ids", keep.get("substitute_product_ids"))
+            allow = e["allow_other_substitutes"] if "allow_other_substitutes" in e else ep.get("allow_other_substitutes", keep.get("allow_other_substitutes", True))
+            base["product"] = ({"query": new_q}
+                               | ({"preferred_product_id": pref} if pref else {})
+                               | ({"substitute_product_ids": subs} if subs else {})
+                               | ({"allow_other_substitutes": False} if allow is False else {}))
+        else:
+            for k in ("preferred_product_id", "substitute_product_ids", "allow_other_substitutes"):
+                if k in e:
+                    base["product"] = {pk: pv for pk, pv in base["product"].items() if pk != k}
+                    if (k == "allow_other_substitutes" and e[k] is False) or (k != "allow_other_substitutes" and e[k]):
+                        base["product"][k] = e[k]
         if "quantity" in e:
             q = e["quantity"] if isinstance(e["quantity"], dict) else {"amount": e["quantity"]}
             base["quantity"] = dict(base["quantity"], **q)

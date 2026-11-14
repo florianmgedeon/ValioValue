@@ -1377,6 +1377,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/kitchen/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search the Valio Aimo catalog for choosing usual products or approved substitutes */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Product name or ID query */
+                    q?: string;
+                    limit?: number;
+                    buyer_id?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Matching catalog products */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            query: string;
+                            products: {
+                                [key: string]: unknown;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/kitchen/ingest": {
         parameters: {
             query?: never;
@@ -1496,6 +1542,95 @@ export interface paths {
                     };
                 };
                 /** @description Valio Aimo refused the new mandate */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/kitchen/usual/fallback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set ordered substitutes and the fallback mode of usual products. Signed when the grant changes.
+         * @description Approved substitutes count as usual products. At autonomy level 1 a change that adds or removes one
+         *     widens or narrows the signed usual-products grant: without mandate_hash (or with an outdated one) the
+         *     answer is 409 NeedsSignature (diff names each substitute) and nothing is applied. With the previewed hash
+         *     the backend signs and stores the mandate, then the profile. Reordering, a mode change that keeps the
+         *     same products, or any change at level 0 or 2 is applied directly (mandate null).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        buyer_id?: string;
+                        updates: {
+                            /** @description Usual product id */
+                            id: string;
+                            /** @description Replaces the list, in the order to try. Omit to keep it. */
+                            substitutes?: {
+                                product_id?: string;
+                                product_name?: string;
+                            }[];
+                            /** @enum {string} */
+                            fallback_mode?: "ask_any" | "only_listed" | "none";
+                        }[];
+                        /** @example Anna Virtanen */
+                        by?: string;
+                        mandate_hash?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Applied */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            profile?: components["schemas"]["KitchenProfile"];
+                            mandate?: components["schemas"]["MandateSummary"] | null;
+                        };
+                    };
+                };
+                /** @description Unknown usual product */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description needs_signature (show preview, resend with its mandate_hash) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NeedsSignature"];
+                    };
+                };
+                /** @description Invalid fallback_mode or Valio Aimo refused the new mandate */
                 422: {
                     headers: {
                         [name: string]: unknown;
@@ -1828,6 +1963,10 @@ export interface components {
             allergens?: string[];
             /** @description The buyer's usual product for this item (1c). Ranked first if it can deliver and breaks no rule */
             usual?: boolean;
+            /** @description One of the buyer's pre-approved ordered substitutes for this item */
+            approved_substitute?: boolean;
+            /** @description 1-based priority order among the buyer's approved substitutes */
+            substitute_rank?: number;
             preference_score?: number;
             /** @description Binds the order to this fixed price */
             quote_id?: string;
@@ -2058,6 +2197,13 @@ export interface components {
                     product_id?: string;
                     name?: string;
                 };
+                /** @description Item chips only: ordered pre-approved fallback products */
+                substitutes?: {
+                    product_id?: string;
+                    name?: string;
+                }[];
+                /** @description False when unapproved catalog substitutes are forbidden */
+                allow_other_substitutes?: boolean;
             }[];
             /** @description E.g. a usual product id that is not in the catalog was ignored */
             notes?: string[];
@@ -2076,18 +2222,30 @@ export interface components {
         IntentItem: {
             /** @example i1 */
             item_id?: string;
-            /** @description Signed. preferred_product_id is the buyer's usual product (1c), part of the intent hash */
+            /** @description Signed. preferred_product_id, substitute_product_ids, and allow_other_substitutes are part of the intent hash */
             product?: {
                 /** @example milk */
                 query?: string;
                 /** @example 463038 */
                 preferred_product_id?: string;
+                /** @description Ordered pre-approved fallback product IDs */
+                substitute_product_ids?: string[];
+                /**
+                 * @description When false, only preferred_product_id and substitute_product_ids may fulfil this item
+                 * @default true
+                 */
+                allow_other_substitutes: boolean;
             };
             /** @description Not signed, for display */
             usual?: {
                 product_id?: string;
                 name?: string;
             } | null;
+            /** @description Not signed, resolved display names for substitute_product_ids */
+            substitutes?: {
+                product_id?: string;
+                name?: string;
+            }[];
             quantity?: {
                 /** @example 1000 */
                 amount?: number;
@@ -2582,6 +2740,20 @@ export interface components {
             unit?: "L" | "KG" | "SALES_UNIT";
             /** @example week */
             per?: string;
+            /** @description Ordered pre-approved fallback products when product_id cannot fulfil */
+            substitutes?: {
+                /** @example DEMO-1005 */
+                product_id?: string | null;
+                product_name?: string | null;
+                /** @description Input only: resolved via catalog search */
+                product_query?: string;
+            }[];
+            /**
+             * @description only_listed = only listed substitutes allowed; none = no substitutes allowed; ask_any = listed substitutes first, other catalog products ask
+             * @default ask_any
+             * @enum {string}
+             */
+            fallback_mode: "ask_any" | "only_listed" | "none";
             source_id?: string;
             /** @enum {string} */
             status?: "active" | "replaced" | "removed";

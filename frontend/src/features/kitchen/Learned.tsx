@@ -4,6 +4,7 @@ import { useComposerText } from "../../app/composer";
 import { navigate } from "../../app/route";
 import { Button, Drawer, Icon, eur } from "../../ui";
 import { unitText } from "./Profile";
+import { FallbackSummary, fallbackLine } from "./Substitutes";
 
 type Suggestion = Schema["Suggestion"];
 type Usual = NonNullable<KitchenProfile["usual"]>[number];
@@ -51,8 +52,10 @@ export function LearnedSection({ profile, usualOrder, limit, drift }: {
   drift: Drift[];
 }) {
   const setText = useComposerText();
-  const [open, setOpen] = useState<Usual | null>(null);
+  const [openId, setOpen] = useState<string | null>(null);
   const items = (profile.usual ?? []).filter((u) => (u.status ?? "active") === "active");
+  // Look the product up on every render, so the drawer shows saved substitutes right away.
+  const open = items.find((u) => u.id === openId) ?? null;
   const weeksOf = (u: Usual) => usualOrder?.items?.find((i) => i.word === u.word)?.weeks ?? [];
   const driftOf = (u: Usual) => drift.find((d) => d.kind === "quantity" && d.word === u.word);
   const changedOf = (u: Usual) => profile.suggestions?.find((s) => s.kind === "usual" && s.status === "accepted"
@@ -78,7 +81,7 @@ export function LearnedSection({ profile, usualOrder, limit, drift }: {
         const d = driftOf(u);
         const changed = changedOf(u);
         return (
-          <button key={u.id} className={`l-row${d ? " drift" : ""}`} onClick={() => setOpen(u)}>
+          <button key={u.id} className={`l-row${d ? " drift" : ""}`} onClick={() => setOpen(u.id ?? null)}>
             <span className="w">{u.word}</span>
             <span className="min-w-0">
               <span className="p">{u.product_name || <span className="muted">no product yet</span>}{changed && <span className="chip k-accent">changed</span>}</span>
@@ -86,6 +89,7 @@ export function LearnedSection({ profile, usualOrder, limit, drift }: {
                 {howOften(weeks, deliveries)}
                 {d && <>{howOften(weeks, deliveries) ? " · " : ""}<span className="up">{d.pct! > 0 ? "↑" : "↓"} {Math.abs(d.pct!)} % since {day(d.since)}</span></>}
               </span>
+              {fallbackLine(u) && <span className="fb"><Icon name="arrow" size={14} />{fallbackLine(u)}</span>}
             </span>
             <span className="r">
               <span className="qty">{u.typical_qty != null ? `~${u.typical_qty} ${unitText(u.unit)} / ${u.per || "week"}` : ""}</span>
@@ -130,6 +134,7 @@ function UsualDrawer({ usual, weeks, deliveries, drift, onClose }: { usual: Usua
       + (drift ? ` ${drift.text}, ${drift.detail?.toLowerCase()}` : "");
   return (
     <Drawer open onClose={onClose} title={main} icon={<span className="l-dw">{usual.word}</span>}>
+      <FallbackSummary usual={usual} />
       <p className="text-[15px]">{why}</p>
       {n > 0 && (
         <div className="grid gap-2">

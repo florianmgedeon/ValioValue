@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { setAutonomyLevel } from "../../api/autonomy";
-import { acceptKitchenSuggestions, getKitchenHistory, ingestKitchenDocuments, patchKitchenProfile, rejectKitchenSuggestion } from "../../api/kitchen";
+import { acceptKitchenSuggestions, getKitchenHistory, ingestKitchenDocuments, patchKitchenProfile, rejectKitchenSuggestion, setUsualFallback } from "../../api/kitchen";
 import { getMandateHistory } from "../../api/mandate";
 import { listOrders } from "../../api/orders";
 import type { KitchenProfile, Mandate, Schema, UploadMeta } from "../../api/types";
@@ -18,6 +18,7 @@ import { LearnedSection } from "./Learned";
 import { About, SourcesLine, Suggestions, TeachCard } from "./Profile";
 import { levelLimit, useUsualOrder } from "../order/data";
 import { errText, MustSection, PreferSection, type RowFlags } from "./Rules";
+import { SubstituteRules, type FallbackDraft } from "./Substitutes";
 
 type Suggestion = Schema["Suggestion"];
 
@@ -27,7 +28,9 @@ const shortDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString("en-
 
 /** Kitchen tab (F2): what the agent knows (profile, unsigned) and may do (mandate, signed). */
 export default function KitchenView({ view: viewParam }: { view?: string }) {
-  const tab: "know" | "may" = viewParam === "may" ? "may" : "know";
+  // `#kitchen/may` or `#kitchen/may:u3` (opens that usual product's substitutes, e.g. from the drawer).
+  const tab: "know" | "may" = viewParam?.startsWith("may") ? "may" : "know";
+  const focusUsual = viewParam?.startsWith("may:") ? viewParam.slice(4) : undefined;
   const toast = useToast();
   const sign = useSignedChange();
   const camera = usePhoneCamera();
@@ -39,6 +42,12 @@ export default function KitchenView({ view: viewParam }: { view?: string }) {
 
   const [ops, setOps] = useState<Op[]>([]);
   const [levelChange, setLevelChange] = useState<LevelChange | null>(null);
+  const [fallbacks, setFallbacks] = useState<Record<string, FallbackDraft>>({});
+  const onFallback = (id: string, d: FallbackDraft | null) => setFallbacks((f) => {
+    const rest = { ...f };
+    delete rest[id];
+    return d ? { ...rest, [id]: d } : rest;
+  });
   const [busy, setBusy] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -219,7 +228,7 @@ export default function KitchenView({ view: viewParam }: { view?: string }) {
   };
 
   // ---- review & sign
-  const pendingCount = ops.length + (levelChange ? 1 : 0);
+  const pendingCount = ops.length + (levelChange ? 1 : 0) + Object.keys(fallbacks).length;
   const review = async () => {
     try {
       if (ops.length) {
@@ -231,6 +240,21 @@ export default function KitchenView({ view: viewParam }: { view?: string }) {
         });
         if (!res) return;
         setOps([]);
+      }
+      const fb = Object.entries(fallbacks);
+      if (fb.length) {
+        const res = await sign({
+          title: plural(fb.length, "substitute change"),
+          call: (mandate_hash) => setUsualFallback({
+            updates: fb.map(([id, d]) => ({ id, substitutes: d.substitutes, fallback_mode: d.fallback_mode })),
+            by: SIGNER_NAME,
+            mandate_hash,
+          }),
+        });
+        if (!res) return;
+        setFallbacks({});
+        await queryClient.invalidateQueries({ queryKey: keys.kitchen });
+        if (!res.mandate) toast("Saved. Your usual products' fallback is updated.");
       }
       if (levelChange) {
         const lc = levelChange;
@@ -295,6 +319,8 @@ export default function KitchenView({ view: viewParam }: { view?: string }) {
             locked={toast}
           />
 
+          <SubstituteRules profile={profile} drafts={fallbacks} onDraft={onFallback} level={levelChange?.level ?? level} limit={limit} focusId={focusUsual} />
+
           <div className="k-grid">
             <MustSection rules={view.mandatory_rules} flags={flags} onToggle={toggleRule("must")} onUnknown={unknownRule} onAdd={addRule("must")} />
             <PreferSection rules={view.preferences} flags={flags} onToggle={toggleRule("prefer")} onWeight={weightRule} onAdd={addRule("prefer")} />
@@ -308,7 +334,7 @@ export default function KitchenView({ view: viewParam }: { view?: string }) {
           <span>
             <b>{plural(pendingCount, "change")} to your rules</b> · not saved yet
           </span>
-          <Button variant="link" className="text-[13px]" onClick={() => { setOps([]); setLevelChange(null); }}>Discard</Button>
+          <Button variant="link" className="text-[13px]" onClick={() => { setOps([]); setLevelChange(null); setFallbacks({}); }}>Discard</Button>
           <Button small onClick={() => void review()}>Check & save</Button>
         </div>
       )}

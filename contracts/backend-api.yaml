@@ -540,6 +540,24 @@ paths:
       parameters: [{ in: query, name: buyer_id, schema: { type: string } }]
       responses:
         "200": { description: History }
+  /kitchen/products:
+    get:
+      summary: Search the Valio Aimo catalog for choosing usual products or approved substitutes
+      parameters:
+        - { in: query, name: q, schema: { type: string }, description: "Product name or ID query" }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 25, default: 8 } }
+        - { in: query, name: buyer_id, schema: { type: string } }
+      responses:
+        "200":
+          description: Matching catalog products
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [query, products]
+                properties:
+                  query: { type: string }
+                  products: { type: array, items: { type: object, additionalProperties: true } }
   /kitchen/ingest:
     post:
       summary: Read documents into suggestions (status proposed). Never orders (W2).
@@ -604,6 +622,51 @@ paths:
                   accepted: { type: array, items: { type: string } }
         "409": { description: "needs_signature (show preview, resend with its mandate_hash) or already decided", content: { application/json: { schema: { $ref: "#/components/schemas/NeedsSignature" } } } }
         "422": { description: Valio Aimo refused the new mandate }
+  /kitchen/usual/fallback:
+    post:
+      summary: Set ordered substitutes and the fallback mode of usual products. Signed when the grant changes.
+      description: |
+        Approved substitutes count as usual products. At autonomy level 1 a change that adds or removes one
+        widens or narrows the signed usual-products grant: without mandate_hash (or with an outdated one) the
+        answer is 409 NeedsSignature (diff names each substitute) and nothing is applied. With the previewed hash
+        the backend signs and stores the mandate, then the profile. Reordering, a mode change that keeps the
+        same products, or any change at level 0 or 2 is applied directly (mandate null).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [updates]
+              properties:
+                buyer_id: { type: string }
+                updates:
+                  type: array
+                  items:
+                    type: object
+                    required: [id]
+                    properties:
+                      id: { type: string, description: "Usual product id" }
+                      substitutes:
+                        type: array
+                        description: "Replaces the list, in the order to try. Omit to keep it."
+                        items: { type: object, properties: { product_id: { type: string }, product_name: { type: string } } }
+                      fallback_mode: { type: string, enum: [ask_any, only_listed, none] }
+                by: { type: string, example: "Anna Virtanen" }
+                mandate_hash: { type: string }
+      responses:
+        "200":
+          description: Applied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile: { $ref: "#/components/schemas/KitchenProfile" }
+                  mandate: { allOf: [{ $ref: "#/components/schemas/MandateSummary" }], nullable: true }
+        "404": { description: Unknown usual product }
+        "409": { description: "needs_signature (show preview, resend with its mandate_hash)", content: { application/json: { schema: { $ref: "#/components/schemas/NeedsSignature" } } } }
+        "422": { description: Invalid fallback_mode or Valio Aimo refused the new mandate }
   /kitchen/suggestions/{suggestion_id}/reject:
     post:
       summary: Reject a suggestion. It stays in the list with status rejected.
@@ -705,6 +768,8 @@ components:
         certificates: { type: array, items: { type: string } }
         allergens: { type: array, items: { type: string } }
         usual: { type: boolean, description: "The buyer's usual product for this item (1c). Ranked first if it can deliver and breaks no rule" }
+        approved_substitute: { type: boolean, description: "One of the buyer's pre-approved ordered substitutes for this item" }
+        substitute_rank: { type: integer, minimum: 1, description: "1-based priority order among the buyer's approved substitutes" }
         preference_score: { type: number }
         quote_id: { type: string, description: "Binds the order to this fixed price" }
         item_id: { type: string, description: "The intent item this quote is for" }
@@ -887,6 +952,8 @@ components:
               label: { type: string, example: "120 L milk → your usual: Valio Eila® semi skimmed milk drink 10 l novobox lactose free" }
               locked: { type: boolean }
               usual: { type: object, properties: { product_id: { type: string }, name: { type: string } }, description: "Item chips only: the 'Your usual' chip" }
+              substitutes: { type: array, items: { type: object, properties: { product_id: { type: string }, name: { type: string } } }, description: "Item chips only: ordered pre-approved fallback products" }
+              allow_other_substitutes: { type: boolean, description: "False when unapproved catalog substitutes are forbidden" }
         notes: { type: array, items: { type: string }, description: "E.g. a usual product id that is not in the catalog was ignored" }
         questions: { type: array, items: { type: string }, description: "Non-empty = cannot be confirmed yet" }
         intent_hash: { type: string, description: "SHA-256 over RFC 8785 canonical JSON of the binding fields" }
@@ -901,11 +968,14 @@ components:
         item_id: { type: string, example: "i1" }
         product:
           type: object
-          description: "Signed. preferred_product_id is the buyer's usual product (1c), part of the intent hash"
+          description: "Signed. preferred_product_id, substitute_product_ids, and allow_other_substitutes are part of the intent hash"
           properties:
             query: { type: string, example: "milk" }
             preferred_product_id: { type: string, example: "463038" }
+            substitute_product_ids: { type: array, items: { type: string }, description: "Ordered pre-approved fallback product IDs" }
+            allow_other_substitutes: { type: boolean, default: true, description: "When false, only preferred_product_id and substitute_product_ids may fulfil this item" }
         usual: { type: object, nullable: true, description: "Not signed, for display", properties: { product_id: { type: string }, name: { type: string } } }
+        substitutes: { type: array, description: "Not signed, resolved display names for substitute_product_ids", items: { type: object, properties: { product_id: { type: string }, name: { type: string } } } }
         quantity:
           type: object
           properties:
@@ -1329,6 +1399,20 @@ components:
         typical_qty: { type: number, example: 120 }
         unit: { type: string, enum: [L, KG, SALES_UNIT] }
         per: { type: string, example: week }
+        substitutes:
+          type: array
+          description: "Ordered pre-approved fallback products when product_id cannot fulfil"
+          items:
+            type: object
+            properties:
+              product_id: { type: string, nullable: true, example: "DEMO-1005" }
+              product_name: { type: string, nullable: true }
+              product_query: { type: string, description: "Input only: resolved via catalog search" }
+        fallback_mode:
+          type: string
+          enum: [ask_any, only_listed, none]
+          default: ask_any
+          description: "only_listed = only listed substitutes allowed; none = no substitutes allowed; ask_any = listed substitutes first, other catalog products ask"
         source_id: { type: string }
         status: { type: string, enum: [active, replaced, removed] }
 

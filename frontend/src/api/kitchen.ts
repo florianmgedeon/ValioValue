@@ -12,6 +12,35 @@ export function patchKitchenProfile(
   return apiRequest<KitchenProfile>("/kitchen", { method: "PATCH", json: patch });
 }
 
+export interface KitchenCatalogProduct {
+  product_id: string;
+  name: string;
+  brand?: string | null;
+  category?: string | null;
+  sales_unit?: string | null;
+  country_of_origin?: string | null;
+}
+
+export function searchKitchenProducts(
+  q: string,
+  limit = 8,
+  buyerId?: string,
+): Promise<{ query: string; products: KitchenCatalogProduct[] }> {
+  const params = new URLSearchParams({ q, limit: String(limit) });
+  if (buyerId) params.set("buyer_id", buyerId);
+  return apiRequest<{ query: string; products: KitchenCatalogProduct[] }>(`/kitchen/products?${params.toString()}`);
+}
+
+/** Substitutes and fallback mode of usual products; 409 needs_signature when the usual-products grant changes. */
+export function setUsualFallback(request: {
+  buyer_id?: string;
+  updates: { id: string; substitutes?: { product_id: string; product_name: string }[]; fallback_mode?: "ask_any" | "only_listed" | "none" }[];
+  by?: string;
+  mandate_hash?: string;
+}): Promise<{ profile?: KitchenProfile; mandate?: unknown }> {
+  return apiRequest("/kitchen/usual/fallback", { method: "POST", json: request });
+}
+
 export function getKitchenHistory(
   buyerId?: string,
 ): Promise<Record<string, unknown>> {

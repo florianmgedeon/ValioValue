@@ -221,40 +221,58 @@ async def search_products(
                                    category=f.category, country_of_origin=f.country_of_origin,
                                    limit=200 if it else limit)
     hits, excluded, funnel, usual = pool, [], [], None
-    preferred = (item or {}).get("product", {}).get("preferred_product_id") if item else None
+    prod_spec = (item or {}).get("product") or {}
+    preferred = prod_spec.get("preferred_product_id") if item else None
+    sub_ids = list(prod_spec.get("substitute_product_ids") or []) if item else []
+    allow_other = prod_spec.get("allow_other_substitutes", True) if item else True
     if it:
-        pp = catalog().get(preferred) if preferred else None
-        if pp:  # the buyer's usual product is always evaluated, even if the text search misses it
-            pool = [pp] + [p for p in pool if p.id != pp.id]
+        cat = catalog()
+        pp = cat.get(preferred) if preferred else None
+        sub_prods = [sp for sid in sub_ids if (sp := cat.get(sid)) and (not pp or sp.id != pp.id)]
+        explicit_prods = ([pp] if pp else []) + sub_prods
+        explicit_set = {p.id for p in explicit_prods}
+        catalog_rest = [p for p in pool if p.id not in explicit_set]
+        start_count = len(explicit_prods) + len(catalog_rest)
+        # When allow_other_substitutes is False, only the buyer's usual product and listed substitutes may be searched.
+        pool = explicit_prods if not allow_other else (explicit_prods + catalog_rest)
         hits = []
         dropped_at: dict[str, int] = {}
         for p in pool:
             evs = constraints.evaluate_all(p, rules)
             bad = [e for e in evs if constraints.violates(e)]
             is_usual = bool(pp) and p.id == pp.id
+            is_sub = p.id in sub_ids
             if bad:
                 dropped_at[bad[0].get("id") or bad[0]["rule"]] = dropped_at.get(bad[0].get("id") or bad[0]["rule"], 0) + 1
                 excluded.append({"product_id": p.id, "name": p.name, "reason": constraints.one_line(bad[0]),
                                  "verdict": bad[0]["verdict"], "rule_id": bad[0].get("id")}
-                                | ({"usual": True} if is_usual else {}))
+                                | ({"usual": True} if is_usual else {})
+                                | ({"approved_substitute": True} if is_sub else {}))
             elif len(hits) < limit:
                 hits.append(p)
             if is_usual:
                 usual = {"product_id": p.id, "name": p.name, "allowed": not bad,
                          "reason": constraints.one_line(bad[0]) if bad else None}
         # Funnel: the pool after each rule, in mandate order. A product is dropped at the first rule it breaks.
+        funnel = [{"step": "catalog", "label": f"Matches for '{query}'", "count": start_count}]
+        if not allow_other:
+            lbl = ("Only your usual product + allowed substitute(s)" if sub_prods
+                   else "Only your usual product (no substitutes)")
+            funnel.append({"step": "rule", "label": lbl, "count": len(pool)})
         left = len(pool)
-        funnel = [{"step": "catalog", "label": f"Matches for '{query}'", "count": left}]
         for r in rules:
             left -= dropped_at.get(r.get("id") or r["label"], 0)
             funnel.append({"step": "must" if r.get("source") == "mandate" else "rule", "rule_id": r.get("id"),
                            "label": r["label"], "count": left})
     usual_ids = {usual["product_id"]} if usual else set()
+    sub_rank_by_id = {sid: idx + 1 for idx, sid in enumerate(sub_ids)}
     result = {"query": query, "intent_id": intent_id, "item_id": item["item_id"] if item else None,
               "filters": f.model_dump(exclude_none=True),
               "total_matches": total, "returned": len(hits),
               "products": [p.summary() | ({"evidence": constraints.evaluate_all(p, rules)} if it else {})
-                           | ({"usual": True} if p.id in usual_ids else {}) for p in hits],
+                           | ({"usual": True} if p.id in usual_ids else {})
+                           | ({"approved_substitute": True, "substitute_rank": sub_rank_by_id[p.id]}
+                              if p.id in sub_rank_by_id else {}) for p in hits],
               "excluded": excluded[:12], "excluded_count": len(excluded),
               "catalog_source": catalog().source}
     if it:
@@ -296,13 +314,17 @@ async def check_offer(
         requested_date = it["deliver_by"]
     if not quantity or not requested_date:
         return {"error": "quantity and requested_date are required without intent_id"}
-    ids = list(dict.fromkeys(str(p) for p in product_ids))
-    preferred = item["product"].get("preferred_product_id") if item else None
-    if preferred and preferred not in ids and catalog().get(preferred):
-        ids.insert(0, preferred)  # the usual product is always quoted; its musts decide if it can win
+    prod_spec = item["product"] if item else {}
+    preferred = prod_spec.get("preferred_product_id") if item else None
+    sub_ids = list(prod_spec.get("substitute_product_ids") or []) if item else []
+    allow_other = prod_spec.get("allow_other_substitutes", True) if item else True
+    cat = catalog()
+    priority_ids = [pid for pid in ([preferred] if preferred else []) + sub_ids if pid and cat.get(pid)]
+    # The buyer's usual product and approved substitutes are always quoted so Valio Aimo can rank them deterministically.
+    ids = list(dict.fromkeys(priority_ids + [str(p) for p in product_ids]))
+    allowed_ids = set(priority_ids)
     prices = await valio_api.price(ids, requested_date)
     avail = await valio_api.availability(ids, requested_date)
-    cat = catalog()
     offers, skipped = [], []
 
     for pid in ids:
@@ -397,17 +419,41 @@ async def check_offer(
             offer["preferences"] = [{"id": p["id"], "label": p["label"], "weight": p.get("weight", 1),
                                      "met": ev["verdict"] == "safe"} for p, ev in met if ev]
             offer["preference_score"] = sum(x["weight"] for x in offer["preferences"] if x["met"])
+        if it and not allow_other and pid not in allowed_ids:
+            offer["can_fulfil"] = False
+            offer["fulfil_issues"] = list(offer["fulfil_issues"]) + ["not an allowed substitute for this item"]
         if preferred and pid == preferred:
             offer["usual"] = True
+        elif pid in sub_ids:
+            offer["approved_substitute"] = True
+            offer["substitute_rank"] = sub_ids.index(pid) + 1
+            offer["is_substitute"] = True
         offers.append(offer)
 
-    # Best first: can deliver in full on time, then the preferences (sum of weights met), then optimise.
+    primary_offer = next((o for o in offers if o.get("usual")), None)
+    for o in offers:
+        if o.get("approved_substitute"):
+            r_idx = o["substitute_rank"]
+            if primary_offer and not primary_offer["can_fulfil"]:
+                why = ", ".join(primary_offer.get("fulfil_issues") or ["unavailable"])
+                o["substitute_reason"] = f"Fallback #{r_idx}: {primary_offer['name']} unavailable ({why})"
+            else:
+                o["substitute_reason"] = f"Approved fallback #{r_idx}"
+
+    # Best first: can deliver in full on time, then usual -> approved substitutes in priority order -> preferences -> optimise.
     opt = (it or {}).get("preferences", {}).get("optimise", "price")
     pref = {"price": lambda o: (o["total_price"], -(o["delivery_reliability"] or 0)),
             "reliability": lambda o: (-(o["delivery_reliability"] or 0), o["total_price"]),
             "co2": lambda o: (o["co2_kg_per_kg"] if o["co2_kg_per_kg"] is not None else 1e9, o["total_price"])}[opt]
-    # The buyer's usual product wins when it can deliver in full and breaks no rule.
-    offers.sort(key=lambda o: (not o["can_fulfil"], not o.get("usual"), -o.get("preference_score", 0), *pref(o)))
+
+    def _tier_order(o: dict) -> tuple[int, int]:
+        if o.get("usual"):
+            return (0, 0)
+        if o.get("approved_substitute"):
+            return (1, int(o.get("substitute_rank") or 999))
+        return (2, 0)
+
+    offers.sort(key=lambda o: (not o["can_fulfil"], *_tier_order(o), -o.get("preference_score", 0), *pref(o)))
     for o, rank in zip([o for o in offers if o["can_fulfil"]], ["best", "better", "good"]):
         o["rank"] = rank
     for o in offers:
@@ -434,14 +480,18 @@ async def check_offer(
 
 
 def _funnel_tail(offers: list[dict], prefs: list[dict]) -> list[dict]:
-    """After the musts: what can deliver in full, then the usual product or the preferences (strongest first,
-    a step only narrows when some offer meets it), then the pick. Each count is at most the previous one."""
+    """After the musts: what can deliver in full, then the usual product, approved substitute, or preferences
+    (strongest first, a step only narrows when some offer meets it), then the pick. Each count <= the previous."""
     pool = [o for o in offers if o["can_fulfil"]]
     tail = [{"step": "available", "label": "Can deliver in full on time", "count": len(pool)}]
     usual = [o for o in pool if o.get("usual")]
+    subs = sorted((o for o in pool if o.get("approved_substitute")), key=lambda o: o.get("substitute_rank") or 999)
     if usual:
         pool = usual
         tail.append({"step": "usual", "label": "Your usual product", "count": len(pool)})
+    elif subs:
+        pool = subs[:1]
+        tail.append({"step": "usual", "label": "Your approved substitute", "count": len(pool)})
     else:
         for p in sorted(prefs, key=lambda p: -p.get("weight", 1)):
             met = [o for o in pool if any(x["id"] == p["id"] and x["met"] for x in o.get("preferences") or [])]
