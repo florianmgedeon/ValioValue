@@ -1,0 +1,141 @@
+mcp-server/valio_mcp/diff.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 68-70,72-73,76-80
+  s_1bfb11234b64f3::t_9c3dbdac94a1b7 81
+backend/buyer_agent/llm.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 4,12,14,25-26,81-142,155-156,158-160,225-226,228-232,306-309,322-323,325-331,349-405,419-431,458-465,467
+backend/tests/test_photos.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-135
+mcp-server/valio_mcp/store.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 136-154
+mcp-server/valio_mcp/mandate.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 18
+contracts/fixtures/uploads/invoices-oct.json
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-63
+contracts/fixtures/kitchen/school-kitchen-espoo.json
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-182
+docs/work-packages/1a-photos-in-chat.md
+  s_1bfb11234b64f3::t_81c54544e4b1a0 3
+backend/tests/test_rules.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-121
+contracts/fixtures/events/autonomy_progress.json
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-13
+mcp-server/tests/test_orders_list.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-63
+contracts/backend-api.yaml
+  s_1bfb11234b64f3::t_81c54544e4b1a0 4,23-31,71-73,98-99,232-301,352-584,590-594,630-631,692-705,764,806-813,825-831,1032-1037,1080-1299
+backend/buyer_agent/static/phone.html
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-113
+mcp-server/README.md
+  s_1bfb11234b64f3::t_81c54544e4b1a0 70-71
+backend/tests/test_usual_and_autonomy.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-169
+backend/buyer_agent/routes_kitchen.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-237
+contracts/fixtures/events/intent_proposed_usual.json
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-55
+backend/buyer_agent/kitchen.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-237
+mcp-server/tests/test_coverage.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-53
+backend/buyer_agent/agent.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 41,147-157,159,166,173-176,180,191-193,195-200,209-218,221,308-309,337,341-342,353-354,366,374-387,417
+backend/buyer_agent/app.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 17,19-22,26-29,33-36,38,41,59,62,89-97,99
+mcp-server/tests/test_usual.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-149
+contracts/fixtures/uploads/menu-w47.json
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-39
+mcp-server/valio_mcp/server.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 20-21,41,223-224,226-228,230,234,236,238-239,242-252,257,260-262,300-302,400-401,409-410,417,429-430,435-453,871-894,971-1015
+  s_1bfb11234b64f3::t_bda77872740896 1016-1017
+docs/work-packages/1b-kitchen-profile-and-ingest.md
+  s_1bfb11234b64f3::t_81c54544e4b1a0 3
+backend/buyer_agent/routes_orders.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-66
+scripts/make_fixtures.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-151
+docs/work-packages/3-polish.md
+  s_1bfb11234b64f3::t_81c54544e4b1a0 3,23-30
+  s_1bfb11234b64f3::t_d5acce2a035eaf 31
+backend/buyer_agent/valio.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-77
+docs/work-packages/1c-usual-products-in-orders.md
+  s_1bfb11234b64f3::t_81c54544e4b1a0 3
+backend/tests/test_kitchen.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-217
+.env.example
+  s_1bfb11234b64f3::t_81c54544e4b1a0 25-30
+contracts/fixtures/uploads/order-list.json
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-10
+backend/buyer_agent/routes_rules.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-288
+contracts/fixtures/kitchen/accept-needs-signature.json
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-20
+contracts/fixtures/events/user_message.json
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-14
+backend/requirements-dev.txt
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-3
+backend/buyer_agent/uploads.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-148
+contracts/fixtures/events/photo_received.json
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-8
+backend/buyer_agent/routes_uploads.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-143
+docs/policy-v3-plan.md
+  s_1bfb11234b64f3::t_81c54544e4b1a0 99
+contracts/fixtures/orders/autonomy.json
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-48
+contracts/fixtures/uploads/allergy-note.json
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-42
+mcp-server/valio_mcp/intent.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 43-45,142-158,165,184,191,259,279,281,297,299-300,339-348
+docs/work-packages/2b-orders-and-autonomy.md
+  s_1bfb11234b64f3::t_81c54544e4b1a0 3
+contracts/fixtures/kitchen/ingest-menu.json
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-53
+contracts/fixtures/mandate-draft-sesame.json
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-11
+mcp-server/valio_mcp/policy.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 120-121
+contracts/fixtures/events/paired.json
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-5
+backend/buyer_agent/autonomy.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-209
+backend/pytest.ini
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-2
+backend/tests/conftest.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-125
+mcp-server/valio_mcp/coverage.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-77
+backend/buyer_agent/config.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 31-39
+scripts/demo_photo.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-58
+backend/buyer_agent/ingest.py
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-296
+backend/requirements.txt
+  s_1bfb11234b64f3::t_81c54544e4b1a0 8-10
+contracts/fixtures/orders/orders.json
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-78
+contracts/fixtures/events/offers_usual_funnel.json
+  s_1bfb11234b64f3::t_81c54544e4b1a0 1-87
+docs/work-packages/README.md
+  s_1bfb11234b64f3::t_81c54544e4b1a0 121,123,142,150
+  s_1bfb11234b64f3::t_bfe33e7a2fde78 154-155
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c3d7918539328caaf20290a7de4a35dea1a5b768",
+  "prompts": {},
+  "sessions": {
+    "s_1bfb11234b64f3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "69b7a2a3-5d49-49d9-a191-914ab89c9203",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
