@@ -1,6 +1,6 @@
 # 2b · Order list and autonomy level
 
-Status: done 14 Nov 2026 (branch claude/work-packages-welle-1-4-43c31f) · Wave 1 (it does not depend on the other packages) · Shared contract: [`README.md`](README.md).
+Status: done 14 Nov 2026 (branch claude/work-packages-welle-1-4-43c31f) · Wave 1 (it does not depend on the other packages) · Shared contract: [`README.md`](README.md). **Note:** built with the old levels (1 = usual products). The level table below is the new target; [`2d`](2d-permissions-and-levels.md) reworks the code.
 
 ## Why
 
