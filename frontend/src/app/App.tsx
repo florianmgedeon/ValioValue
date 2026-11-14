@@ -11,7 +11,7 @@ import { ActivityView } from "../features/activity/ActivityView";
 import { DemoMenu, OnboardingView } from "../features/onboarding";
 import OrderView from "../features/order/OrderView";
 import KitchenView from "../features/kitchen/KitchenView";
-import { Tour } from "../features/tour/Tour";
+import { resetTour, Tour } from "../features/tour/Tour";
 
 const UiGallery = import.meta.env.DEV ? lazy(() => import("./UiGallery")) : null;
 
@@ -38,7 +38,9 @@ function Shell() {
   // A kitchen without a profile version has not been onboarded yet (F3).
   const needsOnboarding = kitchen.isSuccess && !kitchen.data.version;
   useEffect(() => {
-    if (needsOnboarding && (route.tab === "order" || route.tab === "kitchen")) navigate("onboard");
+    if (!needsOnboarding) return;
+    resetTour(); // a fresh kitchen gets the tour again after onboarding
+    if (route.tab === "order" || route.tab === "kitchen") navigate("onboard");
   }, [needsOnboarding, route.tab]);
 
   const showTabs = route.tab !== "onboard";

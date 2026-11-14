@@ -12,6 +12,8 @@ interface Step {
   anchor?: string;
   /** Tab to show behind the spotlight. */
   tab?: Tab;
+  /** Second route segment, e.g. `may` for `#kitchen/may`. */
+  param?: string;
   icon: IconName;
   title: string;
   body: string;
@@ -28,7 +30,7 @@ const STEPS: Step[] = [
     tab: "order",
     icon: "cam",
     title: "Order",
-    body: "Snap a photo of a list or just tell me what you need. I put the cart together. Nothing goes to Valio Aimo without your OK.",
+    body: "Snap a photo of a list, tell me what you need, or just say \"the usual\": I show you what changed since last time first. Nothing goes to Valio Aimo without your OK.",
   },
   {
     anchor: "tab-activity",
@@ -38,22 +40,31 @@ const STEPS: Step[] = [
     body: "Every order, what I did and why: which product I picked, what I left out, who approved it. Check it any time later.",
   },
   {
-    anchor: "tab-kitchen",
+    anchor: "kitchen-know",
     tab: "kitchen",
-    icon: "hand",
-    title: "Kitchen",
-    body: "What I remember about you: fixed rules, preferences, your usual products. Correct me here, or teach me more with a photo.",
+    icon: "bulb",
+    title: "Kitchen: what I know",
+    body: "What I learned from your documents and orders: your kitchen, your usual products. Correct me here, no signature needed. New things wait under \"To check\" until you say yes.",
+  },
+  {
+    anchor: "kitchen-may",
+    tab: "kitchen",
+    param: "may",
+    icon: "lock",
+    title: "Kitchen: what I may do",
+    body: "Never-order rules, preferences, substitutes and my limits. Only you change these, with your signature, and Valio Aimo checks them on every order.",
   },
   {
     anchor: "autonomy",
-    tab: "order",
-    icon: "lock",
-    title: "What I may do alone",
-    body: "This shows how much I may order without asking. Start strict, loosen it when you trust me, take it back any time. Tap it to change.",
+    tab: "kitchen",
+    param: "may",
+    icon: "hand",
+    title: "What I may order alone",
+    body: "Always visible up here. Start strict, loosen it when you trust me, take it back any time. Tap it to come back to this page.",
   },
 ];
 
-const KEY = "tour.v1";
+const KEY = "tour.v2";
 const EVENT = "tour:start";
 
 function read(): string | null {
@@ -74,6 +85,14 @@ function write(v: string) {
 /** Ask for the tour on the next screen (called when onboarding ends). */
 export function queueTour() {
   write("pending");
+}
+/** Forget that the tour was shown (demo: restarting onboarding shows it again afterwards). */
+export function resetTour() {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    /* nothing stored */
+  }
 }
 /** Start the tour now (help button, demo menu). */
 export function startTour() {
@@ -112,14 +131,20 @@ export function Tour() {
   const s = step === null ? null : STEPS[step];
 
   useEffect(() => {
-    if (s?.tab) navigate(s.tab);
+    if (s?.tab) navigate(s.tab, s.param);
   }, [s]);
 
   useLayoutEffect(() => {
     if (!s) return;
     const update = () => setRect(rectOf(s.anchor));
     update();
-    const t = window.setTimeout(update, 60); // after the tab switch re-renders
+    // After the tab switch re-renders: bring an anchor far down the page into the upper third, then measure.
+    const t = window.setTimeout(() => {
+      const el = s.anchor ? document.querySelector(`[data-tour="${s.anchor}"]`) : null;
+      const r = el?.getBoundingClientRect();
+      if (r && (r.top > window.innerHeight * 0.55 || r.bottom < 0)) window.scrollBy({ top: r.top - window.innerHeight * 0.3 });
+      update();
+    }, 60);
     window.addEventListener("resize", update);
     window.addEventListener("scroll", update, true);
     return () => {
@@ -147,10 +172,12 @@ export function Tour() {
   // Card under the spotlight, kept inside the viewport. Narrow screens: a sheet at the bottom.
   const vw = window.innerWidth;
   const narrow = vw < 560;
+  // Not enough room below the spotlight: the card goes above it.
+  const above = !!spot && window.innerHeight - (spot.top + spot.height) < 260;
   const cardStyle: React.CSSProperties = narrow
     ? { left: 12, right: 12, bottom: "calc(12px + env(safe-area-inset-bottom))" }
     : spot
-      ? { top: spot.top + spot.height + 14, left: Math.max(16, Math.min(spot.left + spot.width / 2 - CARD_W / 2, vw - CARD_W - 16)), width: CARD_W }
+      ? { ...(above ? { bottom: window.innerHeight - spot.top + 14 } : { top: spot.top + spot.height + 14 }), left: Math.max(16, Math.min(spot.left + spot.width / 2 - CARD_W / 2, vw - CARD_W - 16)), width: CARD_W }
       : { inset: 0, margin: "auto", width: 420, height: "fit-content" };
   const arrowLeft = spot && !narrow ? spot.left + spot.width / 2 - (cardStyle.left as number) : null;
 
@@ -166,7 +193,7 @@ export function Tour() {
       )}
       <div className="rise fixed rounded-[20px] bg-bg p-5 text-ink shadow-float" style={cardStyle} key={step}>
         {arrowLeft !== null && (
-          <span className="absolute -top-[7px] size-3.5 rotate-45 bg-bg" style={{ left: arrowLeft - 7 }} aria-hidden="true" />
+          <span className={`absolute ${above ? "-bottom-[7px]" : "-top-[7px]"} size-3.5 rotate-45 bg-bg`} style={{ left: arrowLeft - 7 }} aria-hidden="true" />
         )}
         <div className="flex items-center gap-2.5">
           <span className="grid size-8 place-items-center rounded-full bg-accent-soft text-accent">
