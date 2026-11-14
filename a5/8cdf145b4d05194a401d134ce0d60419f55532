@@ -1,0 +1,37 @@
+frontend/src/features/activity/model.ts
+  s_e62429874ee3a8::t_705e3a56adfc8c 1-74,76-88,90-96,99-190
+  s_e62429874ee3a8::t_b0998094f6dc5f 75,89,97-98
+frontend/src/features/activity/ActivityView.tsx
+  s_e62429874ee3a8::t_0a9ee4e6bcdc95 1-89
+frontend/src/features/activity/queries.ts
+  s_e62429874ee3a8::t_099fc243a3993a 1-48
+frontend/src/features/activity/activity.css
+  s_e62429874ee3a8::t_acdf7736b77120 1-44
+frontend/src/app/App.tsx
+  s_e62429874ee3a8::t_4b345ebe8e8b63 11,21
+docs/work-packages/F4-frontend-activity.md
+  s_e62429874ee3a8::t_381dbae2fb1220 3,39-47
+frontend/src/features/activity/format.ts
+  s_e62429874ee3a8::t_ecff21173dda03 1-13
+frontend/src/features/activity/TrustDrawer.tsx
+  s_e62429874ee3a8::t_8e9825351729a2 1-63
+frontend/src/features/activity/StoryTimeline.tsx
+  s_e62429874ee3a8::t_b0998094f6dc5f 78,106-108
+  s_e62429874ee3a8::t_fba343d2db49cb 1-77,79-105,109-166
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a58cdf145b4d05194a401d134ce0d60419f55532",
+  "prompts": {},
+  "sessions": {
+    "s_e62429874ee3a8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0b2e9dce-f782-47de-af77-e5020fd08a2f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
