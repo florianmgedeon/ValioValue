@@ -1,0 +1,19 @@
+frontend/src/features/onboarding/OnboardingView.tsx
+  s_37763c4d3d3796::t_d02553f5be8242 237
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "405b823996b60d5660c5099fb166c36f6ea2d321",
+  "prompts": {},
+  "sessions": {
+    "s_37763c4d3d3796": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c20a269-fc70-46b3-983a-b1fcd9bafd2c",
+        "model": "unknown"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
