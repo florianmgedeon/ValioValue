@@ -622,6 +622,51 @@ paths:
                   accepted: { type: array, items: { type: string } }
         "409": { description: "needs_signature (show preview, resend with its mandate_hash) or already decided", content: { application/json: { schema: { $ref: "#/components/schemas/NeedsSignature" } } } }
         "422": { description: Valio Aimo refused the new mandate }
+  /kitchen/usual/fallback:
+    post:
+      summary: Set ordered substitutes and the fallback mode of usual products. Signed when the grant changes.
+      description: |
+        Approved substitutes count as usual products. At autonomy level 1 a change that adds or removes one
+        widens or narrows the signed usual-products grant: without mandate_hash (or with an outdated one) the
+        answer is 409 NeedsSignature (diff names each substitute) and nothing is applied. With the previewed hash
+        the backend signs and stores the mandate, then the profile. Reordering, a mode change that keeps the
+        same products, or any change at level 0 or 2 is applied directly (mandate null).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [updates]
+              properties:
+                buyer_id: { type: string }
+                updates:
+                  type: array
+                  items:
+                    type: object
+                    required: [id]
+                    properties:
+                      id: { type: string, description: "Usual product id" }
+                      substitutes:
+                        type: array
+                        description: "Replaces the list, in the order to try. Omit to keep it."
+                        items: { type: object, properties: { product_id: { type: string }, product_name: { type: string } } }
+                      fallback_mode: { type: string, enum: [ask_any, only_listed, none] }
+                by: { type: string, example: "Anna Virtanen" }
+                mandate_hash: { type: string }
+      responses:
+        "200":
+          description: Applied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile: { $ref: "#/components/schemas/KitchenProfile" }
+                  mandate: { allOf: [{ $ref: "#/components/schemas/MandateSummary" }], nullable: true }
+        "404": { description: Unknown usual product }
+        "409": { description: "needs_signature (show preview, resend with its mandate_hash)", content: { application/json: { schema: { $ref: "#/components/schemas/NeedsSignature" } } } }
+        "422": { description: Invalid fallback_mode or Valio Aimo refused the new mandate }
   /kitchen/suggestions/{suggestion_id}/reject:
     post:
       summary: Reject a suggestion. It stays in the list with status rejected.

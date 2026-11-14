@@ -101,6 +101,7 @@ export function Suggestions({ items, sources, onAccept, onReject, busy }: {
                 {usual && <span>{usual}</span>}
                 {!fromOrder && src?.title && <span>from {src.title}</span>}
                 {(s.kind === "must" || s.kind === "prefer" || s.kind === "autonomy") && <span>· needs your signature</span>}
+                {s.kind === "usual" && ((s.payload as { substitutes?: unknown[] } | undefined)?.substitutes?.length ?? 0) > 0 && <span>· changes what I may order alone</span>}
               </div>
               {!fromOrder && s.quote && !s.quote.startsWith(s.title ?? "\u0000") && <div className="q">“{s.quote}”</div>}
             </div>

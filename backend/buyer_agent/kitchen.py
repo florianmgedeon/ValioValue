@@ -220,6 +220,45 @@ def apply_usual(profile: dict, payload: dict, source_id: str | None) -> str:
     return f'Usual: "{word}" means {entry["product_name"] or "a product still to choose"}'
 
 
+def find_usual(profile: dict, word: str | None) -> dict | None:
+    """The active usual product for a word or one of its aliases."""
+    w = (word or "").strip().lower()
+    if not w:
+        return None
+    for u in profile.get("usual") or []:
+        if u.get("status", "active") == "active" and (u["word"] == w or w in (u.get("aliases") or [])):
+            return u
+    return None
+
+
+def merge_with_existing(profile: dict, payload: dict) -> dict:
+    """A usual suggestion that only sets substitutes ("if milk is out, take ...") names no product: keep the
+    product, amounts and aliases the kitchen already has for that word instead of searching for the word."""
+    if payload.get("product_id") or payload.get("product_query"):
+        return payload
+    cur = find_usual(profile, payload.get("word"))
+    if not cur:
+        return payload
+    keep = {k: cur.get(k) for k in ("word", "aliases", "product_id", "product_name", "typical_qty", "unit", "per")}
+    return keep | {k: v for k, v in payload.items() if v is not None and k not in ("word",)}
+
+
+def set_fallback(cur: dict, substitutes: list | None, mode: str | None) -> None:
+    """Set a usual product's ordered substitutes and fallback mode (substitutes given = replace the list)."""
+    if substitutes is not None:
+        cur["substitutes"] = normalise_substitutes(substitutes, cur.get("product_id"))
+        if mode is None and cur["substitutes"] and cur.get("fallback_mode", "ask_any") == "ask_any":
+            mode = "only_listed"
+    if mode is not None:
+        cur["fallback_mode"] = normalise_fallback_mode(mode, bool(cur.get("substitutes")))
+
+
+def substitute_ids(profile: dict) -> list[str]:
+    """Approved substitute ids that are not themselves a usual product (those are what a substitute adds)."""
+    primary = {u.get("product_id") for u in profile.get("usual") or [] if u.get("status", "active") == "active"}
+    return [x for x in usual_ids(profile) if x not in primary]
+
+
 def usual_ids(profile: dict) -> list[str]:
     """Product ids covered by level-1 autonomy: every active usual product plus its approved substitutes."""
     ids: list[str] = []

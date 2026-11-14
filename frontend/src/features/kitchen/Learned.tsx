@@ -4,7 +4,7 @@ import { useComposerText } from "../../app/composer";
 import { navigate } from "../../app/route";
 import { Button, Drawer, Icon, eur } from "../../ui";
 import { unitText } from "./Profile";
-import { FallbackEditor, fallbackSentence, type UsualFallbackUpdate } from "./Substitutes";
+import { FallbackSummary, fallbackLine } from "./Substitutes";
 
 type Suggestion = Schema["Suggestion"];
 type Usual = NonNullable<KitchenProfile["usual"]>[number];
@@ -45,12 +45,11 @@ function howOften(weeks: Week[], deliveries: number) {
 
 /** "What I learned from your orders": one row per usual product and the 8 weeks behind it. Drift shows as orange
  *  bars here; the drift decision itself comes when the buyer orders the usual (Order tab). */
-export function LearnedSection({ profile, usualOrder, limit, drift, onSaveUsual }: {
+export function LearnedSection({ profile, usualOrder, limit, drift }: {
   profile: KitchenProfile;
   usualOrder: UsualOrder | undefined;
   limit: number | null;
   drift: Drift[];
-  onSaveUsual?: (update: UsualFallbackUpdate) => Promise<void>;
 }) {
   const setText = useComposerText();
   const [openId, setOpen] = useState<string | null>(null);
@@ -90,7 +89,7 @@ export function LearnedSection({ profile, usualOrder, limit, drift, onSaveUsual 
                 {howOften(weeks, deliveries)}
                 {d && <>{howOften(weeks, deliveries) ? " · " : ""}<span className="up">{d.pct! > 0 ? "↑" : "↓"} {Math.abs(d.pct!)} % since {day(d.since)}</span></>}
               </span>
-              <span className="m">{fallbackSentence(u)}</span>
+              {fallbackLine(u) && <span className="fb"><Icon name="arrow" size={14} />{fallbackLine(u)}</span>}
             </span>
             <span className="r">
               <span className="qty">{u.typical_qty != null ? `~${u.typical_qty} ${unitText(u.unit)} / ${u.per || "week"}` : ""}</span>
@@ -119,12 +118,12 @@ export function LearnedSection({ profile, usualOrder, limit, drift, onSaveUsual 
         </div>
       )}
 
-      <UsualDrawer usual={open} deliveries={deliveries} weeks={open ? weeksOf(open) : []} drift={open ? driftOf(open) : undefined} onSaveUsual={onSaveUsual} onClose={() => setOpen(null)} />
+      <UsualDrawer usual={open} deliveries={deliveries} weeks={open ? weeksOf(open) : []} drift={open ? driftOf(open) : undefined} onClose={() => setOpen(null)} />
     </section>
   );
 }
 
-function UsualDrawer({ usual, weeks, deliveries, drift, onSaveUsual, onClose }: { usual: Usual | null; weeks: Week[]; deliveries: number; drift?: Drift; onSaveUsual?: (update: UsualFallbackUpdate) => Promise<void>; onClose: () => void }) {
+function UsualDrawer({ usual, weeks, deliveries, drift, onClose }: { usual: Usual | null; weeks: Week[]; deliveries: number; drift?: Drift; onClose: () => void }) {
   if (!usual) return null;
   const main = usual.product_name ?? "";
   const shown = [...weeks].reverse();
@@ -135,6 +134,7 @@ function UsualDrawer({ usual, weeks, deliveries, drift, onSaveUsual, onClose }: 
       + (drift ? ` ${drift.text}, ${drift.detail?.toLowerCase()}` : "");
   return (
     <Drawer open onClose={onClose} title={main} icon={<span className="l-dw">{usual.word}</span>}>
+      <FallbackSummary usual={usual} />
       <p className="text-[15px]">{why}</p>
       {n > 0 && (
         <div className="grid gap-2">
@@ -153,7 +153,6 @@ function UsualDrawer({ usual, weeks, deliveries, drift, onSaveUsual, onClose }: 
           </div>
         </div>
       )}
-      {onSaveUsual && usual.id && <FallbackEditor key={usual.id} usual={usual} onSave={onSaveUsual} />}
       <p className="muted text-[13px]">Change the amount or the product by telling me below, e.g. “we need 100 L milk a week”.</p>
     </Drawer>
   );

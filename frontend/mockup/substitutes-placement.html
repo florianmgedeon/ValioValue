@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Substitutes Placement</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Tokens copied from frontend/src/styles.css */
+:root {
+  --bg: #ffffff; --surface: #f5f5f7; --surface2: #ececf0; --line: #e3e3e8;
+  --ink: #1d1d1f; --ink2: #515154; --ink3: #6e6e73;
+  --accent: #0a66d8; --accent-soft: #e8f0fc;
+  --must: #c4291c; --must-soft: #fdecea; --prefer: #1b7f3b; --prefer-soft: #e8f7ec;
+  --usual: #5b3fd1; --usual-soft: #efebfd; --auto: #a35c00; --auto-soft: #fdf2e2;
+  --note: #ffe066; --note-ink: #4a3b00;
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 28px rgba(0,0,0,.07);
+  --shadow-lg: 0 2px 6px rgba(0,0,0,.06), 0 24px 60px rgba(0,0,0,.14);
+  --font: Inter, -apple-system, "SF Pro Text", system-ui, sans-serif;
+  --hand: Caveat, "Bradley Hand", "Segoe Print", cursive;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111113; --surface: #1c1c1f; --surface2: #26262a; --line: #2e2e33;
+    --ink: #f5f5f7; --ink2: #c7c7cc; --ink3: #98989f;
+    --accent: #4c9bff; --accent-soft: #16263d;
+    --must: #ff6a5c; --must-soft: #3a1715; --prefer: #4cc777; --prefer-soft: #12301d;
+    --usual: #a594ff; --usual-soft: #241d44; --auto: #f0a640; --auto-soft: #3a2810;
+    --note: #5c4a00; --note-ink: #ffe9a3;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 28px rgba(0,0,0,.35);
+    --shadow-lg: 0 24px 60px rgba(0,0,0,.55);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111113; --surface: #1c1c1f; --surface2: #26262a; --line: #2e2e33;
+  --ink: #f5f5f7; --ink2: #c7c7cc; --ink3: #98989f;
+  --accent: #4c9bff; --accent-soft: #16263d;
+  --must: #ff6a5c; --must-soft: #3a1715; --prefer: #4cc777; --prefer-soft: #12301d;
+  --usual: #a594ff; --usual-soft: #241d44; --auto: #f0a640; --auto-soft: #3a2810;
+  --note: #5c4a00; --note-ink: #ffe9a3;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 28px rgba(0,0,0,.35);
+  --shadow-lg: 0 24px 60px rgba(0,0,0,.55);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--bg); overflow-x: clip; }
+body { color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+button, input { font: inherit; color: inherit; }
+button { background: none; border: 0; cursor: pointer; }
+h1, h2, h3 { letter-spacing: -0.02em; }
+:focus { outline: none; }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: -3px; }
+.icon { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.muted { color: var(--ink3); }
+.spacer { flex: 1; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: 999px; font-weight: 600; font-size: 15px; white-space: nowrap; transition: transform .15s, background .2s; }
+.btn:active { transform: scale(.97); }
+.btn-primary { background: var(--ink); color: var(--bg); }
+.btn-ghost { background: var(--surface); }
+.btn-ghost:hover { background: var(--surface2); }
+.btn-small { height: 34px; padding: 0 14px; font-size: 13px; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.link { color: var(--accent); font-weight: 600; font-size: 13px; }
+.link:hover { text-decoration: underline; }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.k-usual { background: var(--usual-soft); color: var(--usual); }
+.k-auto { background: var(--auto-soft); color: var(--auto); }
+.k-accent { background: var(--accent-soft); color: var(--accent); }
+
+/* mockup annotations (not part of the UI) */
+.note { display: flex; gap: 10px; align-items: flex-start; background: var(--note); color: var(--note-ink); border-radius: 12px; padding: 10px 14px; font-size: 13px; line-height: 1.4; }
+.note b.n, .dot { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--note-ink); color: var(--note); display: inline-grid; place-items: center; font-size: 12px; font-weight: 800; }
+.dot { width: 20px; height: 20px; font-size: 11px; vertical-align: middle; margin-left: 6px; }
+.intro { max-width: 860px; margin: 20px auto 0; padding: 0 16px; display: grid; gap: 8px; }
+.intro h1 { font-size: 15px; font-weight: 700; }
+.intro ol { padding-left: 0; list-style: none; display: grid; gap: 6px; }
+.intro li { display: flex; gap: 10px; font-size: 13.5px; color: var(--ink2); }
+.toggle-notes { justify-self: start; }
+body.clean .note, body.clean .dot, body.clean .intro ol { display: none; }
+
+/* header */
+header { position: sticky; top: 0; z-index: 20; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: saturate(1.6) blur(16px); -webkit-backdrop-filter: saturate(1.6) blur(16px); }
+.hd { max-width: 1280px; margin: 0 auto; height: 60px; display: flex; align-items: center; gap: 16px; padding: 0 16px; }
+.brand { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; white-space: nowrap; }
+.tabs { display: flex; gap: 2px; background: var(--surface); padding: 3px; border-radius: 999px; }
+.tabs button { height: 32px; padding: 0 16px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--ink2); }
+.tabs button[aria-selected="true"] { background: var(--bg); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: var(--bg); display: grid; place-items: center; font-size: 11px; font-weight: 700; }
+@media (max-width: 640px) { .brand { display: none; } .tabs button { padding: 0 10px; } }
+
+/* page */
+main { max-width: 860px; margin: 0 auto; padding: 24px 16px 140px; display: grid; gap: 20px; }
+.k-head h1 { font-size: clamp(28px, 4vw, 40px); font-weight: 800; line-height: 1.1; }
+.k-head p { color: var(--ink3); font-size: 14px; margin-top: 4px; }
+.views { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: var(--surface); border-radius: 16px; padding: 4px; }
+.views button { padding: 10px 14px; border-radius: 12px; font-weight: 700; font-size: 14.5px; display: flex; gap: 6px; align-items: center; justify-content: center; flex-wrap: wrap; color: var(--ink2); }
+.views button .sub { font-weight: 500; font-size: 12px; color: var(--ink3); }
+.views button[aria-selected="true"] { background: var(--bg); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+.sec { background: var(--bg); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; box-shadow: var(--shadow); }
+.sec-h { display: flex; align-items: center; gap: 10px; padding: 16px 20px 12px; flex-wrap: wrap; }
+.sec-h h2 { font-size: 17px; font-weight: 700; }
+.sec-h p { font-size: 12.5px; color: var(--ink3); width: 100%; }
+.sec > .note { margin: 0 20px 14px; }
+[hidden] { display: none !important; }
+
+/* to check */
+.check { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 6px 14px; align-items: center; padding: 12px 20px; border-top: 1px solid var(--line); }
+.check .t { font-weight: 600; font-size: 14.5px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.check .s { font-size: 12.5px; color: var(--ink3); }
+.yesno { display: flex; gap: 6px; }
+
+/* learned rows */
+.row { width: 100%; text-align: left; display: grid; grid-template-columns: 104px minmax(0,1fr) auto 16px; gap: 4px 16px; align-items: center; padding: 12px 20px; border-top: 1px solid var(--line); transition: background .15s; }
+.row:hover { background: var(--surface); }
+.row .w { font-family: var(--hand); font-size: 22px; line-height: 1; color: var(--usual); overflow-wrap: anywhere; }
+.row .p { font-weight: 600; font-size: 14.5px; }
+.row .m { display: block; font-size: 12.5px; color: var(--ink3); }
+.row .fb { display: flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--ink2); margin-top: 2px; }
+.row .fb .icon { width: 14px; height: 14px; color: var(--ink3); }
+.row .qty { font-size: 13px; color: var(--ink2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.row .chev { color: var(--ink3); width: 16px; height: 16px; }
+@media (max-width: 600px) { .row { grid-template-columns: 76px minmax(0,1fr) 16px; } .row .qty { grid-column: 2; grid-row: 2; } }
+
+/* drawer */
+.scrim { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 40; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100vw); background: var(--bg); z-index: 41; box-shadow: var(--shadow-lg); display: grid; grid-template-rows: auto 1fr; }
+.dw-h { display: flex; gap: 12px; align-items: center; padding: 18px 20px; border-bottom: 1px solid var(--line); }
+.dw-h .w { font-family: var(--hand); font-size: 26px; color: var(--usual); line-height: 1; }
+.dw-h h3 { font-size: 16px; font-weight: 700; line-height: 1.25; }
+.dw-b { overflow-y: auto; padding: 18px 20px 28px; display: grid; gap: 16px; align-content: start; }
+.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink3); }
+.fbcard { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: grid; gap: 8px; }
+.fbcard .chain { display: grid; gap: 4px; font-size: 14px; }
+.fbcard .chain div { display: flex; gap: 8px; align-items: center; }
+.rank { font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 6px; background: var(--usual-soft); color: var(--usual); }
+.rank.p { background: var(--surface2); color: var(--ink2); }
+.fbcard .foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink3); border-top: 1px solid var(--line); padding-top: 8px; }
+.fbcard .foot .icon { width: 14px; height: 14px; }
+.hist { display: grid; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.hist div { display: flex; gap: 12px; padding: 8px 14px; font-size: 14px; border-top: 1px solid var(--line); }
+.hist div:first-child { border-top: 0; }
+.hist .d { width: 56px; color: var(--ink3); }
+.hist .q { margin-left: auto; color: var(--ink2); font-variant-numeric: tabular-nums; }
+
+/* autonomy (may view) */
+.auto-now { margin: 0 20px 16px; padding: 14px 16px; border-radius: 16px; background: var(--auto-soft); display: flex; gap: 12px; align-items: center; }
+.auto-now .ic { width: 36px; height: 36px; border-radius: 10px; background: var(--bg); color: var(--auto); display: grid; place-items: center; flex: none; }
+.auto-now b { display: block; }
+.auto-now span.s { font-size: 13px; color: var(--ink3); }
+
+/* substitute rules (may view) */
+.fbrow { display: grid; grid-template-columns: 104px minmax(0,1fr) auto; gap: 4px 16px; align-items: center; padding: 12px 20px; border-top: 1px solid var(--line); }
+.fbrow .w { font-family: var(--hand); font-size: 22px; line-height: 1; color: var(--usual); }
+.fbrow .p { font-weight: 600; font-size: 14px; }
+.fbrow .r { font-size: 12.5px; color: var(--ink3); }
+.fbrow .r b { color: var(--ink2); font-weight: 600; }
+.fbrow.changed { background: var(--auto-soft); }
+.fbrow.off .r { font-style: italic; }
+@media (max-width: 600px) { .fbrow { grid-template-columns: 76px minmax(0,1fr); } .fbrow > button { grid-column: 2; justify-self: start; } }
+.editor { grid-column: 1 / -1; margin-top: 10px; padding: 16px; border-radius: 16px; background: var(--surface); display: grid; gap: 14px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { padding: 6px 12px; border-radius: 999px; border: 1.5px solid var(--line); font-size: 13px; font-weight: 600; background: var(--bg); }
+.seg button[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+.subs { display: grid; gap: 6px; }
+.subi { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 11px; background: var(--bg); border: 1px solid var(--line); font-size: 13.5px; }
+.subi .nm { flex: 1; min-width: 0; font-weight: 600; }
+.subi .x { width: 26px; height: 26px; border-radius: 7px; background: var(--surface); color: var(--ink2); font-weight: 700; }
+.search { display: flex; gap: 8px; align-items: center; height: 38px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); padding: 0 10px; }
+.search input { border: 0; background: none; flex: 1; min-width: 0; font-size: 14px; outline: none; }
+.hits { display: grid; gap: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 6px; }
+.hit { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 8px; border-radius: 8px; font-size: 13.5px; }
+.hit:hover { background: var(--surface); }
+.widen { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; color: var(--auto); background: var(--auto-soft); padding: 8px 12px; border-radius: 10px; }
+.widen .icon { width: 15px; height: 15px; margin-top: 1px; }
+.signnote { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--ink3); padding: 0 4px; }
+.signnote .icon { width: 15px; height: 15px; }
+
+/* change bar + sign modal */
+.changebar { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 30; display: flex; gap: 12px; align-items: center; padding: 10px 10px 10px 18px; border-radius: 999px; background: var(--ink); color: var(--bg); box-shadow: var(--shadow-lg); font-size: 14px; font-weight: 600; white-space: nowrap; }
+.changebar .btn-primary { background: var(--bg); color: var(--ink); }
+.modal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(0,0,0,.4); }
+.modal .box { width: min(480px, 100%); background: var(--bg); border-radius: 20px; box-shadow: var(--shadow-lg); padding: 22px; display: grid; gap: 14px; }
+.modal h3 { font-size: 18px; }
+.diff { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; font-size: 14px; }
+.diff div { padding: 10px 14px; border-top: 1px solid var(--line); display: flex; gap: 10px; }
+.diff div:first-child { border-top: 0; }
+.diff .plus { color: var(--prefer); font-weight: 800; }
+.done { display: flex; gap: 8px; align-items: center; color: var(--prefer); font-weight: 600; font-size: 14px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 13V5a1.5 1.5 0 0 1 3 0v6M11 11V4a1.5 1.5 0 0 1 3 0v7M14 11V5.5a1.5 1.5 0 0 1 3 0V14a6 6 0 0 1-6 6h-1a6 6 0 0 1-4.5-2L3 15a1.5 1.5 0 0 1 2.2-2L8 15"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></symbol>
+</svg>
+
+<header><div class="hd">
+  <span class="brand">Kitchen agent</span>
+  <nav class="tabs"><button>Order</button><button>Activity</button><button aria-selected="true">Kitchen</button></nav>
+  <span class="spacer"></span><span class="avatar">SK</span>
+</div></header>
+
+<section class="intro">
+  <h1>Mockup: Wohin mit den Ersatzprodukten?</h1>
+  <ol>
+    <li><b class="dot">1</b>Die Regel wird unter „What I may do“ bearbeitet und mit dem Rest signiert, weil sie festlegt, was der Agent allein bestellen darf.</li>
+    <li><b class="dot">2</b>„What I know“ zeigt sie nur an: oben im Panel, mit dem Link zum Ändern.</li>
+    <li><b class="dot">3</b>In der Liste steht die Ausweich-Zeile nur dort, wo eine Regel gesetzt ist.</li>
+    <li><b class="dot">4</b>Ersatzprodukte entstehen aus Bestellungen, als Vorschlag unter „To check“ (eigene Aufgabe).</li>
+  </ol>
+  <button class="link toggle-notes" onclick="document.body.classList.toggle('clean'); this.textContent = document.body.classList.contains('clean') ? 'Notizen einblenden' : 'Notizen ausblenden'">Notizen ausblenden</button>
+</section>
+
+<main>
+  <div class="k-head">
+    <h1>School kitchen Espoo</h1>
+    <p>Teach me more with a photo or a sentence below.</p>
+  </div>
+
+  <div class="views" role="tablist">
+    <button role="tab" id="t-know" aria-selected="true" onclick="view('know')">What I know <span class="sub">learned, no signature</span></button>
+    <button role="tab" id="t-may" aria-selected="false" onclick="view('may')"><svg class="icon" style="width:15px;height:15px"><use href="#i-lock"/></svg>What I may do <span class="sub">signed</span></button>
+  </div>
+
+  <!-- ============ WHAT I KNOW ============ -->
+  <div id="v-know" style="display:grid;gap:20px">
+    <section class="sec" id="tocheck">
+      <div class="sec-h"><h2>To check <span class="muted">(1)</span></h2><span class="spacer"></span><span class="muted" style="font-size:13px">Nothing changes until you say yes</span></div>
+      <div class="note"><b class="n">4</b><span>Neu: Bei der letzten Bestellung war die Butter ausverkauft und du hast selbst einen Ersatz gewählt. Daraus wird ein Vorschlag. „Yes“ öffnet nicht sofort etwas, sondern legt eine Änderung zum Signieren an, weil sie die Bestellrechte erweitert.</span></div>
+      <div class="check">
+        <div>
+          <div class="t"><span class="chip k-usual">usual</span>Butter: take Arla butter 500 g unsalted if Valio is out</div>
+          <div class="s">You chose it instead of Valio butter 500 g unsalted on 9 Nov · needs your signature</div>
+        </div>
+        <div class="yesno">
+          <button class="btn btn-small btn-ghost" onclick="rejectSuggestion()">No</button>
+          <button class="btn btn-small btn-primary" onclick="acceptSuggestion()">Yes</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec">
+      <div class="sec-h">
+        <h2>What I learned from your orders</h2><span class="spacer"></span><span class="muted" style="font-size:13px">31 orders since 21 Sept</span>
+        <p>When you say the word, I pick this product. Click a product to see the weeks behind it.</p>
+      </div>
+      <div class="note"><b class="n">3</b><span>Nur Milch hat eine Regel, also steht nur dort die Ausweich-Zeile. Bei den anderen gilt der Normalfall („I ask you“), und der wird nicht in jeder Zeile wiederholt.</span></div>
+      <div id="rows"></div>
+    </section>
+
+    <section class="sec">
+      <div class="sec-h"><h2>About your kitchen</h2></div>
+      <p style="padding:0 20px 18px;font-size:15px" class="muted">School canteen in Espoo, around 420 meals a day, nut-free, vegetarian on Wednesdays…</p>
+    </section>
+  </div>
+
+  <!-- ============ WHAT I MAY DO ============ -->
+  <div id="v-may" style="display:none;gap:20px">
+    <section class="sec" id="autonomy">
+      <div class="sec-h"><h2>What may I order without you?</h2></div>
+      <div class="auto-now">
+        <span class="ic"><svg class="icon"><use href="#i-hand"/></svg></span>
+        <div><b>Your usual products, up to €600 an order.</b><span class="s">Your musts always apply. Approved substitutes count as usual products.</span></div>
+        <span class="spacer"></span><button class="btn btn-small btn-ghost">Change</button>
+      </div>
+    </section>
+
+    <section class="sec" id="subrules">
+      <div class="sec-h">
+        <h2>If a usual product is out of stock</h2>
+        <p>I take your substitutes in this order. They count as usual products, so with your current setting I order them alone.</p>
+      </div>
+      <div class="note"><b class="n">1</b><span>Neuer Abschnitt direkt unter „What may I order without you?“, weil er festlegt, was zu „your usual products“ zählt. Änderungen gehen in die Leiste unten und werden zusammen mit Regel- und Rechte-Änderungen signiert.</span></div>
+      <div id="fbrows"></div>
+    </section>
+
+    <p class="signnote"><svg class="icon"><use href="#i-lock"/></svg>Changes here are signed by you and checked by Valio Aimo on every order.</p>
+  </div>
+</main>
+
+<div id="drawer" hidden>
+  <div class="scrim" onclick="closeDrawer()"></div>
+  <aside class="drawer" role="dialog" aria-modal="true">
+    <div class="dw-h"><span class="w" id="dw-w"></span><h3 id="dw-t"></h3><span class="spacer"></span><button class="btn btn-small btn-ghost" onclick="closeDrawer()">Close</button></div>
+    <div class="dw-b" id="dw-b"></div>
+  </aside>
+</div>
+
+<div class="changebar" id="bar" hidden>
+  <span id="bar-t">1 change</span>
+  <button class="btn btn-small btn-primary" onclick="openSign()">Review &amp; sign</button>
+</div>
+
+<div class="modal" id="modal" hidden onclick="if(event.target===this)this.hidden=true">
+  <div class="box">
+    <h3>Sign these changes</h3>
+    <p class="muted" style="font-size:14px">What I may order alone changes like this:</p>
+    <div class="diff" id="diff"></div>
+    <div class="note"><b class="n">1</b><span>Der Signier-Dialog sagt klar, dass neue Produkte allein bestellt werden dürfen. Valio Aimo prüft das bei jeder Bestellung gegen die signierte Version.</span></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-small btn-ghost" onclick="document.getElementById('modal').hidden=true">Back</button>
+      <button class="btn btn-small btn-primary" onclick="sign()">Sign</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PRODUCTS = [
+  { id: "milk", w: "milk", p: "Valio Eila® semi skimmed milk drink 10 l novobox lactose free", q: "~120 L / week", m: "every week · ↑ 20 % since 26 Oct",
+    mode: "only_listed", subs: ["Valio Eila® Luomu™ semi skimmed milk drink 1 l lactose free, organic"],
+    hist: [["2 Nov","120 L"],["26 Oct","120 L"],["19 Oct","110 L"],["12 Oct","–"],["5 Oct","100 L"],["28 Sept","100 L"]] },
+  { id: "butter", w: "butter", p: "Valio butter 500 g unsalted", q: "~10 kg / week", m: "every week", mode: "ask_any", subs: [],
+    hist: [["2 Nov","10 kg"],["26 Oct","10 kg"],["19 Oct","10 kg"]] },
+  { id: "rye", w: "rye rolls", p: "Vaasan Ruispalat 660g 12 pcs Wholegrain Ryebread", q: "~25 packs / week", m: "in 7 of 8 weeks", mode: "ask_any", subs: [], hist: [] },
+  { id: "oat", w: "oat drink", p: "Oddlygood® Barista oat drink 1 l UHT gluten free", q: "~35 L / week", m: "every week", mode: "none", subs: [], hist: [] },
+  { id: "granola", w: "granola", p: "Start Naturell granola 750g", q: "~15 kg / week", m: "in 6 of 8 weeks", mode: "ask_any", subs: [], hist: [] },
+  { id: "potatoes", w: "potatoes", p: "PP pre-washed potato 35-50 mm 15 kg/box", q: "~80 kg / week", m: "every week", mode: "ask_any", subs: [], hist: [] },
+];
+const CATALOG = {
+  milk: ["Valio Eila® semi skimmed milk drink 1 l lactose free", "Arla Lactofree semi skimmed milk 1,5 l", "Valio semi skimmed milk 10 l bag-in-box"],
+  butter: ["Arla butter 500 g unsalted", "Valio butter 2,5 kg unsalted", "Meijerin voi 500 g"],
+};
+const MODES = { only_listed: "Only these substitutes", ask_any: "Ask me before other products", none: "Never substitute" };
+let pending = {};   // id -> {mode, subs}
+let editing = null;
+const $ = (s) => document.getElementById(s);
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const cur = (p) => pending[p.id] ?? p;
+const hasRule = (p) => p.mode !== "ask_any" || p.subs.length > 0;
+const ruleText = (r) => r.mode === "none" ? "never substitute"
+  : r.subs.length ? r.subs.map((s, i) => `${i + 1}. ${s}`).join(" → ") + (r.mode === "only_listed" ? " · nothing else" : " · then ask me")
+  : "ask me";
+
+function view(v) {
+  $("t-know").setAttribute("aria-selected", v === "know");
+  $("t-may").setAttribute("aria-selected", v === "may");
+  $("v-know").style.display = v === "know" ? "grid" : "none";
+  $("v-may").style.display = v === "may" ? "grid" : "none";
+  window.scrollTo({ top: 0 });
+}
+
+function renderRows() {
+  $("rows").innerHTML = PRODUCTS.map((p) => `
+    <button class="row" onclick="openDrawer('${p.id}')">
+      <span class="w">${p.w}</span>
+      <span style="min-width:0">
+        <span class="p">${esc(p.p)}</span>
+        <span class="m">${p.m}</span>
+        ${hasRule(p) ? `<span class="fb"><svg class="icon"><use href="#i-swap"/></svg>If out: ${esc(ruleText(p))}</span>` : ""}
+      </span>
+      <span class="qty">${p.q}</span>
+      <svg class="icon chev"><use href="#i-chev"/></svg>
+    </button>`).join("");
+}
+
+function openDrawer(id) {
+  const p = PRODUCTS.find((x) => x.id === id);
+  $("dw-w").textContent = p.w;
+  $("dw-t").textContent = p.p;
+  const chain = p.mode === "none"
+    ? `<div>Never substitute. If it's out, I leave it open and tell you.</div>`
+    : `<div><span class="rank p">now</span>${esc(p.p)}</div>` + p.subs.map((s, i) => `<div><span class="rank">#${i + 1}</span>${esc(s)}</div>`).join("")
+      + `<div class="muted" style="font-size:13px">${p.mode === "only_listed" ? "Nothing else." : "Then I ask you before taking another product."}</div>`;
+  $("dw-b").innerHTML = `
+    <div class="note"><b class="n">2</b><span>Die Ausweich-Regel steht jetzt oben, vor der Historie, und ist hier nur zu lesen. „Change“ springt zu „What I may do“ und öffnet dort genau dieses Produkt.</span></div>
+    <span class="eyebrow">If it's out of stock</span>
+    <div class="fbcard">
+      <div class="chain">${chain}</div>
+      <div class="foot"><svg class="icon"><use href="#i-lock"/></svg>Signed rule · I order these alone, like your usual products<span class="spacer"></span><button class="link" onclick="goEdit('${p.id}')">Change</button></div>
+    </div>
+    <p style="font-size:15px">Ordered ${p.m}${p.hist.length ? "." : ". I know it from your documents."}</p>
+    ${p.hist.length ? `<span class="eyebrow">The last weeks</span><div class="hist">${p.hist.map(([d, q]) => `<div><span class="d">${d}</span><span class="q">${q}</span></div>`).join("")}</div>` : ""}
+    <p class="muted" style="font-size:13px">Change the amount or the product by telling me below, e.g. “we need 100 L milk a week”.</p>`;
+  $("drawer").hidden = false;
+}
+function closeDrawer() { $("drawer").hidden = true; }
+function goEdit(id) { closeDrawer(); view("may"); editing = id; renderFb(); setTimeout(() => $("fb-" + id)?.scrollIntoView({ block: "center", behavior: "smooth" }), 50); }
+
+function renderFb() {
+  $("fbrows").innerHTML = PRODUCTS.map((p) => {
+    const r = cur(p);
+    const changed = !!pending[p.id];
+    const ed = editing === p.id;
+    return `
+    <div class="fbrow ${changed ? "changed" : ""} ${hasRule(r) ? "" : "off"}" id="fb-${p.id}">
+      <span class="w">${p.w}</span>
+      <div style="min-width:0"><div class="p">${esc(p.p)}</div><div class="r">${hasRule(r) ? `<b>${esc(ruleText(r))}</b>` : "ask me (default)"}${changed ? ` · <span style="color:var(--auto);font-weight:600">changed, not signed</span>` : ""}</div></div>
+      <button class="btn btn-small btn-ghost" onclick="toggleEdit('${p.id}')">${ed ? "Close" : "Change"}</button>
+      ${ed ? editor(p, r) : ""}
+    </div>`;
+  }).join("");
+}
+
+function editor(p, r) {
+  const hits = (CATALOG[p.id] ?? []).filter((h) => !r.subs.includes(h));
+  const added = r.subs.filter((s) => !p.subs.includes(s));
+  return `<div class="editor">
+    <div style="display:grid;gap:6px"><span class="eyebrow">If ${esc(p.w)} is out of stock</span>
+      <div class="seg">${Object.entries(MODES).map(([k, l]) => `<button aria-pressed="${r.mode === k}" onclick="setMode('${p.id}','${k}')">${l}</button>`).join("")}</div>
+    </div>
+    ${r.mode === "none" ? "" : `
+    <div style="display:grid;gap:6px"><span class="eyebrow">Substitutes in order</span>
+      <div class="subs">${r.subs.length ? r.subs.map((s, i) => `<div class="subi"><span class="rank">#${i + 1}</span><span class="nm">${esc(s)}</span>${i ? `<button class="x" onclick="up('${p.id}',${i})" aria-label="Move up">↑</button>` : ""}<button class="x" onclick="rm('${p.id}',${i})" aria-label="Remove">×</button></div>`).join("") : `<p class="muted" style="font-size:13px">No substitutes yet.</p>`}</div>
+      <div class="search"><svg class="icon" style="color:var(--ink3)"><use href="#i-search"/></svg><input value="${esc(p.w)}" aria-label="Search Valio Aimo"></div>
+      ${hits.length ? `<div class="hits">${hits.slice(0, 3).map((h) => `<div class="hit"><span>${esc(h)}</span><button class="btn btn-small btn-ghost" onclick="add('${p.id}', this.dataset.n)" data-n="${esc(h)}">+ Add as #${r.subs.length + 1}</button></div>`).join("")}</div>` : ""}
+    </div>`}
+    ${added.length && r.mode !== "none" ? `<div class="widen"><svg class="icon"><use href="#i-up"/></svg><span>${added.length === 1 ? "This product" : "These products"} will count as usual: I may order ${added.length === 1 ? "it" : "them"} alone, up to €600 an order.</span></div>` : ""}
+  </div>`;
+}
+
+function edit(id, fn) {
+  const p = PRODUCTS.find((x) => x.id === id);
+  const r = structuredClone(cur(p));
+  fn(r);
+  const same = r.mode === p.mode && JSON.stringify(r.subs) === JSON.stringify(p.subs);
+  if (same) delete pending[id]; else pending[id] = { mode: r.mode, subs: r.subs };
+  renderFb(); renderBar();
+}
+const toggleEdit = (id) => { editing = editing === id ? null : id; renderFb(); };
+const setMode = (id, m) => edit(id, (r) => { r.mode = m; });
+const add = (id, n) => edit(id, (r) => { r.subs.push(n); if (r.mode === "ask_any" && r.subs.length === 1) r.mode = "only_listed"; });
+const rm = (id, i) => edit(id, (r) => { r.subs.splice(i, 1); if (!r.subs.length && r.mode === "only_listed") r.mode = "ask_any"; });
+const up = (id, i) => edit(id, (r) => { [r.subs[i - 1], r.subs[i]] = [r.subs[i], r.subs[i - 1]]; });
+
+function renderBar() {
+  const n = Object.keys(pending).length;
+  $("bar").hidden = n === 0;
+  $("bar-t").textContent = `${n} change${n === 1 ? "" : "s"} to sign`;
+}
+function openSign() {
+  $("diff").innerHTML = Object.entries(pending).map(([id, r]) => {
+    const p = PRODUCTS.find((x) => x.id === id);
+    const added = r.subs.filter((s) => !p.subs.includes(s));
+    return `<div><span class="plus">${added.length ? "+" : "~"}</span><span><b>${p.w}</b>: ${added.length ? `may also order ${esc(added.join(", "))} alone` : esc(ruleText(r))}</span></div>`;
+  }).join("");
+  $("modal").hidden = false;
+}
+function sign() {
+  for (const [id, r] of Object.entries(pending)) Object.assign(PRODUCTS.find((x) => x.id === id), r);
+  pending = {}; editing = null;
+  $("modal").hidden = true;
+  renderFb(); renderRows(); renderBar();
+  $("subrules").insertAdjacentHTML("beforeend", `<div class="done" style="padding:12px 20px;border-top:1px solid var(--line)"><svg class="icon"><use href="#i-check"/></svg>Signed. Valio Aimo checks the new version from the next order on.</div>`);
+}
+function acceptSuggestion() {
+  $("tocheck").remove();
+  view("may");
+  edit("butter", (r) => { r.subs = ["Arla butter 500 g unsalted"]; r.mode = "only_listed"; });
+  editing = "butter"; renderFb();
+  setTimeout(() => $("fb-butter")?.scrollIntoView({ block: "center", behavior: "smooth" }), 50);
+}
+function rejectSuggestion() { $("tocheck").remove(); }
+
+renderRows(); renderFb();
+</script>
+</body>
+</html>

@@ -1556,6 +1556,95 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/kitchen/usual/fallback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set ordered substitutes and the fallback mode of usual products. Signed when the grant changes.
+         * @description Approved substitutes count as usual products. At autonomy level 1 a change that adds or removes one
+         *     widens or narrows the signed usual-products grant: without mandate_hash (or with an outdated one) the
+         *     answer is 409 NeedsSignature (diff names each substitute) and nothing is applied. With the previewed hash
+         *     the backend signs and stores the mandate, then the profile. Reordering, a mode change that keeps the
+         *     same products, or any change at level 0 or 2 is applied directly (mandate null).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        buyer_id?: string;
+                        updates: {
+                            /** @description Usual product id */
+                            id: string;
+                            /** @description Replaces the list, in the order to try. Omit to keep it. */
+                            substitutes?: {
+                                product_id?: string;
+                                product_name?: string;
+                            }[];
+                            /** @enum {string} */
+                            fallback_mode?: "ask_any" | "only_listed" | "none";
+                        }[];
+                        /** @example Anna Virtanen */
+                        by?: string;
+                        mandate_hash?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Applied */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            profile?: components["schemas"]["KitchenProfile"];
+                            mandate?: components["schemas"]["MandateSummary"] | null;
+                        };
+                    };
+                };
+                /** @description Unknown usual product */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description needs_signature (show preview, resend with its mandate_hash) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NeedsSignature"];
+                    };
+                };
+                /** @description Invalid fallback_mode or Valio Aimo refused the new mandate */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/kitchen/suggestions/{suggestion_id}/reject": {
         parameters: {
             query?: never;

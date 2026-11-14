@@ -31,6 +31,16 @@ export function searchKitchenProducts(
   return apiRequest<{ query: string; products: KitchenCatalogProduct[] }>(`/kitchen/products?${params.toString()}`);
 }
 
+/** Substitutes and fallback mode of usual products; 409 needs_signature when the usual-products grant changes. */
+export function setUsualFallback(request: {
+  buyer_id?: string;
+  updates: { id: string; substitutes?: { product_id: string; product_name: string }[]; fallback_mode?: "ask_any" | "only_listed" | "none" }[];
+  by?: string;
+  mandate_hash?: string;
+}): Promise<{ profile?: KitchenProfile; mandate?: unknown }> {
+  return apiRequest("/kitchen/usual/fallback", { method: "POST", json: request });
+}
+
 export function getKitchenHistory(
   buyerId?: string,
 ): Promise<Record<string, unknown>> {
