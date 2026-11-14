@@ -1,6 +1,6 @@
 # F3 · Frontend: onboarding and the phone as camera
 
-Status: open · Frontend wave B: after F0, parallel to F1, F2, F4 · Shared rules: [Frontend packages in `README.md`](README.md#frontend-packages-f0f4).
+Status: done 14 Nov 2026 · Frontend wave B: after F0, parallel to F1, F2, F4 · Shared rules: [Frontend packages in `README.md`](README.md#frontend-packages-f0f4).
 
 ## Why
 
@@ -40,3 +40,14 @@ Shown when the kitchen profile has no version yet (route decided in F0), and fro
 * Phone on the same Wi-Fi: scan the QR, take a photo, it appears on the beamer and is read (onboarding and Kitchen) or starts an order (Order tab).
 * Onboarding with the three fixture documents produces the suggestions from 1b's fixtures; accepting signs one mandate version.
 * Without a phone: drag and drop and the file input work.
+
+## Built (14 Nov)
+
+* `src/features/camera/PhoneCameraModal.tsx`: `POST /pairings` (purpose `order` or `kitchen`), QR code as SVG (`qrcode`), phone URL and short code, live `paired` / `photo_received` from the pairing stream, received thumbnail in a phone frame, then closes. "Upload from this computer" uses the provider's file input.
+* `src/app/PhoneCamera.tsx` (provider body): `open(where)` shows the modal on a desktop and the device camera (`capture="environment"`) on a phone (coarse pointer, narrow). Photos for `kitchen` / `onboard` with no registered handler are ingested (`features/camera/ingestPhoto.ts`, toast with the result), so the Kitchen tab learns from photos before F2 registers its own handler. `order` photos go to F1's handler.
+* `src/features/onboarding/OnboardingView.tsx`: hero, document grid (Ready / Uploading… / Reading… with scan line / Read / Failed), drop zone (drag and drop, several files, file picker) + "Use your phone", "Read my kitchen" (one `POST /kitchen/ingest` per document, in order, LEARN cards appear one by one), "Or tell me in one sentence", "Skip, use example kitchen" (uploads `menu-w47.jpg`, `allergy-note.jpg`, `invoices-oct.pdf` from `contracts/fixtures/uploads/`), order-list hint and ingest notes under the card, "Try reading again" for failed documents. Hover a card: its document gets a ring and the quote is shown on it (no boxes, W1). Adopt bar → one `POST /kitchen/suggestions/accept` through `useSignedChange` (one mandate version), then the dropped ones are rejected, then `#order`. Without must / prefer / autonomy it saves without the sign modal.
+* `src/features/onboarding/LearnCard.tsx`: `LearnCard`, `suggestionKind`, `suggestionSub`, exported for F2.
+* `DemoMenu` ("Demo · restart onboarding", dev only, ≥ 1240 px). Restarting keeps the profile; onboarding adds to it.
+* Shared changes: `src/api/types.ts` (`Suggestion`, `IngestResult`, `IngestResponse`), `ingestKitchenDocuments` typed, `App.tsx` (onboard route + demo menu), `vite.config.ts` (`server.fs.allow` for the fixture documents), `qrcode` dependency.
+* Checked in the browser against the backend (scripted provider): example kitchen → 8 suggestions → drop one → sign → mandate v2, 7 accepted, 1 rejected, route to `#order`. Pairing simulated with curl (`GET /phone`, `POST /uploads` with `pair_id`): "connected", thumbnail, card added; the order list shows the "send it in the Order tab" hint. Typed sentence → about + 2 musts. 375 px: no horizontal scroll.
+* Not checked: a real phone on the LAN (needs `BACKEND_HOST=0.0.0.0` and `PUBLIC_BASE_URL`), and the order hand-off (F1 registers the `order` handler).

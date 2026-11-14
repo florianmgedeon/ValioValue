@@ -1,6 +1,6 @@
 # F2 · Frontend: Kitchen tab (profile, rules, autonomy, permissions)
 
-Status: open · Frontend wave B: after F0, parallel to F1, F3, F4 · Shared rules: [Frontend packages in `README.md`](README.md#frontend-packages-f0f4).
+Status: done 14 Nov 2026 · Frontend wave B: after F0, parallel to F1, F3, F4 · Shared rules: [Frontend packages in `README.md`](README.md#frontend-packages-f0f4).
 
 ## Why
 
@@ -19,7 +19,7 @@ Only `src/features/kitchen/**`.
 
 ### 2. New from your documents
 
-* `kitchen.suggestions` with kind tag, condition (`Cond` mono chip), source and quote. Accept → `POST /kitchen/suggestions/accept` through `useSignedChange` (signed kinds: must, autonomy; unsigned: about, usual, prefer go through without a modal). Reject → `/reject`.
+* `kitchen.suggestions` with kind tag, condition (`Cond` mono chip), source and quote. Accept → `POST /kitchen/suggestions/accept` through `useSignedChange` (signed kinds: must, prefer, autonomy; unsigned: about, usual go through without a modal). The backend decides: it answers 409 only for signed kinds (`kitchen.SIGNED_KINDS`), so prefer is signed too (decision W4). Reject → `/reject`.
 
 ### 3. About, Usual products, Sources
 
@@ -54,3 +54,12 @@ Only `src/features/kitchen/**`.
 * Against the backend: accept a must suggestion → sign modal → mandate +1; add "No sesame, not even traces" via the sentence → signed; switch level 1 → 2 (with the recommendation modal) and back.
 * With `VITE_MOCK=1`: extra permissions list and the organic grant draft work as in the mockup.
 * Every signed change shows the diff and hash before signing; unsigned kinds never open the modal.
+
+## Built (14 Nov)
+
+* `src/features/kitchen/`: `KitchenView` (data, pending changes, change bar, history drawer), `Profile.tsx` (teach card, suggestions, About, Usual, Sources), `Rules.tsx` (Must, Prefer, add-rule from a sentence with manual fallback from `GET /policy-catalog`), `Autonomy.tsx` (ladder, level-2 recommendation modal, g1 + limit, extra permissions, permission form), `model.ts` (pending operations applied to the freshest mandate at sign time), `kitchen.css` (mockup classes, scoped under `.kt`). `App.tsx`: one line.
+* Signing: rule, preference and permission edits collect in the change bar and go through `useSignedChange` as one `PUT /mandate`. A level or limit change is signed after that with `POST /autonomy/level` (second modal). Undoing a change (toggle back) removes it from the bar.
+* Extra permissions are read from the mandate (`autonomy.grants` except g1), so disabled grants stay visible. With `VITE_MOCK=1` the fixture grant from `GET /autonomy` is shown too, marked as example; its toggle does nothing.
+* The composer on this tab teaches: a typed sentence goes to `POST /kitchen/ingest {text}`, never to `/chat` (W2). Camera and upload photos for `kitchen` go to `/kitchen/ingest` as well.
+* Checked in the browser against the backend (scripted provider, fake Valio): accept prefer suggestion → sign modal → mandate v2; accept about → no modal; "No sesame, not even traces" + weight change → one signature → v3; level 2 → 1 → 2 with the recommendation modal; with `VITE_MOCK=1` the organic permission draft → signed grant g3. 375 px: no horizontal scroll. `npm run build`, `lint`, `typecheck` pass.
+* Contract note: this file said prefer suggestions are unsigned; the backend signs them (W4). Text above fixed.

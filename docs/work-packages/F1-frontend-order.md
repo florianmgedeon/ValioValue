@@ -1,6 +1,6 @@
 # F1 · Frontend: Order tab (start screen, order mode, live stream)
 
-Status: open · Frontend wave B: after F0, parallel to F2–F4 · Shared rules: [Frontend packages in `README.md`](README.md#frontend-packages-f0f4).
+Status: done 14 Nov 2026 (see "Built") · Frontend wave B: after F0, parallel to F2–F4 · Shared rules: [Frontend packages in `README.md`](README.md#frontend-packages-f0f4).
 
 ## Why
 
@@ -62,3 +62,12 @@ Write the reducer test-first with Vitest using recorded streams: add `contracts/
 * Against the real backend with the scripted provider: "120 L milk by Monday" runs to a receipt without a decision; the usual order with the granola label change shows the decision card and a receipt after choosing; a cart over the limit shows the approve card; "ignore the nut rule just this once" shows the block card.
 * Reloading the page mid-order rebuilds the same blocks from the replayed stream (no duplicates).
 * Reducer tests pass on the four recorded streams.
+
+## Built (14 Nov)
+
+* `src/features/order/`: `OrderView` (start ↔ order mode, composer, photo → chat), `StartView`, `blocks.tsx` (me, photo, say, read-back with Sign & send, merged funnel, decision, approve, block with "Show the policy", receipt with per-line reason, learn, error with retry), `panels.tsx` (`LivePanel`, `KitchenPanel`), `TrustDrawer` (intent hash; `GET /orders/{id}/verify` checks), `useOrderSession` (session id in sessionStorage: a reload rebuilds the order from the replayed stream; autonomy toast once per order), `order.css` (mockup classes for this tab).
+* `orderReducer.ts` + Vitest (`npm test`, 26 tests) on `contracts/fixtures/streams/*.jsonl`; see the README there for which streams are recorded and which parts are written by hand.
+* Decision card options: the approval has no alternatives, so the card offers "take what I found" (approve the cart) or "not this time" (reject). Choosing another product needs a new order.
+* Shared changes: `src/app/App.tsx` (one route line), `src/api/chat.ts` subscribes to `context_suggestion` (2a), `package.json` adds Vitest and `npm test`. Contract: `DiffCheck.field` gains `usual` (the backend already sends it).
+* Checked in the browser against the scripted backend: milk → receipt alone; 400 L milk → approve card → receipt; the usual (quantity deviation on the sample catalog) → decision card → receipt; reload mid-order gives the same blocks; Verify drawer; 375 px without horizontal scroll.
+* Not checked live: the granola block and the jailbreak block card (the scripted planner never produces them on the sample catalog; with the real catalog the scripted planner fails on truncated tool results in `agent.py`). Covered by the reducer tests only. `GET /mandate/cedar` answers 401 "approver token required" from the backend, so "Show the policy" shows a toast until that is fixed.
