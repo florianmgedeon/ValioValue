@@ -17,8 +17,9 @@ BY = (date.today() + timedelta(days=5)).isoformat()
 
 
 def make_intent(amount, unit, pct, under, rules, budget, query):
-    it = intents.build(buyer_id="juvenes", mandate=MANDATE, session=None, original_request="", product_query=query,
-                       quantity=amount, quantity_unit=unit, deliver_by=BY, hard_rules=rules, optimise="price",
+    it = intents.build(buyer_id="juvenes", mandate=MANDATE, session=None, original_request="",
+                       items=[{"product_query": query, "quantity": amount, "quantity_unit": unit}],
+                       deliver_by=BY, hard_rules=rules, optimise="price",
                        origin_preference=None, budget_max_total=budget, max_over_pct=pct, allow_under=under,
                        agent_questions=[], check_text=False)
     it["status"] = "confirmed"
@@ -55,7 +56,8 @@ def test_autonomous_orders_never_deviate(amount, pct, under, rules, budget, quer
     quote = make_quote(pid, qty, content, unit_price, avail, day_offset,
                        amount if same_request else amount + 1, "L", "juvenes" if same_buyer else "someone-else",
                        expired)
-    d = diff.compute(it, quote, MANDATE)
+    item = it["items"][0]
+    d = diff.compute(it, [(item, quote, item["item_id"], "q_prop")], MANDATE)
     tier = policy.tier(d["checks"])
     if tier != "auto":
         return
@@ -66,9 +68,29 @@ def test_autonomous_orders_never_deviate(amount, pct, under, rules, budget, quer
     assert got <= Decimal(amount) * (1 + Decimal(pct) / 100)
     # nothing different
     assert pid in catalog().matching_ids(query)
-    for ev in constraints.evaluate_all(catalog().get(pid), it["hard_rules"]):
+    for ev in constraints.evaluate_all(catalog().get(pid), intents.effective_rules(it, item)):
         assert ev["verdict"] == "safe"
     assert line["available_date"] <= BY and avail >= qty
     assert line["total_price"] <= MANDATE["spend_limit"] and (budget is None or line["total_price"] <= budget)
     assert same_request and same_buyer and not expired
     assert d["deviations"] == 0
+
+
+@settings(max_examples=400, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+@given(n=st.integers(1, 4), pick=st.lists(st.integers(0, 3), min_size=1, max_size=6))
+def test_cart_never_buys_an_item_twice_or_outside_the_intent(n, pick):
+    """Any combination of line -> item assignments: auto tier only if every line maps to a distinct, open item."""
+    it = make_intent(120, "L", 2, False, [], None, "lactose-free milk")
+    it["items"] = [dict(it["items"][0], item_id=f"i{k + 1}") for k in range(n)]
+    pairs = []
+    for k in pick:
+        iid = f"i{k + 1}"
+        item = next((i for i in it["items"] if i["item_id"] == iid), None)
+        q = make_quote("DEMO-1001", 120, 1.0, 0.89, 5000, 0, 120, "L", "juvenes", False)
+        q["data"]["item_id"] = iid
+        q["data"]["provenance"] = trust.valio_sign_obj(diff.quote_core(q["data"]))
+        pairs.append((item, q, iid, f"q{k}"))
+    tier = policy.tier(diff.compute(it, pairs, MANDATE)["checks"])
+    ids = [p[2] for p in pairs]
+    valid = len(ids) == len(set(ids)) and all(p[0] is not None for p in pairs) and 0.89 * 120 * len(ids) <= 1000
+    assert (tier == "auto") == valid

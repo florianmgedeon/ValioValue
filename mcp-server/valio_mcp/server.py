@@ -33,7 +33,7 @@ from starlette.responses import JSONResponse
 
 from . import config, constraints, diff, intent as intents, policy, trust, valio_api
 from .catalog import catalog
-from .intent import HardRuleIn
+from .intent import HardRuleIn, ItemIn
 from .store import TransitionError, iso, new_id, now, store
 
 log = logging.getLogger("valio_mcp")
@@ -104,31 +104,35 @@ READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotent
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False,
                                       openWorldHint=False))
 async def propose_intent(
-    original_request: Annotated[str, Field(description="The buyer's message, verbatim")],
-    product_query: Annotated[str, Field(description="Short product description, English, e.g. 'lactose-free milk'")],
-    quantity: Annotated[float, Field(gt=0, description="Amount exactly as the buyer said it")],
-    quantity_unit: Annotated[Literal["L", "KG", "SALES_UNIT"], Field(description="Unit the buyer used")],
+    original_request: Annotated[str, Field(description="The buyer's message or recipe, verbatim")],
+    items: Annotated[list[ItemIn], Field(min_length=1, max_length=40, description=(
+        "Everything to buy. One item for a single product request. For a recipe or menu: one item per ingredient, "
+        "scaled to the portions the buyer needs, in buyable units (L, KG or sales units)."))],
     deliver_by: Annotated[str, Field(description="Latest delivery date, YYYY-MM-DD")],
-    hard_rules: Annotated[list[HardRuleIn], Field(description="Must-haves: lactose_free, exclude_allergen, origin")] = [],
+    hard_rules: Annotated[list[HardRuleIn], Field(description="Must-haves for ALL items (e.g. a guest's milk allergy)")] = [],
     optimise: Annotated[Literal["price", "reliability", "co2"], Field(description="What to optimise among offers that meet every rule")] = "price",
     origin_preference: Annotated[str | None, Field(description="Soft preference only, ISO alpha-2")] = None,
-    budget_max_total: Annotated[float | None, Field(description="Only if the buyer named a budget")] = None,
+    budget_max_total: Annotated[float | None, Field(description="Only if the buyer named a budget, for the whole intent")] = None,
     max_over_pct: Annotated[float, Field(ge=0, le=20, description="Allowed overshoot when rounding to whole packs")] = 2.0,
     allow_under: Annotated[bool, Field(description="Only true if the buyer accepts less than asked")] = False,
     open_questions: Annotated[list[str], Field(description="Anything ambiguous you could not resolve, one question each")] = [],
     ctx: Context | None = None,
 ) -> dict[str, Any]:
-    """Turn the buyer's request into an OrderIntent and show it back. Call this FIRST, before searching.
-    Fill only what the buyer said. Never guess an allergy: if 'non-dairy' or similar is unclear, add an open question.
-    Valio Aimo adds the buyer's mandatory rules, cross-checks numbers against the original text and returns
-    a read-back and questions. Then STOP: a human must confirm the intent. You cannot confirm it."""
+    """Turn the buyer's request (a product, a list or a recipe) into an OrderIntent and show it back.
+    Call this FIRST, before searching. Fill only what the buyer said or what the recipe needs.
+    Never guess an allergy: if 'non-dairy' or similar is unclear, add an open question.
+    Valio Aimo adds the buyer's mandatory rules, cross-checks against the original text and returns
+    a read-back, one item_id per item and open questions. Then STOP: a human must confirm. You cannot."""
     session, buyer_id = _caller(ctx)
     mandate = policy.buyer_policy(buyer_id)
+
+    def dump(m, cls):
+        return m.model_dump() if hasattr(m, "model_dump") else cls(**m).model_dump()
+
     it = intents.build(buyer_id=mandate["buyer_id"], mandate=mandate, session=session,
-                       original_request=original_request, product_query=product_query, quantity=quantity,
-                       quantity_unit=quantity_unit, deliver_by=deliver_by,
-                       hard_rules=[r.model_dump() if hasattr(r, 'model_dump') else HardRuleIn(**r).model_dump()
-                                   for r in hard_rules], optimise=optimise,
+                       original_request=original_request,
+                       items=[dump(i, ItemIn) for i in items], deliver_by=deliver_by,
+                       hard_rules=[dump(r, HardRuleIn) for r in hard_rules], optimise=optimise,
                        origin_preference=origin_preference, budget_max_total=budget_max_total,
                        max_over_pct=max_over_pct, allow_under=allow_under, agent_questions=open_questions)
     store().save_intent(it)
@@ -147,9 +151,23 @@ def _confirmed_intent(intent_id: str | None) -> tuple[dict | None, str | None]:
         return None, f"unknown intent_id {intent_id}"
     if it["status"] == "proposed":
         return None, "intent not confirmed by the buyer yet"
+    if it["status"] == "fulfilled":
+        return None, "every item of this intent is already ordered"
     if it["status"] in ("superseded", "expired") or intents.is_expired(it):
         return None, f"intent is {it['status'] if it['status'] != 'confirmed' else 'expired'}, propose a new one"
     return it, None
+
+
+def _item(it: dict | None, item_id: str | None) -> tuple[dict | None, str | None]:
+    if not it:
+        return None, None
+    if not item_id:
+        if len(it["items"]) == 1:
+            return it["items"][0], None
+        return None, f"item_id required, this intent has {len(it['items'])} items: " + ", ".join(
+            f"{i['item_id']}={i['product']['query']}" for i in it["items"])
+    item = intents.get_item(it, item_id)
+    return (item, None) if item else (None, f"unknown item_id {item_id}")
 
 
 class SearchFilters(BaseModel):
@@ -164,6 +182,7 @@ class SearchFilters(BaseModel):
 async def search_products(
     query: Annotated[str, Field(description="What the buyer needs, e.g. 'lactose-free milk'. English or Finnish.")],
     intent_id: Annotated[str | None, Field(description="Confirmed intent: its hard rules are applied from data")] = None,
+    item_id: Annotated[str | None, Field(description="Which item of the intent (required if it has several)")] = None,
     filters: SearchFilters | None = None,
     limit: Annotated[int, Field(ge=1, le=25)] = 10,
     ctx: Context | None = None,
@@ -174,8 +193,10 @@ async def search_products(
     session, _ = _caller(ctx)
     f = filters or SearchFilters()
     it, err = _confirmed_intent(intent_id)
-    if err:
-        return {"error": err}
+    item, err2 = _item(it, item_id)
+    if err or err2:
+        return {"error": err or err2}
+    rules = intents.effective_rules(it, item) if it else []
     # With an intent the hard rules are checked below from data, with evidence, so the name-based shortcut is off
     # and excluded products are reported instead of silently missing.
     pool, total = catalog().search(query, lactose_free=False if it else f.lactose_free,
@@ -186,16 +207,17 @@ async def search_products(
     if it:
         hits = []
         for p in pool:
-            evs = constraints.evaluate_all(p, it["hard_rules"])
+            evs = constraints.evaluate_all(p, rules)
             bad = [e for e in evs if e["verdict"] != "safe" and not e["rule"].startswith("origin")]
             if bad:
                 excluded.append({"product_id": p.id, "name": p.name, "reason": constraints.one_line(bad[0]),
                                  "verdict": bad[0]["verdict"]})
             elif len(hits) < limit:
                 hits.append(p)
-    result = {"query": query, "intent_id": intent_id, "filters": f.model_dump(exclude_none=True),
+    result = {"query": query, "intent_id": intent_id, "item_id": item["item_id"] if item else None,
+              "filters": f.model_dump(exclude_none=True),
               "total_matches": total, "returned": len(hits),
-              "products": [p.summary() | ({"evidence": constraints.evaluate_all(p, it["hard_rules"])} if it else {})
+              "products": [p.summary() | ({"evidence": constraints.evaluate_all(p, rules)} if it else {})
                            for p in hits],
               "excluded": excluded[:12], "excluded_count": len(excluded),
               "catalog_source": catalog().source}
@@ -203,7 +225,8 @@ async def search_products(
                   f"Searched catalog for '{query}': {total} matches, returned {len(hits)}"
                   + (f", {len(excluded)} excluded by hard rules" if it else ""),
                   session=session, data={"filters": result["filters"], "product_ids": [p.id for p in hits],
-                                         "intent_id": intent_id, "excluded_count": len(excluded)})
+                                         "intent_id": intent_id, "item_id": result["item_id"],
+                                         "excluded_count": len(excluded)})
     return result
 
 
@@ -211,6 +234,7 @@ async def search_products(
 async def check_offer(
     product_ids: Annotated[list[str], Field(min_length=1, max_length=25, description="Shortlisted product ids")],
     intent_id: Annotated[str | None, Field(description="Confirmed intent. Quantity, unit and date are taken from it.")] = None,
+    item_id: Annotated[str | None, Field(description="Which item of the intent (required if it has several)")] = None,
     requested_date: Annotated[str | None, Field(description="Desired delivery date, YYYY-MM-DD (ignored with intent_id)")] = None,
     quantity: Annotated[float | None, Field(gt=0, description="Amount the buyer needs (ignored with intent_id)")] = None,
     quantity_unit: Annotated[Literal["L", "KG", "SALES_UNIT"], Field(
@@ -222,10 +246,12 @@ async def check_offer(
     With intent_id, each offer carries the evidence for every hard rule. Offers are sorted best first."""
     session, buyer_id = _caller(ctx)
     it, err = _confirmed_intent(intent_id)
-    if err:
-        return {"error": err}
+    item, err2 = _item(it, item_id)
+    if err or err2:
+        return {"error": err or err2}
+    rules = intents.effective_rules(it, item) if it else []
     if it:
-        quantity, quantity_unit = it["quantity"]["amount"], it["quantity"]["unit"]
+        quantity, quantity_unit = item["quantity"]["amount"], item["quantity"]["unit"]
         requested_date = it["deliver_by"]
     if not quantity or not requested_date:
         return {"error": "quantity and requested_date are required without intent_id"}
@@ -313,12 +339,13 @@ async def check_offer(
             "quote_id": quote_id,
             "quote_expires_at": iso(expires),
             "intent_id": intent_id,
+            "item_id": item["item_id"] if item else None,
         }
         signed = trust.valio_sign_obj(diff.quote_core(offer))
         offer["provenance"] = {"source": f"Valio Aimo API {config.VALIO_API_BASE}/api/price + /api/availability",
                                "fetched_at": iso(), "valid_until": offer["quote_expires_at"], **signed}
         if it and prod:
-            offer["evidence"] = constraints.evaluate_all(prod, it["hard_rules"])
+            offer["evidence"] = constraints.evaluate_all(prod, rules)
             if any(e["verdict"] != "safe" and not e["rule"].startswith("origin") for e in offer["evidence"]):
                 offer["can_fulfil"] = False
                 offer["fulfil_issues"] = issues + ["breaks a hard rule of the intent"]
@@ -342,80 +369,105 @@ async def check_offer(
                   f"{n_full} can deliver {quantity:g} {quantity_unit} in full",
                   session=session,
                   data={"quotes": [o["quote_id"] for o in offers], "recommended": recommended, "skipped": skipped,
-                        "intent_id": intent_id})
-    return {"requested_date": requested_date, "requested_quantity": quantity, "requested_unit": quantity_unit,
+                        "intent_id": intent_id, "item_id": item["item_id"] if item else None})
+    return {"intent_id": intent_id, "item_id": item["item_id"] if item else None,
+            "product_query": item["product"]["query"] if item else None,
+            "requested_date": requested_date, "requested_quantity": quantity, "requested_unit": quantity_unit,
             "offers": offers, "recommended_product_id": recommended, "skipped": skipped,
                 "note": "unit_price and total_price are net of VAT. available_amount 999999 or more means stock is "
                     "not limited or unknown (terminal = supplier warehouse). fulfil_issues explains why an offer "
                     "cannot deliver in full on time."}
 
 
+class OrderLine(BaseModel):
+    item_id: str = Field(description="item_id from the intent")
+    quote_id: str = Field(description="quote_id from check_offer for that item")
+
+
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=True,
                                       openWorldHint=False))
 async def place_order(
-    quote_id: Annotated[str, Field(description="quote_id from check_offer")],
     intent_id: Annotated[str, Field(description="The confirmed intent this order fulfils")],
-    reason: Annotated[str, Field(description="Why this offer was chosen, shown to the human approver and in the audit log")],
+    reason: Annotated[str, Field(description="Why these offers were chosen, shown to the human approver and in the audit log")],
+    lines: Annotated[list[OrderLine] | None, Field(description="One line per item: item_id + quote_id. Put all items you can fulfil in ONE order")] = None,
+    quote_id: Annotated[str | None, Field(description="Shortcut for a single-item intent instead of lines")] = None,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
-    """Commit to a quote for a confirmed intent. Valio Aimo diffs the quote against the intent field by field
-    (product, hard rules, quantity, date, budget, mandate) and returns the tier:
+    """Commit a cart for a confirmed intent. Valio Aimo diffs every line against its intent item
+    (product, hard rules, quantity, date) and the whole cart against budget and mandate, then returns the tier:
     'confirmed' (auto), 'pending_approval' (ask: wait for a human, you cannot approve) or 'rejected' (block).
-    Idempotent: one confirmed intent buys exactly one order, repeating the call returns the same order."""
-    session, buyer_id = _caller(ctx)
+    Every item can be bought exactly once. Items not in this order stay open for a later order.
+    Idempotent: repeating the same call returns the same order."""
+    session, _ = _caller(ctx)
     s = store()
     it = s.get_intent(intent_id)
     if not it:
         return {"status": "rejected", "error": f"unknown intent_id {intent_id}"}
-    if it["status"] == "consumed":
-        prev = s.get_order(it["order_id"]) or {}
-        prev.pop("_session", None)
-        if prev.get("quote_id") == quote_id:
-            return _order_result(prev) | {"idempotent_replay": True}
-        return {"status": "rejected", "error": f"intent already used by order {it['order_id']}. "
-                                               f"One intent buys exactly one order."}
-    if it["status"] != "confirmed" or intents.is_expired(it):
-        return {"status": "rejected", "error": f"intent is {it['status']}, the buyer must confirm a current intent"}
-    quote = s.get_quote(quote_id)
-    if not quote:
-        s.audit("buyer_agent", "place_order", f"Tried to order unknown quote {quote_id}", session=session, reason=reason)
-        return {"status": "rejected", "error": f"unknown quote_id {quote_id}"}
+    req = [(l.item_id, l.quote_id) if hasattr(l, "item_id") else (l["item_id"], l["quote_id"]) for l in lines or []]
+    if quote_id and not req:
+        q = s.get_quote(quote_id)
+        iid = (q or {}).get("data", {}).get("item_id") or (it["items"][0]["item_id"] if len(it["items"]) == 1 else "?")
+        req = [(iid, quote_id)]
+    if not req:
+        return {"status": "rejected", "error": "no lines"}
 
-    line = quote["data"]
+    # idempotent replay: exactly these lines already form one order
+    prev_ids = {i.get("order_id") for i in it["items"] if i["item_id"] in {r[0] for r in req}}
+    if len(prev_ids) == 1 and None not in prev_ids:
+        prev = s.get_order(prev_ids.pop()) or {}
+        prev.pop("_session", None)
+        if sorted((c["item_id"], c["quote_id"]) for c in prev.get("cart", {}).get("lines", [])) == sorted(req):
+            return _order_result(prev) | {"idempotent_replay": True}
+    if it["status"] not in ("confirmed", "fulfilled") or intents.is_expired(it):
+        return {"status": "rejected", "error": f"intent is {it['status']}, the buyer must confirm a current intent"}
+
     mandate = policy.buyer_policy(it["buyer_id"])
     order_id = new_id("ord")
+    pairs, quoted = [], []
+    for iid, qid in req:
+        item, quote = intents.get_item(it, iid), s.get_quote(qid)
+        pairs.append((item, quote, iid, qid))
+        if item and quote:
+            quoted.append((iid, quote["data"]))
     s.audit("buyer_agent", "place_order",
-            f"Requested order for {line['quantity']:g} {line['sales_unit']} of {line['product_id']} "
-            f"({line['name']}) at {line['unit_price']:.2f} {line['currency']}",
-            session=session, order_id=order_id, reason=reason, data={"quote_id": quote_id, "intent_id": intent_id})
+            f"Requested order with {len(req)} line(s): " + "; ".join(
+                f"{l['quantity']:g} {l['sales_unit']} {l['name']} at {l['unit_price']:.2f} {l['currency']}"
+                for _, l in quoted), session=session, order_id=order_id, reason=reason,
+            data={"lines": [{"item_id": a, "quote_id": b} for a, b in req], "intent_id": intent_id})
 
-    d = diff.compute(it, quote, mandate)
+    d = diff.compute(it, pairs, mandate)
     tier = policy.tier(d["checks"])
     status = policy.STATUS[tier]
-    the_cart = diff.cart(it["intent_hash"], line)
+    the_cart = diff.cart(it["intent_hash"], quoted)
     cart_hash = trust.digest(the_cart)
     public_diff = {"deviations": d["deviations"], "checks": d["checks"]}
     failed = [c for c in d["checks"] if not c["ok"]]
-    order = {"order_id": order_id, "quote_id": quote_id, "intent_id": intent_id, "status": status, "tier": tier,
-             "buyer_id": it["buyer_id"], "lines": [line], "total_price": line["total_price"],
-             "currency": line["currency"], "delivery_date": the_cart["delivery_date"], "diff": public_diff,
+    item_ids = [iid for iid, _ in quoted]
+    open_after = [i["item_id"] for i in it["items"] if i["status"] == "open" and i["item_id"] not in item_ids]
+    order = {"order_id": order_id, "intent_id": intent_id, "status": status, "tier": tier, "buyer_id": it["buyer_id"],
+             "lines": [l for _, l in quoted], "item_ids": item_ids, "total_price": the_cart["total_price"],
+             "currency": the_cart["currency"], "delivery_date": the_cart["delivery_date"], "diff": public_diff,
              "cart": the_cart, "cart_hash": cart_hash, "fingerprint": trust.fingerprint(cart_hash),
              "intent": intents.public(it), "agent_rationale": reason, "approved_by": None, "created_at": iso(),
-             "receipt": None}
+             "receipt": None, "quote_id": quoted[0][1]["quote_id"] if quoted else None,
+             "items_open_after": open_after if tier != "block" else None}
+
+    def label(c):
+        item = intents.get_item(it, c.get("item_id") or "")
+        return f"{item['product']['query']}: " if item and len(it["items"]) > 1 else ""
 
     if tier == "block":
-        order["message"] = "Blocked: " + "; ".join(f"{c['field']} ({c['intended']}): {c['detail']}" for c in failed
-                                                   if c["severity"] == "block")
+        order["message"] = "Blocked: " + "; ".join(f"{label(c)}{c['field']} ({c['intended']}): {c['detail']}"
+                                                   for c in failed if c["severity"] == "block")
         s.audit("policy_engine", "policy_check", order["message"], session=session, order_id=order_id,
                 data={"tier": tier, "diff": public_diff, "intent_id": intent_id})
         s.save_order(order, session, it["buyer_id"])
         return _order_result(order)
 
-    it |= {"status": "consumed", "order_id": order_id}
-    s.update_intent(it)
+    _reserve(it, item_ids, order_id, the_cart["total_price"])
     if tier == "ask":
         appr = {"approval_id": new_id("appr"), "order_id": order_id, "status": "pending",
-                "reason": "; ".join(f"{c['field']}: {c['detail']}" for c in failed), "tier": tier,
+                "reason": "; ".join(f"{label(c)}{c['field']}: {c['detail']}" for c in failed), "tier": tier,
                 "diff": public_diff, "cart": the_cart, "cart_hash": cart_hash, "fingerprint": order["fingerprint"],
                 "intent": intents.public(it), "lines": order["lines"], "total_price": order["total_price"],
                 "currency": order["currency"], "agent_rationale": reason, "created_at": iso(),
@@ -424,11 +476,11 @@ async def place_order(
         order["approval_id"] = appr["approval_id"]
         s.save_approval(appr)
         s.audit("policy_engine", "policy_check",
-                f"{d['deviations']} deviation(s) a human may accept: {', '.join(c['field'] for c in failed)}. "
+                f"{d['deviations']} deviation(s) a human may accept: {', '.join(sorted({c['field'] for c in failed}))}. "
                 f"Sent to human approval", session=session, order_id=order_id,
                 data={"approval_id": appr["approval_id"], "tier": tier, "diff": public_diff, "intent_id": intent_id})
     else:
-        s.audit("policy_engine", "policy_check", "0 deviations from the confirmed intent, within the mandate",
+        s.audit("policy_engine", "policy_check", f"0 deviations on {len(item_ids)} line(s), within the mandate",
                 session=session, order_id=order_id, data={"tier": tier, "diff": public_diff, "intent_id": intent_id})
         order["receipt"] = _receipt(order, it, approved_by=None, buyer_cart_signature=None)
         s.audit("valio_mcp", "order_confirmed",
@@ -439,10 +491,31 @@ async def place_order(
     return _order_result(order)
 
 
+def _reserve(it: dict, item_ids: list[str], order_id: str, total: float) -> None:
+    for i in it["items"]:
+        if i["item_id"] in item_ids:
+            i["status"], i["order_id"] = "ordered", order_id
+    it["spent"] = round(float(it.get("spent") or 0) + total, 2)
+    it["order_ids"] = list(it.get("order_ids") or []) + [order_id]
+    if not intents.open_items(it):
+        it["status"] = "fulfilled"
+    store().update_intent(it)
+
+
+def _release(it: dict, order: dict) -> None:
+    """A human refused the cart (or the quote expired): its items are open again, the intent stands."""
+    for i in it["items"]:
+        if i.get("order_id") == order["order_id"]:
+            i["status"], i["order_id"] = "open", None
+    it["spent"] = round(float(it.get("spent") or 0) - float(order["total_price"]), 2)
+    it["status"] = "confirmed"
+    store().update_intent(it)
+
+
 def _order_result(order: dict) -> dict:
     out = {k: order.get(k) for k in ("status", "tier", "order_id", "intent_id", "total_price", "currency",
-                                     "delivery_date", "lines", "diff", "cart_hash", "fingerprint", "receipt",
-                                     "message", "approval_id")}
+                                     "delivery_date", "lines", "item_ids", "items_open_after", "diff", "cart_hash",
+                                     "fingerprint", "receipt", "message", "approval_id")}
     out["policy_checks"] = [{"rule": c["field"], "passed": c["ok"], "detail": c["detail"]}
                             for c in (order.get("diff") or {}).get("checks", [])]
     if order.get("status") == "pending_approval":
@@ -533,8 +606,8 @@ async def decide_approval(request: Request) -> JSONResponse:
             data={"cart_hash": order["cart_hash"]} if decision == "approve" else {})
 
     if decision == "approve":
-        quote = s.get_quote(order["quote_id"])
-        if quote and now() < datetime.fromisoformat(quote["expires_at"]):
+        quotes = [s.get_quote(l["quote_id"]) for l in order["lines"]]
+        if quotes and all(q and now() < datetime.fromisoformat(q["expires_at"]) for q in quotes):
             order |= {"status": "confirmed", "approved_by": who}
             order["receipt"] = _receipt(order, it, approved_by=who, buyer_cart_signature=body.get("signature"))
             s.audit("valio_mcp", "order_confirmed",
@@ -543,16 +616,12 @@ async def decide_approval(request: Request) -> JSONResponse:
                     data={"total_price": order["total_price"], "currency": order["currency"], "approved_by": who})
         else:
             order |= {"status": "quote_expired", "approved_by": who}
-            it["status"] = "confirmed"
-            it["order_id"] = None
-            s.update_intent(it)
+            _release(it, order)
             s.audit("valio_mcp", "quote_expired", "Approved after the quote expired. A new offer is needed",
                     session=session, order_id=order["order_id"])
     else:
         order["status"] = "rejected"
-        it["status"] = "confirmed"  # the buyer's intent stands, only this cart was refused
-        it["order_id"] = None
-        s.update_intent(it)
+        _release(it, order)  # the buyer's intent stands, only this cart was refused
     s.update_order(order)
     return JSONResponse({"approval": appr, "order": order})
 
@@ -668,11 +737,17 @@ def verify(order_id: str) -> dict:
         f"Recomputed {trust.fingerprint(ch)} from the ordered cart")
     add("cart_bound_to_intent", order["cart"]["intent_hash"] == it.get("intent_hash"),
         "The cart names the confirmed intent")
-    line = order["lines"][0]
-    prov = line.get("provenance") or {}
-    add("quote_signature", trust.verify(trust.valio_key().public_key(), prov.get("hash", ""), prov.get("signature"))
-        and prov.get("hash") == trust.digest(diff.quote_core(line)),
-        "Price and availability signed by Valio Aimo when quoted")
+    sigs = []
+    for line in order["lines"]:
+        prov = line.get("provenance") or {}
+        sigs.append(trust.verify(trust.valio_key().public_key(), prov.get("hash", ""), prov.get("signature"))
+                    and prov.get("hash") == trust.digest(diff.quote_core(line)))
+    add("quote_signatures", bool(sigs) and all(sigs),
+        f"{sum(sigs)} of {len(sigs)} line(s): price and availability signed by Valio Aimo when quoted")
+    items = {i["item_id"]: i for i in it.get("items", [])}
+    ids = [c["item_id"] for c in order["cart"].get("lines", [])]
+    add("one_line_per_item", len(ids) == len(set(ids)) and all(i in items for i in ids),
+        f"{len(ids)} line(s), each fulfils a different item of the intent")
     if order.get("tier") == "ask":
         add("buyer_cart_signature", trust.verify(trust.buyer_public(order["buyer_id"]), order["cart_hash"],
                                                  rc.get("buyer_cart_signature")),

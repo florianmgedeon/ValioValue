@@ -31,8 +31,8 @@ CREATE TABLE IF NOT EXISTS audit (
 
 # Allowed state changes. Anything else is a bug and raises.
 INTENT_FLOW = {"proposed": {"confirmed", "superseded", "expired"},
-               "confirmed": {"consumed", "expired"},
-               "consumed": {"confirmed"},  # only when the human rejects the order that used it
+               "confirmed": {"fulfilled", "expired"},   # stays confirmed while some items are still open
+               "fulfilled": {"confirmed"},              # only when a human rejects an order, items reopen
                "superseded": set(), "expired": set()}
 ORDER_FLOW = {"pending_approval": {"confirmed", "rejected", "quote_expired"},
               "confirmed": set(), "rejected": set(), "quote_expired": set()}

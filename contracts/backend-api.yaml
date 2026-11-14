@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ValioValue Buyer Agent API
-  version: 0.2.0
+  version: 0.3.0
   description: |
     Contract between the frontend and the buyer-side backend.
     The frontend talks ONLY to this API. It never talks to the MCP server directly.
@@ -189,7 +189,10 @@ paths:
                 confirmed_by: { type: string, example: "chef.anna" }
                 edits:
                   type: object
-                  description: "Optional field changes, same shape as OrderIntent (quantity, deliver_by, hard_rules, budget, preferences)"
+                  description: |
+                    Optional. Returns a revised intent (status proposed, new hash) instead of confirming.
+                    { items: [{item_id, quantity: {amount}, product: {query}, hard_rules, remove: true}],
+                      deliver_by, hard_rules, budget: {max_total} | null, preferences }
       responses:
         "200":
           description: Confirmed intent. The agent continues in the same SSE stream.
@@ -256,6 +259,7 @@ components:
         certificates: { type: array, items: { type: string } }
         allergens: { type: array, items: { type: string } }
         quote_id: { type: string, description: "Binds the order to this fixed price" }
+        item_id: { type: string, description: "The intent item this quote is for" }
         quote_expires_at: { type: string, format: date-time }
         evidence:
           type: array
@@ -326,22 +330,20 @@ components:
 
     OrderIntent:
       type: object
-      required: [intent_id, status, product, quantity, deliver_by, hard_rules, readback, chips, questions]
+      description: |
+        One request = one intent with one or more items (a single product, or everything a recipe needs).
+        Each item can be bought exactly once. Items may be ordered together or in several orders.
+      required: [intent_id, status, items, deliver_by, hard_rules, readback, chips, questions]
       properties:
         intent_id: { type: string, example: "int_9f2c1a7b" }
-        status: { type: string, enum: [proposed, confirmed, consumed, expired] }
+        status: { type: string, enum: [proposed, confirmed, fulfilled, superseded, expired], description: "fulfilled = every item ordered" }
         buyer_id: { type: string }
         mandate_id: { type: string }
-        product: { type: object, properties: { query: { type: string, example: "lactose-free milk" } } }
-        quantity:
-          type: object
-          properties:
-            amount: { type: number, example: 1000 }
-            unit: { type: string, enum: [L, KG, SALES_UNIT] }
-            max_over_pct: { type: number, example: 2, description: "Rounding up to whole packs allowed up to this % over" }
-            allow_under: { type: boolean, default: false }
+        items: { type: array, items: { $ref: "#/components/schemas/IntentItem" } }
         deliver_by: { type: string, format: date }
-        hard_rules: { type: array, items: { $ref: "#/components/schemas/HardRule" } }
+        hard_rules: { type: array, description: "Apply to ALL items (mandate rules plus request-wide)", items: { $ref: "#/components/schemas/HardRule" } }
+        spent: { type: number, description: "Sum of orders placed against this intent" }
+        order_ids: { type: array, items: { type: string } }
         preferences:
           type: object
           properties:
@@ -358,6 +360,23 @@ components:
         confirmed_by: { type: string, nullable: true }
         confirmed_at: { type: string, format: date-time, nullable: true }
         expires_at: { type: string, format: date-time }
+
+    IntentItem:
+      type: object
+      properties:
+        item_id: { type: string, example: "i1" }
+        product: { type: object, properties: { query: { type: string, example: "lactose-free milk" } } }
+        quantity:
+          type: object
+          properties:
+            amount: { type: number, example: 1000 }
+            unit: { type: string, enum: [L, KG, SALES_UNIT] }
+            max_over_pct: { type: number, example: 2, description: "Rounding up to whole packs allowed up to this % over" }
+            allow_under: { type: boolean, default: false }
+        hard_rules: { type: array, description: "Rules for this item only", items: { $ref: "#/components/schemas/HardRule" } }
+        note: { type: string, nullable: true }
+        status: { type: string, enum: [open, ordered] }
+        order_id: { type: string, nullable: true }
 
     RuleEvidence:
       type: object
@@ -386,7 +405,8 @@ components:
     DiffCheck:
       type: object
       properties:
-        field: { type: string, enum: [product, hard_rules, quantity, delivery_date, budget, spend_limit, category, quote_valid, quote_signature, order_cutoff, availability, binding] }
+        field: { type: string, enum: [product, hard_rules, quantity, delivery_date, budget, spend_limit, quote_valid, quote_signature, order_cutoff, availability, binding] }
+        item_id: { type: string, nullable: true, description: "Line check for this item. Null = whole cart (budget, spend_limit)" }
         intended: { type: string, example: "1,000 L" }
         cart: { type: string, example: "1,008 L (84 × 12 L)" }
         ok: { type: boolean }
@@ -522,6 +542,8 @@ components:
             request_summary: { type: string }
             offers: { type: array, items: { $ref: "#/components/schemas/Offer" } }
             recommended_product_id: { type: string, nullable: true }
+            item_id: { type: string }
+            product_query: { type: string }
             excluded:
               type: array
               description: "Rejected options, one line each, e.g. 'Valio X 1 L: contains milk (GS1 AM CONTAINS)'"
@@ -548,6 +570,7 @@ components:
             currency: { type: string }
             delivery_date: { type: string, format: date }
             approved_by: { type: string, nullable: true, description: "null if placed autonomously" }
+            items_open_after: { type: array, items: { type: string }, description: "Intent items still to be ordered" }
             tier: { type: string, enum: [auto, ask] }
             diff: { $ref: "#/components/schemas/Diff" }
             receipt: { $ref: "#/components/schemas/Receipt" }

@@ -30,8 +30,9 @@ def http():
         yield c
 
 
-def propose(text, query, qty, unit="L", rules=(), buyer="juvenes", **kw):
-    return run(server.propose_intent(original_request=text, product_query=query, quantity=qty, quantity_unit=unit,
+def propose(text, query, qty, unit="L", rules=(), buyer="juvenes", items=None, **kw):
+    items = items or [{"product_query": query, "quantity": qty, "quantity_unit": unit}]
+    return run(server.propose_intent(original_request=text, items=items,
                                      deliver_by=kw.pop("deliver_by", next_monday()), hard_rules=list(rules),
                                      ctx=ctx(buyer), **kw))["intent"]
 
@@ -48,15 +49,16 @@ def offers_for(it, ids=("DEMO-1001", "DEMO-1002", "DEMO-1003"), buyer="juvenes")
     return run(server.check_offer(product_ids=list(ids), intent_id=it["intent_id"], ctx=ctx(buyer)))["offers"]
 
 
-def order(it, quote_id, buyer="juvenes"):
-    return run(server.place_order(quote_id=quote_id, intent_id=it["intent_id"], reason="test", ctx=ctx(buyer)))
+def order(it, quote_id, buyer="juvenes", lines=None):
+    return run(server.place_order(quote_id=quote_id, lines=lines, intent_id=it["intent_id"], reason="test",
+                                  ctx=ctx(buyer)))
 
 
 # --------------------------------------------------------------------------- auto
 
 def test_auto_tier_exact_match_and_verify(http):
     it = confirm(http, propose("120 litres of lactose-free milk by Monday", "lactose-free milk", 120))
-    assert it["status"] == "confirmed" and it["hard_rules"][0]["rule"] == "lactose_free"
+    assert it["status"] == "confirmed" and it["items"][0]["hard_rules"][0]["rule"] == "lactose_free"
     found = run(server.search_products(query="lactose-free milk", intent_id=it["intent_id"], ctx=ctx()))
     ids = [p["product_id"] for p in found["products"]]
     assert "DEMO-1004" not in ids  # plain milk, no lactose-free signal
@@ -73,13 +75,14 @@ def test_auto_tier_exact_match_and_verify(http):
     assert again["order_id"] == res["order_id"] and again.get("idempotent_replay")
 
 
-def test_second_order_on_same_intent_is_refused(http):
+def test_same_item_cannot_be_bought_twice(http):
     it = confirm(http, propose("120 l lactose-free milk", "lactose-free milk", 120))
     offers = offers_for(it)
     first = order(it, offers[0]["quote_id"])
     assert first["status"] in ("confirmed", "pending_approval")
     second = order(it, offers[1]["quote_id"])
-    assert second["status"] == "rejected" and "one order" in second["error"]
+    assert second["status"] == "rejected" and second["tier"] == "block"
+    assert any("only once" in c["detail"] for c in second["diff"]["checks"])
 
 
 # --------------------------------------------------------------------------- ask
@@ -176,7 +179,7 @@ def test_confirm_requires_matching_hash_signature_and_no_questions(http):
     assert http.post(f"/internal/intents/{it['intent_id']}/confirm",
                      json={"intent_hash": it["intent_hash"], "signature": sig}).status_code == 401
     q = propose("Need 100 l non-dairy milk", "milk", 1000)
-    assert len(q["questions"]) == 2
+    assert len(q["questions"]) == 2, q["questions"]
     r = http.post(f"/internal/intents/{q['intent_id']}/confirm", headers=AUTH,
                   json={"intent_hash": q["intent_hash"], "signature": trust.sign(trust.buyer_key("juvenes"), q["intent_hash"])})
     assert r.status_code == 409
@@ -185,8 +188,72 @@ def test_confirm_requires_matching_hash_signature_and_no_questions(http):
 def test_revise_creates_new_hash_and_supersedes(http):
     it = propose("120 l lactose-free milk", "lactose-free milk", 120)
     r = http.post(f"/internal/intents/{it['intent_id']}/revise", headers=AUTH,
-                  json={"edits": {"quantity": {"amount": 240}}})
+                  json={"edits": {"items": [{"item_id": "i1", "quantity": {"amount": 240}}]}})
     new = r.json()
-    assert r.status_code == 200 and new["intent_hash"] != it["intent_hash"] and new["quantity"]["amount"] == 240
+    assert r.status_code == 200 and new["intent_hash"] != it["intent_hash"]
+    assert new["items"][0]["quantity"]["amount"] == 240
     assert store().get_intent(it["intent_id"])["status"] == "superseded"
     assert new["questions"] == []  # the buyer's own edit wins over the original text
+
+
+# --------------------------------------------------------------------------- recipes: one intent, many items
+
+RECIPE = [{"product_query": "lactose-free milk", "quantity": 120, "quantity_unit": "L"},
+          {"product_query": "skimmed milk drink 10 l", "quantity": 20, "quantity_unit": "L",
+           "hard_rules": [{"rule": "lactose_free"}]}]
+
+
+def test_recipe_intent_orders_every_item_in_one_cart(http):
+    it = confirm(http, propose("Risotto for 200 guests, recipe attached", None, None, items=RECIPE))
+    assert [i["item_id"] for i in it["items"]] == ["i1", "i2"] and it["readback"].startswith("2 items")
+    q1 = run(server.check_offer(product_ids=["DEMO-1001"], intent_id=it["intent_id"], item_id="i1", ctx=ctx()))["offers"][0]
+    q2 = run(server.check_offer(product_ids=["DEMO-1002"], intent_id=it["intent_id"], item_id="i2", ctx=ctx()))["offers"][0]
+    assert q2["quantity"] == 2 and q2["item_id"] == "i2"
+    res = order(it, None, lines=[{"item_id": "i1", "quote_id": q1["quote_id"]}, {"item_id": "i2", "quote_id": q2["quote_id"]}])
+    assert res["status"] == "confirmed" and res["tier"] == "auto", res.get("message") or res["diff"]
+    assert len(res["lines"]) == 2 and res["items_open_after"] == []
+    assert store().get_intent(it["intent_id"])["status"] == "fulfilled"
+    v = http.get(f"/verify/{res['order_id']}").json()
+    assert v["valid"] and any(c["name"] == "one_line_per_item" and c["ok"] for c in v["checks"]), v
+
+
+def test_recipe_items_can_be_ordered_in_waves_but_never_twice(http):
+    it = confirm(http, propose("two things", None, None, items=RECIPE))
+    q1 = run(server.check_offer(product_ids=["DEMO-1001"], intent_id=it["intent_id"], item_id="i1", ctx=ctx()))["offers"][0]
+    first = order(it, None, lines=[{"item_id": "i1", "quote_id": q1["quote_id"]}])
+    assert first["status"] == "confirmed" and first["items_open_after"] == ["i2"]
+    assert store().get_intent(it["intent_id"])["status"] == "confirmed"
+    q2 = run(server.check_offer(product_ids=["DEMO-1002"], intent_id=it["intent_id"], item_id="i2", ctx=ctx()))["offers"][0]
+    q1b = run(server.check_offer(product_ids=["DEMO-1001"], intent_id=it["intent_id"], item_id="i1", ctx=ctx()))
+    assert "error" not in q1b  # quoting is fine, buying i1 again is not
+    again = order(it, None, lines=[{"item_id": "i1", "quote_id": q1b["offers"][0]["quote_id"]},
+                                   {"item_id": "i2", "quote_id": q2["quote_id"]}])
+    assert again["tier"] == "block"
+    second = order(it, None, lines=[{"item_id": "i2", "quote_id": q2["quote_id"]}])
+    assert second["status"] == "confirmed"
+    assert store().get_intent(it["intent_id"])["status"] == "fulfilled"
+
+
+def test_quote_for_one_item_cannot_fill_another(http):
+    it = confirm(http, propose("two things", None, None, items=RECIPE))
+    q1 = run(server.check_offer(product_ids=["DEMO-1001"], intent_id=it["intent_id"], item_id="i1", ctx=ctx()))["offers"][0]
+    res = order(it, None, lines=[{"item_id": "i2", "quote_id": q1["quote_id"]}])
+    assert res["tier"] == "block"
+
+
+def test_rejected_cart_reopens_its_items(http):
+    big = [{"product_query": "lactose-free milk", "quantity": 1000, "quantity_unit": "L"}]
+    it = confirm(http, propose("1000 l lactose-free milk", None, None, items=big))
+    q = next(o for o in offers_for(it) if o["product_id"] == "DEMO-1001")
+    res = order(it, q["quote_id"])
+    assert res["tier"] == "ask"
+    r = http.post(f"/internal/approvals/{res['approval_id']}", headers=AUTH, json={"decision": "reject"})
+    assert r.status_code == 200
+    again = store().get_intent(it["intent_id"])
+    assert again["status"] == "confirmed" and again["items"][0]["status"] == "open" and again["spent"] == 0
+
+
+def test_multi_item_needs_item_id(http):
+    it = confirm(http, propose("two things", None, None, items=RECIPE))
+    r = run(server.check_offer(product_ids=["DEMO-1001"], intent_id=it["intent_id"], ctx=ctx()))
+    assert "item_id required" in r["error"]
