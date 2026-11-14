@@ -212,7 +212,7 @@ export function OnboardingView() {
       }
       for (const l of drop) await rejectKitchenSuggestion(l.s.id ?? "", { by: SIGNER_NAME }).catch(() => undefined);
       await queryClient.invalidateQueries({ queryKey: keys.kitchen });
-      if (!needsMandate) toast(`Saved. I remember ${keep.length} thing${keep.length === 1 ? "" : "s"} about your kitchen.`);
+      if (!needsMandate && keep.length) toast(`Saved. I remember ${keep.length} thing${keep.length === 1 ? "" : "s"} about your kitchen.`);
       navigate("order");
     } catch (e) {
       toast(`Could not save: ${(e as Error).message}`);
@@ -316,22 +316,31 @@ export function OnboardingView() {
               />
             ))}
           </div>
-          {stage === "review" && !busyReading && (
-            <div className="rise flex flex-wrap items-center gap-4 rounded-[20px] bg-ink p-5 text-bg">
-              <p className="min-w-0 flex-1">
+        </section>
+      )}
+
+      {stage === "review" && !busyReading && (
+        <div className="rise mt-10 flex flex-wrap items-center gap-4 rounded-[20px] bg-ink p-5 text-bg">
+          <p className="min-w-0 flex-1">
+            {learned.length === 0 ? (
+              <>
+                <b>Nothing to remember yet.</b> Add another photo or a sentence above, or start ordering and teach me as we go.
+              </>
+            ) : (
+              <>
                 <b>{keep.length} thing{keep.length === 1 ? "" : "s"} to remember.</b>{" "}
                 {signedCount > 0
                   ? `${signedCount} of them ${signedCount === 1 ? "is a signed rule" : "are signed rules"}: Valio Aimo enforces ${signedCount === 1 ? "it" : "them"} on every order, I can't change ${signedCount === 1 ? "it" : "them"}.`
                   : needsMandate
                     ? "Your preferences go into the signed mandate."
                     : "Nothing here needs a signature."}
-              </p>
-              <Button variant="inverse" iconAfter="arrow" disabled={adopting} onClick={() => void adopt()}>
-                {adopting ? "Saving…" : needsMandate ? "Sign & start ordering" : "Save & start ordering"}
-              </Button>
-            </div>
-          )}
-        </section>
+              </>
+            )}
+          </p>
+          <Button variant="inverse" iconAfter="arrow" disabled={adopting} onClick={() => void adopt()}>
+            {adopting ? "Saving…" : learned.length === 0 ? "Start ordering" : needsMandate ? "Sign & start ordering" : "Save & start ordering"}
+          </Button>
+        </div>
       )}
     </main>
   );
