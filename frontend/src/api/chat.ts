@@ -5,7 +5,7 @@ export function startChat(request: ChatRequest): Promise<ChatResponse> {
   return apiRequest<ChatResponse>("/chat", { method: "POST", json: request });
 }
 
-const chatEventTypes: ChatStreamEvent["type"][] = [
+const chatEventTypes: (ChatStreamEvent["type"] | "context_suggestion")[] = [
   "user_message",
   "reasoning",
   "message",
@@ -20,6 +20,7 @@ const chatEventTypes: ChatStreamEvent["type"][] = [
   "error",
   "done",
   "autonomy_progress",
+  "context_suggestion", // 2a: not in ChatStreamEvent yet, the Order tab handles it
 ];
 
 export interface StreamHandlers {

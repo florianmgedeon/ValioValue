@@ -868,7 +868,7 @@ components:
     DiffCheck:
       type: object
       properties:
-        field: { type: string, enum: [product, hard_rules, preference, quantity, delivery_date, budget, autonomy, quote_valid, quote_signature, order_cutoff, availability, binding] }
+        field: { type: string, enum: [product, hard_rules, preference, quantity, delivery_date, budget, autonomy, quote_valid, quote_signature, order_cutoff, availability, binding, usual], description: "usual (1c): the cart has another product than the buyer's usual one" }
         item_id: { type: string, nullable: true, description: "Line check for this item. Null = whole cart (budget, autonomy)" }
         pref_id: { type: string, description: "preference checks: which preference" }
         grants_used: { type: array, items: { type: string }, description: "autonomy check: the grants that let the agent order alone" }

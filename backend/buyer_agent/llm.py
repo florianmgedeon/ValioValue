@@ -161,7 +161,9 @@ class AnthropicProvider:
                 role = "user"
             elif m["role"] == "assistant":
                 if m.get("raw"):
-                    blocks = list(m["raw"])
+                    # Thinking blocks are signed against the system prompt they were made with. The prompt is rebuilt
+                    # every turn (time, mandate, kitchen profile), so only this turn's thinking may be sent back.
+                    blocks = [b for b in m["raw"] if n > latest or b["type"] not in ("thinking", "redacted_thinking")]
                 else:
                     blocks = ([{"type": "text", "text": m["text"]}] if m.get("text") else []) + [
                         {"type": "tool_use", "id": c["id"], "name": c["name"], "input": c["args"]}

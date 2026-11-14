@@ -9,6 +9,8 @@ import { navigate, useHashRoute, type Route } from "./route";
 import { SignProvider } from "./signing";
 import { Placeholder } from "./Placeholder";
 import { DemoMenu, OnboardingView } from "../features/onboarding";
+import OrderView from "../features/order/OrderView";
+import KitchenView from "../features/kitchen/KitchenView";
 
 const UiGallery = import.meta.env.DEV ? lazy(() => import("./UiGallery")) : null;
 
@@ -16,11 +18,11 @@ const UiGallery = import.meta.env.DEV ? lazy(() => import("./UiGallery")) : null
 function Screen({ route }: { route: Route }): ReactNode {
   switch (route.tab) {
     case "order":
-      return <Placeholder pkg="F1" title="Order" />;
+      return <OrderView />;
     case "activity":
       return <Placeholder pkg="F4" title="Activity" note={route.param ? `Order ${route.param}` : undefined} />;
     case "kitchen":
-      return <Placeholder pkg="F2" title="Kitchen" />;
+      return <KitchenView />;
     case "onboard":
       return <OnboardingView />;
     case "ui":
