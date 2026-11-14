@@ -124,7 +124,10 @@ def build(*, buyer_id: str, mandate: dict, session: str | None, original_request
         said = ", ".join(_fmt_qty(float(n), u) for n, u in mentioned)
         questions.append(f"Your message says {said}, but the order would be {_fmt_qty(quantity, quantity_unit)}. "
                          f"Which is right?")
-    milk_product = re.search(r"\bmilk\b|maito|mjölk|cream|kerma|butter|cheese|juusto|yog", product_query.lower())
+    plant = re.search(r"non[- ]?dairy|dairy[- ]?free|plant|oat|soy|almond|coconut|rice|kaura|soija|vegan|alternative",
+                      product_query.lower())
+    milk_product = not plant and re.search(r"\bmilk\b|maito|mjölk|cream|kerma|butter|cheese|juusto|yog",
+                                           product_query.lower())
     if milk_product and any(r["rule"] == "exclude_allergen" and r.get("allergen") == "milk" for r in rules):
         questions.append(f"'{product_query}' is a dairy product, but there is also a no-milk rule. "
                          f"Did you mean a plant-based alternative?")

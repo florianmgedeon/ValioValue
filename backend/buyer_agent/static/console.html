@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ValioValue · Agent console</title>
+<title>ValioValue · Trusted agent console</title>
 <style>
   :root {
     --bg: #f6f7f9; --card: #fff; --ink: #1d2330; --muted: #6b7385; --line: #e4e7ec;
@@ -96,12 +96,52 @@
   .details table td, .details table th { padding: 4px 6px; font-size: 12px; }
   pre.json { margin: 0; max-height: 360px; overflow: auto; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; background: #fbfbfc; padding: 8px; border-radius: 6px; }
   .req { color: var(--red); font-weight: 700; }
+  /* ---- v2 trust components ---- */
+  .intent { border: 1px solid #c9d6ff; background: #f7f9ff; border-radius: 12px; padding: 14px; }
+  .intent .rb { font-size: 15px; font-weight: 600; margin: 2px 0 10px; }
+  .ichips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+  .ichip { font-size: 12.5px; padding: 5px 11px; border-radius: 99px; background: #fff; border: 1px solid #c9d6ff; color: var(--ink); }
+  .ichip.locked { background: #f0f1f4; border-color: var(--line); color: var(--muted); }
+  .q { background: var(--amber-soft); border: 1px solid #f5d9a8; border-radius: 8px; padding: 8px 10px; margin: 6px 0; }
+  .seal { display: inline-flex; align-items: center; gap: 8px; background: #0f3d2e; border: 0; color: #fff; font-weight: 650; padding: 9px 14px; border-radius: 9px; }
+  .seal .fp { font: 11px ui-monospace, Menlo, monospace; background: rgba(255,255,255,.14); padding: 2px 6px; border-radius: 4px; letter-spacing: .05em; }
+  .seal:disabled { background: #9aa3b2; }
+  .signed { font-size: 12.5px; color: var(--green); }
+  .fpt { font: 11.5px ui-monospace, Menlo, monospace; background: #f0f1f4; padding: 1px 6px; border-radius: 4px; letter-spacing: .04em; }
+  .editf { display: none; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; padding: 10px; background: #fff; border: 1px dashed #c9d6ff; border-radius: 8px; }
+  .editf.open { display: flex; }
+  .editf input[type=number], .editf input[type=date] { font: inherit; padding: 5px 7px; border: 1px solid var(--line); border-radius: 7px; width: 120px; }
+  .tick { display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; padding: 1px 6px; border-radius: 4px; margin: 2px 3px 0 0; cursor: help; position: relative; }
+  .tick.safe { background: var(--green-soft); color: var(--green); }
+  .tick.excluded { background: var(--red-soft); color: var(--red); }
+  .tick.unknown { background: var(--amber-soft); color: var(--amber); }
+  .tick .tip { display: none; position: absolute; z-index: 5; left: 0; top: 120%; width: 300px; background: #1d2330; color: #fff; padding: 8px 10px; border-radius: 8px; font-size: 12px; line-height: 1.4; text-align: left; white-space: normal; }
+  .tick:hover .tip { display: block; }
+  .lock { font-size: 11.5px; color: var(--green); white-space: nowrap; }
+  .lock.exp { color: var(--red); }
+  .rej { margin-top: 10px; font-size: 12.5px; }
+  .rej summary { cursor: pointer; color: var(--muted); }
+  .rej li { margin: 3px 0; }
+  .tier { font-size: 11px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; padding: 3px 8px; border-radius: 5px; }
+  .tier.auto { background: var(--green-soft); color: var(--green); }
+  .tier.ask { background: var(--amber-soft); color: var(--amber); }
+  .tier.block { background: var(--red-soft); color: var(--red); }
+  .dev { font-size: 22px; font-weight: 750; margin: 4px 0 8px; }
+  .dev.zero { color: var(--green); }
+  .dev.some { color: var(--amber); }
+  table.diff td { font-size: 12.5px; }
+  table.diff tr.bad td { background: #fff8ec; }
+  table.diff tr.blk td { background: var(--red-soft); }
+  .vlist { list-style: none; padding: 0; margin: 8px 0 0; }
+  .vlist li { padding: 3px 0; opacity: 0; transform: translateY(3px); transition: all .25s; }
+  .vlist li.in { opacity: 1; transform: none; }
+  .mandate .kv { grid-template-columns: 110px 1fr; }
   @media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
 <header>
-  <h1>ValioValue</h1><span class="sub">Agent console</span>
+  <h1>ValioValue</h1><span class="sub">Trusted agent console · what you see is what you sign</span>
   <span style="flex:1"></span>
   <span id="health" class="pill">checking…</span>
 </header>
@@ -112,14 +152,14 @@
       <h2>Ask the purchasing agent</h2>
       <textarea id="msg" placeholder="e.g. I need 1,000 litres of lactose-free milk by Monday"></textarea>
       <div class="row" style="margin-top:10px">
-        <button class="chip" data-ex="I need 1,000 litres of lactose-free milk by Monday">1,000 L lactose-free milk by Monday</button>
-        <button class="chip" data-ex="We need 60 litres of lactose-free milk by Monday">60 L milk (under limit)</button>
-        <button class="chip" data-ex="20 kg of lactose free butter by Wednesday">20 kg butter by Wednesday</button>
-        <button class="chip" data-ex="200 litres of oat drink tomorrow">200 L oat drink tomorrow</button>
+        <button class="chip" data-ex="I need 1,000 litres of lactose-free milk by Monday">Ask: 1,000 L lactose-free milk</button>
+        <button class="chip" data-ex="We need 120 litres of lactose-free milk by Monday">Auto: 120 L, exact packs</button>
+        <button class="chip" data-ex="We need 100 litres of non-dairy milk by Monday">Question: non-dairy</button>
+        <button class="chip" data-ex="200 litres of oat drink by Monday, we have a milk allergy">Allergy: oat drink</button>
       </div>
       <div class="row" style="margin-top:12px">
         <label class="muted">Buyer</label>
-        <select id="buyer"><option>hotel-chain-helsinki</option><option>default</option></select>
+        <select id="buyer"><option>juvenes</option><option>hotel-chain-helsinki</option><option>school-kitchen-espoo</option><option>default</option></select>
         <label class="muted"><input type="checkbox" id="newsession" checked> new conversation</label>
         <span style="flex:1"></span>
         <button id="send" class="primary">Send</button>
@@ -130,6 +170,10 @@
   </section>
 
   <aside>
+    <div class="card mandate">
+      <h2>Purchasing mandate</h2>
+      <div id="mandate"><p class="empty">Loading…</p></div>
+    </div>
     <div class="card">
       <h2>Waiting for your approval</h2>
       <div class="row" style="margin-bottom:10px">
@@ -150,12 +194,144 @@
 <script>
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}):\d{2}(?:[+-]\d{2}:\d{2}|Z)?/g, "$1 $2").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const attr = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const md = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
 const money = (v, c = "EUR") => v == null ? "–" : `${Number(v).toLocaleString("en", {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${c}`;
 const num = (v) => v == null ? "–" : Number(v).toLocaleString("en", {maximumFractionDigits: 2});
 const time = (iso) => iso ? new Date(iso).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"}) : "";
 const RULES = {quote_valid: "Price quote still valid", order_cutoff: "Ordered before the cut-off", availability: "Full quantity available on time", spend_limit: "Within the agent's spend limit"};
 const ACTORS = {buyer_agent: ["Buyer agent", "#1f5eff"], valio_mcp: ["Valio Aimo", "#127a46"], policy_engine: ["Policy engine", "#a15c00"], human: ["Human", "#1d2330"]};
+
+
+// ---------------------------------------------------------------- v2 trust components
+const fp = (h) => { const x = String(h || "").split(":").pop().slice(0, 8).toUpperCase(); return x ? `${x.slice(0, 4)}-${x.slice(4)}` : ""; };
+const FIELDS = {binding: "Bound to intent", product: "Product", hard_rules: "Rule", quantity: "Quantity", delivery_date: "Delivery",
+  availability: "Availability", quote_signature: "Valio signature", budget: "Your budget", spend_limit: "Agent limit", category: "Category", quote_valid: "Price lock", order_cutoff: "Cut-off"};
+let INTENT = null;
+
+async function loadMandate() {
+  try {
+    const m = await (await fetch(`/mandate?buyer_id=${encodeURIComponent($("#buyer").value)}`)).json();
+    const rules = (m.mandatory_rules || []).map((r) => `<span class="ichip locked">🔒 no ${esc(r.allergen || r.rule)}</span>`).join(" ") || '<span class="muted">none</span>';
+    $("#mandate").innerHTML = `<div class="kv">
+      <div>Buyer</div><div><b>${esc(m.display_name)}</b></div>
+      <div>Agent may</div><div>search, compare, order up to <b>${money(m.spend_limit, m.currency)}</b> alone</div>
+      <div>Above that</div><div>a human signs the exact cart</div>
+      <div>Always</div><div>${rules}</div>
+      <div>Mandate</div><div><span class="fpt">${esc(m.mandate_id)}</span> <span class="fpt" title="${esc(m.mandate_hash)}">${fp(m.mandate_hash)}</span></div></div>`;
+  } catch { $("#mandate").innerHTML = '<p class="empty">Cannot load mandate.</p>'; }
+}
+
+function intentCard(it) {
+  INTENT = it;
+  const chips = (it.chips || []).map((c) => `<span class="ichip ${c.locked ? "locked" : ""}">${c.locked ? "🔒 " : ""}${esc(c.label)}</span>`).join("");
+  const qs = (it.questions || []).map((q) => `<div class="q">❓ ${esc(q)}${/non-dairy/i.test(q) ? `
+    <div class="row" style="margin-top:6px"><button onclick="answerDairy('${esc(it.intent_id)}','allergy')">Milk allergy: no milk at all</button>
+    <button onclick="answerDairy('${esc(it.intent_id)}','lactose')">Lactose intolerance: lactose-free is fine</button></div>` : ""}</div>`).join("");
+  const r = it.hard_rules || [];
+  const has = (k, a) => r.some((x) => x.rule === k && (!a || x.allergen === a) && x.source !== "mandate");
+  const id = esc(it.intent_id);
+  return `<div class="intent" id="i_${id}">
+    <div class="muted" style="font-size:12px">What I understood · nothing is searched or ordered before you confirm</div>
+    <div class="rb">${esc(it.readback)}</div>
+    <div class="ichips">${chips}</div>${qs}
+    <div class="editf" id="e_${id}">
+      <label>Quantity <input type="number" id="eq_${id}" value="${it.quantity.amount}" min="0"> ${esc(it.quantity.unit)}</label>
+      <label>By <input type="date" id="ed_${id}" value="${esc(it.deliver_by)}"></label>
+      <label>Budget <input type="number" id="eb_${id}" value="${it.budget ? it.budget.max_total : ""}" placeholder="none"> EUR</label>
+      <label><input type="checkbox" id="el_${id}" ${has("lactose_free") ? "checked" : ""}> lactose-free</label>
+      <label><input type="checkbox" id="em_${id}" ${has("exclude_allergen", "milk") ? "checked" : ""}> milk allergy (no milk at all)</label>
+      <button onclick="reviseIntent('${id}')">Update</button>
+    </div>
+    <div class="row" data-int="${id}">
+      <button class="seal" onclick="confirmIntent('${id}')" ${it.questions?.length ? "disabled title='Answer the questions first (Edit)'" : ""}>🔒 Confirm &amp; sign <span class="fp">${fp(it.intent_hash)}</span></button>
+      <button onclick="document.getElementById('e_${id}').classList.toggle('open')">Edit</button>
+      <span class="muted" style="font-size:12px">Signs hash <span class="fpt" title="${esc(it.intent_hash)}">${fp(it.intent_hash)}</span> of exactly this intent</span>
+    </div></div>`;
+}
+
+async function confirmIntent(id) {
+  const it = INTENT;
+  document.querySelectorAll(`[data-int="${id}"] button`).forEach((b) => b.disabled = true);
+  const r = await fetch(`/intents/${id}/confirm`, {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({intent_hash: it.intent_hash, confirmed_by: $("#approver").value || "buyer.human"})});
+  if (!r.ok) { const e = await r.json(); alert(JSON.stringify(e.detail || e)); document.querySelectorAll(`[data-int="${id}"] button`).forEach((b) => b.disabled = false); }
+  else $("#send").disabled = true;
+}
+
+async function reviseIntent(id) {
+  const it = INTENT, v = (k) => document.getElementById(`${k}_${id}`);
+  const rules = [];
+  if (v("el").checked) rules.push({rule: "lactose_free"});
+  if (v("em").checked) rules.push({rule: "exclude_allergen", allergen: "milk", strictness: "contains_or_may_contain"});
+  (it.hard_rules || []).filter((x) => x.source !== "mandate" && !(x.rule === "lactose_free" || (x.rule === "exclude_allergen" && x.allergen === "milk"))).forEach((x) => rules.push(x));
+  const edits = {quantity: {amount: Number(v("eq").value)}, deliver_by: v("ed").value, hard_rules: rules,
+    budget: v("eb").value ? {max_total: Number(v("eb").value)} : null};
+  document.querySelectorAll(`[data-int="${id}"] button`).forEach((b) => b.disabled = true);
+  await fetch(`/intents/${id}/confirm`, {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({intent_hash: it.intent_hash, edits})});
+}
+
+async function answerDairy(id, kind) {
+  const it = INTENT;
+  const keep = (it.hard_rules || []).filter((x) => x.source !== "mandate" && x.rule !== "lactose_free" && !(x.rule === "exclude_allergen" && x.allergen === "milk"));
+  const rule = kind === "allergy" ? {rule: "exclude_allergen", allergen: "milk", strictness: "contains_or_may_contain"} : {rule: "lactose_free"};
+  const edits = {hard_rules: [...keep, rule], product: {query: kind === "allergy" ? "plant-based milk alternative" : "lactose-free milk"}};
+  document.querySelectorAll(`#i_${id} button`).forEach((b) => b.disabled = true);
+  await fetch(`/intents/${id}/confirm`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({intent_hash: it.intent_hash, edits})});
+}
+
+function ticks(evs) {
+  return (evs || []).map((ev) => {
+    const sig = (ev.signals || []).map((s) => `${s.says === "safe" ? "✓" : "✗"} ${esc(s.source)} · ${esc(s.field)} = ${esc(s.value)}`).join("<br>") || "No data. Unknown is never treated as safe.";
+    const label = ev.rule.replace("exclude_allergen:", "no ").replace("lactose_free", "lactose-free").replace("origin:", "origin ");
+    const ic = ev.verdict === "safe" ? "✓" : ev.verdict === "excluded" ? "✗" : "?";
+    return `<span class="tick ${ev.verdict}">${ic} ${esc(label)}<span class="tip"><b>${esc(ev.verdict.toUpperCase())}</b> · decided from data, not by the AI<br>${sig}</span></span>`;
+  }).join("");
+}
+
+function lockBadge(o) {
+  const p = o.provenance || {};
+  return `<div class="lock" data-expires="${attr(o.quote_expires_at)}" title="Signed by Valio Aimo (${esc(p.key_id)})&#10;${esc(p.source)}&#10;fetched ${esc(p.fetched_at)}">🔒 price locked</div>`;
+}
+
+function tickLocks() {
+  document.querySelectorAll("[data-expires]").forEach((el) => {
+    const ms = new Date(el.dataset.expires) - new Date();
+    if (ms <= 0) { el.textContent = "price lock expired"; el.classList.add("exp"); return; }
+    const m = Math.floor(ms / 60000), s = Math.floor(ms / 1000) % 60;
+    el.textContent = `🔒 price locked · ${m}:${String(s).padStart(2, "0")}`;
+  });
+}
+setInterval(tickLocks, 1000);
+
+function rejected(list) {
+  if (!list?.length) return "";
+  return `<details class="rej"><summary>${list.length} more product${list.length > 1 ? "s" : ""} checked and excluded by your rules</summary><ul>
+    ${list.map((x) => `<li><b>${esc(x.name)}</b> <span class="muted">#${esc(x.product_id)}</span> · ${esc(x.reason)}</li>`).join("")}</ul></details>`;
+}
+
+function diffTable(d) {
+  const rows = (d?.checks || []).map((c) => `<tr class="${c.ok ? "" : c.severity === "block" ? "blk" : "bad"}">
+    <td>${c.ok ? '<span class="p" style="color:var(--green);font-weight:700">✓</span>' : '<span style="color:var(--red);font-weight:700">✗</span>'}</td>
+    <td><b>${esc(FIELDS[c.field] || c.field)}</b></td><td>${esc(c.intended)}</td><td>${esc(c.cart)}</td><td class="muted">${esc(c.detail)}</td></tr>`).join("");
+  return `<table class="diff"><tr><th></th><th>Check</th><th>You asked</th><th>Cart</th><th>Why</th></tr>${rows}</table>`;
+}
+
+function devHeadline(d) {
+  const n = d?.deviations ?? 0;
+  return `<div class="dev ${n ? "some" : "zero"}">${n ? `${n} deviation${n > 1 ? "s" : ""} from your intent` : "0 deviations from your intent"}</div>`;
+}
+
+async function verifyReceipt(orderId, btn) {
+  btn.disabled = true;
+  const v = await (await fetch(`/orders/${encodeURIComponent(orderId)}/verify`)).json();
+  const box = document.getElementById(`v_${orderId}`);
+  box.innerHTML = `<ul class="vlist">${v.checks.map((c) => `<li><span style="color:${c.ok ? "var(--green)" : "var(--red)"};font-weight:700">${c.ok ? "✓" : "✗"}</span> <b>${esc(c.name.replace(/_/g, " "))}</b> <span class="muted">· ${esc(c.detail)}</span></li>`).join("")}
+    <li><b style="color:${v.valid ? "var(--green)" : "var(--red)"}">${v.valid ? "Receipt valid: recomputed and checked just now, independent of the agent" : "Receipt NOT valid"}</b></li></ul>`;
+  box.querySelectorAll("li").forEach((li, i) => setTimeout(() => li.classList.add("in"), 120 * i));
+  btn.disabled = false;
+}
 
 let sessionId = null, source = null;
 const steps = {};
@@ -214,12 +390,13 @@ function offersTable(e) {
       <td class="num">${esc(o.available_date || "–")}<div class="muted" style="font-size:12px">${avail}</div></td>
       <td class="num">${o.delivery_reliability != null ? Math.round(o.delivery_reliability * 100) + "%" : "–"}</td>
       <td class="num">${o.co2_kg_per_kg != null ? num(o.co2_kg_per_kg) : "–"}</td>
+      <td>${ticks(o.evidence)}${lockBadge(o)}</td>
     </tr>`;
   }).join("");
   return `<div class="bubble" style="padding:12px"><b>Offers for ${esc(e.request_summary)}</b> <span class="muted">(green = agent's recommendation, grey = cannot deliver in full on time)</span>
     <div style="overflow-x:auto;margin-top:8px"><table>
-    <tr><th></th><th>Product</th><th class="num">Quantity</th><th class="num">Price</th><th class="num">Total (net)</th><th class="num">Delivery</th><th class="num">Reliability</th><th class="num">kg CO₂e/kg</th></tr>
-    ${rows}</table></div></div>`;
+    <tr><th></th><th>Product</th><th class="num">Quantity</th><th class="num">Price</th><th class="num">Total (net)</th><th class="num">Delivery</th><th class="num">Reliability</th><th class="num">kg CO₂e/kg</th><th>Your rules · proof</th></tr>
+    ${rows}</table></div>${rejected(e.excluded)}</div>`;
 }
 
 function checksList(checks) {
@@ -229,18 +406,19 @@ function checksList(checks) {
 
 function approvalCard(a, inline) {
   const l = (a.lines || [])[0] || {};
+  const d = a.diff;
   return `<div class="${inline ? "box wait" : "appr"}">
-    ${inline ? `<h3>⏸ Needs human approval</h3>` : `<b>${esc(a.order_id)}</b> <span class="muted">· ${time(a.created_at)}</span>`}
+    <div class="row">${inline ? `<h3 style="margin:0">⏸ Needs your signature</h3>` : `<b>${esc(a.order_id)}</b> <span class="muted">· ${time(a.created_at)}</span>`}
+      <span style="flex:1"></span><span class="tier ${esc(a.tier || "ask")}">${esc(a.tier || "ask")}</span></div>
+    ${d ? devHeadline(d) : ""}
     <div class="kv">
-      <div>Product</div><div>${esc(l.name)}</div>
-      <div>Quantity</div><div>${num(l.quantity)} ${esc(l.sales_unit)}</div>
+      <div>Cart</div><div>${num(l.quantity)} ${esc(l.sales_unit)} · ${esc(l.name)}</div>
       <div>Total</div><div><b>${money(a.total_price, a.currency)}</b> net</div>
-      <div>Delivery</div><div>${esc(l.requested_date)}</div>
       <div>Agent's reason</div><div>${esc(a.agent_rationale)}</div>
     </div>
-    ${checksList(a.policy_checks)}
-    <div class="row" data-appr="${esc(a.approval_id)}">
-      <button class="approve" onclick="decide('${esc(a.approval_id)}','approve',this)">Approve</button>
+    ${d ? (inline ? diffTable(d) : `<details><summary class="muted">You asked vs. cart</summary>${diffTable(d)}</details>`) : checksList(a.policy_checks)}
+    <div class="row" data-appr="${esc(a.approval_id)}" style="margin-top:10px">
+      <button class="seal" onclick="decide('${esc(a.approval_id)}','approve',this,'${esc(a.cart_hash || "")}')">🔒 Approve &amp; sign cart <span class="fp">${esc(a.fingerprint || fp(a.cart_hash))}</span></button>
       <button class="reject" onclick="decide('${esc(a.approval_id)}','reject',this)">Reject</button>
     </div>
   </div>`;
@@ -280,17 +458,31 @@ function handle(e) {
       break;
     }
     case "offers":
-      add("step done", "€", offersTable(e), e.timestamp); break;
+      add("step done", "€", offersTable(e), e.timestamp); tickLocks(); break;
+    case "intent_proposed":
+      add("step", "✎", intentCard(e.intent), e.timestamp); break;
+    case "intent_confirmed":
+      document.querySelectorAll(`[data-int="${e.intent.intent_id}"]`).forEach((row) => row.innerHTML =
+        `<span class="signed">✓ Confirmed and signed by <b>${esc(e.intent.confirmed_by)}</b> · intent <span class="fpt">${fp(e.intent.intent_hash)}</span>. The agent may only buy this.</span>`);
+      break;
+    case "order_rejected":
+      add("step fail", "⛔", `<div class="box err"><div class="row"><h3 style="margin:0">Blocked by Valio Aimo</h3><span style="flex:1"></span><span class="tier block">block</span></div>
+        <div style="margin:6px 0">${esc(e.message)}</div>${diffTable(e.diff)}</div>`, e.timestamp); break;
     case "approval_required":
       add("step", "⏸", approvalCard(e.approval, true), e.timestamp); loadApprovals(); break;
     case "order_confirmed": {
       const l = (e.lines || [])[0] || {};
-      add("step done", "✓", `<div class="box ok"><h3>Order ${esc(e.order_id)} confirmed</h3>
+      const rc = e.receipt || {};
+      add("step done", "✓", `<div class="box ok"><div class="row"><h3 style="margin:0">Order ${esc(e.order_id)} confirmed</h3><span style="flex:1"></span><span class="tier ${esc(e.tier || "auto")}">${esc(e.tier || "auto")}</span></div>
+        ${e.tier === "auto" ? devHeadline(e.diff) : ""}
         <div class="kv"><div>Product</div><div>${esc(l.name)}</div>
         <div>Quantity</div><div>${num(l.quantity)} ${esc(l.sales_unit)}</div>
         <div>Total</div><div><b>${money(e.total_price, e.currency)}</b> net</div>
         <div>Delivery</div><div>${esc(e.delivery_date)}</div>
-        <div>Approved by</div><div>${e.approved_by ? esc(e.approved_by) : "nobody needed: within the agent's mandate"}</div></div></div>`, e.timestamp);
+        <div>Approved by</div><div>${e.approved_by ? `${esc(e.approved_by)}, signed cart <span class="fpt">${esc(e.fingerprint)}</span>` : "nobody needed: 0 deviations and within the mandate"}</div>
+        <div>Receipt</div><div><span class="fpt" title="${esc(rc.receipt_hash)}">${esc(e.fingerprint)}</span> signed by Valio Aimo
+          <button style="margin-left:6px;padding:3px 9px" onclick="verifyReceipt('${esc(e.order_id)}', this)">Verify receipt</button></div></div>
+        <div id="v_${esc(e.order_id)}"></div></div>`, e.timestamp);
       $("#orderid").value = e.order_id; loadAudit(); loadApprovals(); break;
     }
     case "error":
@@ -303,7 +495,8 @@ function handle(e) {
 function listen(id) {
   if (source) source.close();
   source = new EventSource(`/chat/${id}/stream`);
-  ["reasoning", "message", "tool_call", "tool_result", "offers", "approval_required", "order_confirmed", "error", "done"]
+  ["reasoning", "message", "tool_call", "tool_result", "offers", "approval_required", "order_confirmed", "error", "done",
+   "intent_proposed", "intent_confirmed", "order_rejected"]
     .forEach((t) => source.addEventListener(t, (m) => handle(JSON.parse(m.data))));
 }
 
@@ -321,10 +514,10 @@ async function send() {
   $("#newsession").checked = false;
 }
 
-async function decide(id, decision, btn) {
+async function decide(id, decision, btn, cartHash) {
   document.querySelectorAll(`[data-appr="${id}"] button`).forEach((b) => b.disabled = true);
   const r = await fetch(`/approvals/${id}`, {method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({decision, decided_by: $("#approver").value || "buyer.human"})});
+    body: JSON.stringify({decision, decided_by: $("#approver").value || "buyer.human", cart_hash: cartHash || null})});
   const a = await r.json();
   document.querySelectorAll(`[data-appr="${id}"]`).forEach((row) => row.innerHTML =
     `<b style="color:${decision === "approve" ? "var(--green)" : "var(--red)"}">${esc(a.status || a.detail?.error || "done")} by ${esc(a.decided_by || "")}</b>`);
@@ -356,7 +549,8 @@ document.querySelectorAll("[data-ex]").forEach((b) => b.onclick = () => { $("#ms
 $("#send").onclick = send;
 $("#msg").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send(); });
 $("#loadaudit").onclick = loadAudit;
-health(); loadApprovals(); setInterval(loadApprovals, 5000);
+$("#buyer").onchange = loadMandate;
+health(); loadMandate(); loadApprovals(); setInterval(loadApprovals, 5000);
 </script>
 </body>
 </html>

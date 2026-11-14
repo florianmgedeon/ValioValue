@@ -135,7 +135,7 @@ def compute(intent: dict, quote: dict, mandate: dict) -> dict:
     sig_ok = bool(prov.get("signature")) and trust.verify(trust.valio_key().public_key(), prov.get("hash", ""),
                                                            prov.get("signature")) \
         and prov.get("hash") == trust.digest(quote_core(line))
-    checks.append(_check("binding", "quote signed by Valio Aimo", "signature valid" if sig_ok else "invalid",
+    checks.append(_check("quote_signature", "quote signed by Valio Aimo", "signature valid" if sig_ok else "invalid",
                          sig_ok, "block", "Quote untouched since Valio priced it" if sig_ok
                          else "Quote signature does not match its content"))
 

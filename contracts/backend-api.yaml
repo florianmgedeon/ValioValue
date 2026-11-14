@@ -386,7 +386,7 @@ components:
     DiffCheck:
       type: object
       properties:
-        field: { type: string, enum: [product, hard_rules, quantity, delivery_date, budget, spend_limit, quote_valid, order_cutoff, availability, binding] }
+        field: { type: string, enum: [product, hard_rules, quantity, delivery_date, budget, spend_limit, category, quote_valid, quote_signature, order_cutoff, availability, binding] }
         intended: { type: string, example: "1,000 L" }
         cart: { type: string, example: "1,008 L (84 × 12 L)" }
         ok: { type: boolean }
