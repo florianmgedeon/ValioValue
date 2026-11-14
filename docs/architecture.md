@@ -29,7 +29,7 @@ See [`mcp-server/README.md`](../mcp-server/README.md). Not a tool on purpose: co
 
 | Object | Hash | Signed by |
 |---|---|---|
-| Mandate | `mandate_hash` (RFC 8785 + SHA-256) | part of every intent |
+| Mandate (Must, Prefer, Autonomy; versioned) | `mandate_hash` (RFC 8785 + SHA-256) | buyer (Ed25519) on every change; named in every receipt |
 | OrderIntent | `intent_hash` over the binding fields | buyer (Ed25519) on confirm |
 | Quote | hash of price, quantity, availability, expiry | Valio Aimo, when quoted |
 | Cart | `cart_hash`, names the `intent_hash` and quote signature | buyer, only for tier ask |

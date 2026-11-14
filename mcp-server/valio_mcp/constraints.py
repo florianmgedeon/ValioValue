@@ -143,30 +143,110 @@ def eval_lactose_free(p: Product) -> dict:
     return {"rule": "lactose_free", "verdict": _verdict(signals, "unknown"), "signals": signals}
 
 
-def eval_origin(p: Product, country: str) -> dict:
-    if not p.country:
-        return {"rule": f"origin:{country}", "verdict": "unknown", "signals": []}
-    ok = p.country.lower() == country.lower()
-    return {"rule": f"origin:{country}", "verdict": "safe" if ok else "excluded",
-            "signals": [_sig("catalog", "countryOfOrigin", p.country, "safe" if ok else "excluded")]}
+def _flip(ev: dict) -> dict:
+    """'contains X' is the opposite verdict of 'not_contains X'."""
+    flip = {"safe": "excluded", "excluded": "safe", "unknown": "unknown"}
+    return ev | {"verdict": flip[ev["verdict"]],
+                 "signals": [s | {"says": flip.get(s["says"], s["says"])} for s in ev["signals"]]}
 
 
-def evaluate(p: Product, rule: dict) -> dict:
-    kind = rule.get("rule")
-    if kind == "lactose_free":
+def product_value(p: Product, attr: str, offer: dict | None = None) -> Any:
+    """Raw value of a plain attribute. None = unknown. Offer attributes need an offer."""
+    if attr in ("unit_price", "comparison_price"):
+        return (offer or {}).get(attr)
+    if attr == "line_total":
+        return (offer or {}).get("total_price")
+    return {"product_id": p.id, "name": p.name, "brand": p.brand, "vendor": p.vendor, "category": p.category,
+            "country": (p.country or "").lower() or None, "labels": p.labels, "claims": p.claims,
+            "allergens_free_from": p.allergens_free_from, "delivery_reliability": p.delivery_reliability,
+            "co2_kg_per_kg": p.co2_kg_per_kg}.get(attr)
+
+
+def _compare(op: str, have: Any, want: Any) -> bool:
+    if op in ("eq", "ne"):
+        same = (str(have).lower() == str(want).lower()) if isinstance(have, str) else have == want
+        return same if op == "eq" else not same
+    if op in ("in", "not_in"):
+        hit = str(have).lower() in {str(w).lower() for w in want}
+        return hit if op == "in" else not hit
+    if op in ("contains", "not_contains"):
+        hit = str(want).lower() in {str(h).lower() for h in have}
+        return hit if op == "contains" else not hit
+    return {"lt": have < want, "lte": have <= want, "gt": have > want, "gte": have >= want}[op]
+
+
+def check(p: Product, c: dict, offer: dict | None = None) -> dict | None:
+    """Verdict for one normalised condition. None if it cannot be checked yet (offer attribute, no offer)."""
+    from .rules import ATTRIBUTES
+    a, op, v = c["attr"], c["op"], c["value"]
+    if ATTRIBUTES[a][1] == "offer" and offer is None:
+        return None
+    if a in ("allergens", "allergens_contains") and op in ("contains", "not_contains"):
+        ev = eval_allergen(p, v, "contains_or_may_contain" if a == "allergens" else "contains")
+        return ev if op == "not_contains" else _flip(ev)
+    if a == "lactose_free":
         ev = eval_lactose_free(p)
-    elif kind == "exclude_allergen":
-        ev = eval_allergen(p, rule.get("allergen", ""), rule.get("strictness") or "contains_or_may_contain")
-    elif kind == "origin":
-        ev = eval_origin(p, rule.get("country", ""))
-    else:
-        ev = {"rule": str(kind), "verdict": "unknown", "signals": []}
-    ev["source"] = rule.get("source", "request")
+        return ev if v else _flip(ev)
+    have = product_value(p, a, offer)
+    field = {"country": "countryOfOrigin"}.get(a, a)
+    src = "price API" if ATTRIBUTES[a][1] == "offer" else "catalog"
+    if have is None:
+        return {"rule": a, "verdict": "unknown", "signals": []}
+    ok = _compare(op, have, v)
+    shown = ", ".join(map(str, have)) if isinstance(have, list) else have
+    return {"rule": a, "verdict": "safe" if ok else "excluded",
+            "signals": [_sig(src, field, shown if shown != "" else "none", "safe" if ok else "excluded")]}
+
+
+def evaluate(p: Product, rule: dict, offer: dict | None = None) -> dict | None:
+    """Verdict + evidence for a must (or preference). Accepts V2 shorthands. None = not applicable here:
+    the rule is off, its applies_to does not match this product, or it needs a price we do not have yet."""
+    from .rules import rule as norm
+    r = rule if "attr" in rule and "label" in rule else norm(rule, source=rule.get("source", "request"))
+    if not r.get("enabled", True):
+        return None
+    for cond in r.get("applies_to") or []:
+        ev = check(p, cond, offer)
+        if ev is None or ev["verdict"] != "safe":
+            return None
+    ev = check(p, r, offer)
+    if ev is None:
+        return None
+    ev["rule"] = r["label"]
+    ev["id"] = r.get("id")
+    ev["source"] = r.get("source", "request")
+    ev["if_unknown"] = r.get("if_unknown", "exclude")
     return ev
 
 
-def evaluate_all(p: Product, rules: list[dict]) -> list[dict]:
-    return [evaluate(p, r) for r in rules]
+def evaluate_all(p: Product, rules: list[dict], offer: dict | None = None) -> list[dict]:
+    return [ev for ev in (evaluate(p, r, offer) for r in rules) if ev is not None]
+
+
+def violates(ev: dict) -> bool:
+    """A must is broken if the data says so, or if it is unknown and the rule says 'exclude if unknown'."""
+    return ev["verdict"] == "excluded" or (ev["verdict"] == "unknown" and ev.get("if_unknown") != "ask")
+
+
+def facts(p: Product, offer: dict | None = None) -> dict:
+    """Product attributes as plain values, for Cedar. Unknown values are left out."""
+    from .rules import ATTRIBUTES
+    out: dict[str, Any] = {}
+    for a, (typ, where, _) in ATTRIBUTES.items():
+        if a in ("allergens", "allergens_contains"):
+            data = p.has_allergen_data or p.allergens_contains or p.allergens_may_contain
+            if data:
+                out[a] = sorted(set(p.allergens_contains) | (set(p.allergens_may_contain) if a == "allergens" else set()))
+            continue
+        if a == "lactose_free":
+            v = eval_lactose_free(p)["verdict"]
+            if v != "unknown":
+                out[a] = v == "safe"
+            continue
+        v = product_value(p, a, offer)
+        if v is not None:
+            out[a] = list(v) if typ == "set" else v
+    return out
 
 
 def one_line(ev: dict) -> str:

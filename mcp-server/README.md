@@ -45,12 +45,12 @@ Per product and rule: `safe`, `excluded` or `unknown`, with the signals. Unknown
 | Check | Mismatch |
 |---|---|
 | binding (buyer, exact quantity the quote was asked for), quote signature, quote valid, cut-off | block |
-| hard rules (lactose, allergens) not `safe` | block |
+| musts (mandate and request) not `safe` (unknown counts as broken unless the rule says `if_unknown: ask`) | block |
 | product class (catalog search for the intent's product includes it) | ask |
 | quantity in Decimal: not less, max +`max_over_pct` from pack rounding | ask |
-| delivery date, availability, budget, mandate spend limit, category | ask |
+| delivery date, availability, budget, missed preference | ask |
 
-`auto` = 0 deviations: confirmed, receipt signed by Valio Aimo. `ask` = a human signs the exact cart hash. `block` = rejected, the intent stays usable.
+Then Cedar decides per line (`policy.decide`): a broken must or technical rule blocks; a line goes through alone only if a grant of the mandate covers its scope, its limits and every *ask* deviation. `auto`: confirmed, the receipt names the grants. `ask`: a human signs the exact cart hash. `block`: rejected, the intent stays usable. Details: [`docs/policy-v3-plan.md`](../docs/policy-v3-plan.md).
 
 ## Human-only endpoints (not MCP)
 
@@ -62,14 +62,20 @@ POST /internal/intents/{id}/confirm   {"intent_hash", "signature", "confirmed_by
 POST /internal/intents/{id}/revise    {"edits": {...}}  -> new proposed intent, new hash
 GET  /internal/approvals?status=pending
 POST /internal/approvals/{id}         {"decision", "decided_by", "cart_hash", "signature"}   409 if the cart changed
-GET  /internal/orders/{id}  /internal/orders/{id}/audit  /internal/mandate/{buyer_id}
+GET  /internal/orders/{id}  /internal/orders/{id}/audit
+GET  /internal/mandate/{buyer_id}            current mandate (Must, Prefer, Autonomy) + summary
+POST /internal/mandate/{buyer_id}/preview    validate, next version, hash to sign, Cedar
+PUT  /internal/mandate/{buyer_id}            {"mandate", "mandate_hash", "signature", "updated_by"}   409 hash, 403 signature, 422 invalid
+GET  /internal/mandate/{buyer_id}/history    /internal/mandate/{buyer_id}/cedar    /internal/policy-catalog
 ```
 
 Public: `GET /verify/{order_id}` recomputes every hash and checks every signature. `GET /keys` returns Valio Aimo's public key.
 
-## Mandates (`policies.json`)
+## Mandates (three levels, versioned)
 
-`juvenes` (1,000 EUR autonomous), `hotel-chain-helsinki` (500), `school-kitchen-espoo` (300, always no peanuts and tree nuts incl. may contain), `default`.
+`mandatory_rules` (Must: block), `preferences` (Prefer: ranking, a miss asks), `autonomy.grants` (when the agent may decide alone). All rules are conditions `{attr, op, value}` over product data, no fixed rule kinds. Versions live in SQLite; every change is signed by the buyer. Format and decision: [`docs/policy-v3-plan.md`](../docs/policy-v3-plan.md).
+
+Seeds in `policies.json` (V2 format, migrated on first read, `spend_limit` becomes grant `g1`): `juvenes` (1,000 EUR autonomous), `hotel-chain-helsinki` (500), `school-kitchen-espoo` (300, always no peanuts and tree nuts incl. may contain), `default`.
 
 ## Data
 

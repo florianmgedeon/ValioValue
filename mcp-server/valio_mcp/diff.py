@@ -40,9 +40,9 @@ def delivered_amount(line: dict, unit: str) -> Decimal | None:
     return qty * D(content)
 
 
-def compute_line(intent: dict, item: dict, quote: dict) -> tuple[list[dict], list[dict]]:
-    """Checks for one cart line against the intent item it claims to fulfil."""
-    from .intent import effective_rules
+def compute_line(intent: dict, item: dict, quote: dict, mandate: dict | None = None) -> tuple[list[dict], list[dict]]:
+    """Checks for one cart line against the intent item it claims to fulfil, under the current mandate."""
+    from .intent import effective_preferences, effective_rules
     line = quote["data"]
     checks: list[dict] = []
     product = catalog().get(line["product_id"])
@@ -70,14 +70,25 @@ def compute_line(intent: dict, item: dict, quote: dict) -> tuple[list[dict], lis
                f"Catalog search for '{item['product']['query']}' includes this product" if in_class
                else f"'{line['name']}' is not what a search for '{item['product']['query']}' returns"))
 
-    # hard rules from data, never from the agent
-    rules = effective_rules(intent, item)
-    evidence = constraints.evaluate_all(product, rules) if product else []
+    # musts from data, never from the agent. Broken -> block. Unknown -> block, or ask if the rule says so.
+    rules = effective_rules(intent, item, mandate)
+    evidence = constraints.evaluate_all(product, rules, offer=line) if product else []
     for ev in evidence:
         ok = ev["verdict"] == "safe"
-        sev = "ask" if ev["rule"].startswith("origin") else "block"
+        sev = "block" if constraints.violates(ev) else "ask"
         detail = (", ".join(f"{s['source']} {s['field']}={s['value']}" for s in ev["signals"]) or "no data")
         add(_check("hard_rules", ev["rule"], ev["verdict"], ok, sev, detail) | {"evidence": ev})
+
+    # preferences: a miss is a deviation that asks, unless a grant of the mandate accepts it
+    for pref in (effective_preferences(intent, mandate) if mandate and product else []):
+        ev = constraints.evaluate(product, pref, offer=line)
+        if ev is None:
+            continue
+        ok = ev["verdict"] == "safe"
+        detail = (", ".join(f"{s['source']} {s['field']}={s['value']}" for s in ev["signals"]) or "no data")
+        add(_check("preference", pref["label"], ev["verdict"], ok, "ask",
+                   ("Meets your preference: " if ok else "Misses your preference: ") + detail)
+            | {"pref_id": pref["id"], "weight": pref.get("weight", 1)})
     if not product and rules:
         add(_check("hard_rules", "all rules", "unknown product", False, "block",
                    "Product not in catalog, rules cannot be proven"))
@@ -102,7 +113,8 @@ def compute_line(intent: dict, item: dict, quote: dict) -> tuple[list[dict], lis
             detail = "Exact"
         else:
             detail = f"Rounded up to whole packs: +{over.quantize(Decimal('0.1'))} % (allowed {q.get('max_over_pct', 0):g} %)"
-        add(_check("quantity", _q(amount, q["unit"]), _q(got, q["unit"]) + pack, ok, "ask", detail))
+        add(_check("quantity", _q(amount, q["unit"]), _q(got, q["unit"]) + pack, ok, "ask", detail)
+            | {"over_pct": float(over.quantize(Decimal("0.01")))})
 
     # delivery date and availability
     by = intent["deliver_by"]
@@ -157,7 +169,7 @@ def compute(intent: dict, pairs: list[tuple[dict | None, dict | None, str, str]]
             checks.append(_check("binding", "a live quote", f"unknown quote {qid}", False, "block",
                                  "Quote not found") | {"item_id": iid})
             continue
-        c, ev = compute_line(intent, item, quote)
+        c, ev = compute_line(intent, item, quote, mandate)
         checks += c
         evidence[iid] = ev
         total += D(quote["data"]["total_price"])
@@ -170,10 +182,6 @@ def compute(intent: dict, pairs: list[tuple[dict | None, dict | None, str, str]]
         checks.append(_check("budget", f"max {b:,.2f} {cur} for the whole intent",
                              f"{after:,.2f} {cur}" + (f" (incl. {spent:,.2f} already ordered)" if spent else ""),
                              after <= b, "ask", "Within your budget" if after <= b else "Over your budget"))
-    lim = D(mandate["spend_limit"])
-    checks.append(_check("spend_limit", f"auto up to {lim:,.2f} {cur} per order", f"{total:,.2f} {cur}",
-                         total <= lim, "ask", "Within the agent's autonomous limit" if total <= lim
-                         else "Above the agent's autonomous limit, a human must sign"))
     deviations = sum(1 for c in checks if not c["ok"])
     return {"deviations": deviations, "checks": checks, "evidence": evidence, "total": float(total)}
 

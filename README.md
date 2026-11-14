@@ -4,6 +4,10 @@ Hack Junction 2026 · Valio Aimo Challenge · **Trusted Trade Agents**
 
 An external purchasing agent that finds products, compares offers and orders from Valio Aimo, with the guardrails enforced on Valio Aimo's side, not in the agent's prompt.
 
+**Product goal:** an agent that knows your kitchen. See [`docs/product-vision.md`](docs/product-vision.md) and the UX draft [`docs/ux-concept.md`](docs/ux-concept.md).
+
+**V3: policies in three levels.** The buyer's mandate has Must rules (block), Preferences (ranking) and Autonomy grants (when the agent may order alone). Rules are generic conditions over product data, versioned, signed by the buyer, enforced by Valio Aimo in [Cedar](https://www.cedarpolicy.com/). Editable via `PUT /mandate`. Details: [`docs/policy-v3-plan.md`](docs/policy-v3-plan.md).
+
 **V2: what you see is what you sign.** The agent first turns the request (a product, a list or a whole recipe) into an OrderIntent with one item per ingredient. The buyer confirms and signs it. Valio Aimo then diffs every cart line against its item, field by field, and decides: auto, ask (a human signs the exact cart) or block. Every item is bought exactly once. Every receipt can be verified live. Plan and rationale: [`docs/v2-plan.md`](docs/v2-plan.md).
 
 ## Architecture
@@ -44,7 +48,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 scripts/fetch_data.sh                 # downloads the full product catalog into data/raw/
 scripts/dev.sh                        # mcp-server :8001 + backend :8000
 .venv/bin/python scripts/demo_e2e.py  # intent -> signed confirm -> offers -> signed approval -> verify -> audit
-(cd mcp-server && ../.venv/bin/pytest)  # 31 tests incl. property-based guarantee
+(cd mcp-server && ../.venv/bin/pytest)  # 55 tests incl. property-based guarantees (Cedar decision)
 ```
 
 Open **http://localhost:8000/app**: the buyer UI. Paste or upload a recipe or a request, check and sign the intent (one line per ingredient), see per item the products proven safe with their evidence and signed price locks, the cart with "what differs from what you signed", sign it, and verify the receipt. The right column shows the mandate, the trust inspector (mandate, intent, quotes, cart, receipt as a hash chain) and the audit trail.

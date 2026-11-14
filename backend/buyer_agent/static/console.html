@@ -199,26 +199,36 @@ const md = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "
 const money = (v, c = "EUR") => v == null ? "–" : `${Number(v).toLocaleString("en", {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${c}`;
 const num = (v) => v == null ? "–" : Number(v).toLocaleString("en", {maximumFractionDigits: 2});
 const time = (iso) => iso ? new Date(iso).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"}) : "";
-const RULES = {quote_valid: "Price quote still valid", order_cutoff: "Ordered before the cut-off", availability: "Full quantity available on time", spend_limit: "Within the agent's spend limit"};
+const RULES = {quote_valid: "Price quote still valid", order_cutoff: "Ordered before the cut-off", availability: "Full quantity available on time", spend_limit: "Within the agent's spend limit", autonomy: "Agent may decide alone (mandate grants)", preference: "Meets your preference"};
 const ACTORS = {buyer_agent: ["Buyer agent", "#1f5eff"], valio_mcp: ["Valio Aimo", "#127a46"], policy_engine: ["Policy engine", "#a15c00"], human: ["Human", "#1d2330"]};
 
 
 // ---------------------------------------------------------------- v2 trust components
 const fp = (h) => { const x = String(h || "").split(":").pop().slice(0, 8).toUpperCase(); return x ? `${x.slice(0, 4)}-${x.slice(4)}` : ""; };
 const FIELDS = {binding: "Bound to intent", product: "Product", hard_rules: "Rule", quantity: "Quantity", delivery_date: "Delivery",
-  availability: "Availability", quote_signature: "Valio signature", budget: "Your budget", spend_limit: "Agent limit", category: "Category", quote_valid: "Price lock", order_cutoff: "Cut-off"};
+  availability: "Availability", quote_signature: "Valio signature", budget: "Your budget", spend_limit: "Agent limit", autonomy: "Agent autonomy", preference: "Preference", category: "Category", quote_valid: "Price lock", order_cutoff: "Cut-off"};
 let INTENT = null;
+
+function ruleLabel(r) { return r.label || (r.rule === "exclude_allergen" ? `no ${r.allergen}` : r.rule); }
+function mandateHtml(m) {
+  const on = (xs) => (xs || []).filter((x) => x.enabled !== false);
+  const must = on(m.mandatory_rules).map((r) => `<span class="ichip locked">🔒 ${esc(r.label || ruleLabel(r))}</span>`).join(" ") || '<span class="muted">none</span>';
+  const prefer = on(m.preferences).map((p) => `<span class="ichip">${esc(p.label)} ${"★".repeat(p.weight || 1)}</span>`).join(" ");
+  const grants = on((m.autonomy || {}).grants);
+  return `<div class="kv">
+      <div>Buyer</div><div><b>${esc(m.display_name)}</b> <span class="muted">· v${esc(m.version)}${m.updated_by ? `, signed by ${esc(m.updated_by)}` : ""}</span></div>
+      <div>Must</div><div>${must}</div>
+      <div>Prefer</div><div>${prefer ? prefer + " " : ""}<span class="muted">then ${esc(m.optimise || "price")}</span></div>
+      <div>Agent alone</div><div>${grants.length ? grants.map((g) => `<div>${esc(g.label)}</div>`).join("") : "nothing: every order needs your signature"}</div>
+      <div>Human signs</div><div>anything no grant covers</div>
+      <div>Never</div><div>a broken must, an expired price, an item twice</div>
+      <div>Mandate</div><div><span class="fpt">${esc(m.mandate_id)}</span> <span class="fpt" title="${esc(m.mandate_hash)}">${fp(m.mandate_hash)}</span></div></div>`;
+}
 
 async function loadMandate() {
   try {
     const m = await (await fetch(`/mandate?buyer_id=${encodeURIComponent($("#buyer").value)}`)).json();
-    const rules = (m.mandatory_rules || []).map((r) => `<span class="ichip locked">🔒 no ${esc(r.allergen || r.rule)}</span>`).join(" ") || '<span class="muted">none</span>';
-    $("#mandate").innerHTML = `<div class="kv">
-      <div>Buyer</div><div><b>${esc(m.display_name)}</b></div>
-      <div>Agent may</div><div>search, compare, order up to <b>${money(m.spend_limit, m.currency)}</b> alone</div>
-      <div>Above that</div><div>a human signs the exact cart</div>
-      <div>Always</div><div>${rules}</div>
-      <div>Mandate</div><div><span class="fpt">${esc(m.mandate_id)}</span> <span class="fpt" title="${esc(m.mandate_hash)}">${fp(m.mandate_hash)}</span></div></div>`;
+    $("#mandate").innerHTML = mandateHtml(m);
   } catch { $("#mandate").innerHTML = '<p class="empty">Cannot load mandate.</p>'; }
 }
 
@@ -479,7 +489,7 @@ function handle(e) {
         <div>Quantity</div><div>${num(l.quantity)} ${esc(l.sales_unit)}</div>
         <div>Total</div><div><b>${money(e.total_price, e.currency)}</b> net</div>
         <div>Delivery</div><div>${esc(e.delivery_date)}</div>
-        <div>Approved by</div><div>${e.approved_by ? `${esc(e.approved_by)}, signed cart <span class="fpt">${esc(e.fingerprint)}</span>` : "nobody needed: 0 deviations and within the mandate"}</div>
+        <div>Approved by</div><div>${e.approved_by ? `${esc(e.approved_by)}, signed cart <span class="fpt">${esc(e.fingerprint)}</span>` : `nobody needed: ${(rc.grants_used || []).length ? `auto under ${esc(rc.grants_used.join(", "))}` : "within the mandate"}`}</div>
         <div>Receipt</div><div><span class="fpt" title="${esc(rc.receipt_hash)}">${esc(e.fingerprint)}</span> signed by Valio Aimo
           <button style="margin-left:6px;padding:3px 9px" onclick="verifyReceipt('${esc(e.order_id)}', this)">Verify receipt</button></div></div>
         <div id="v_${esc(e.order_id)}"></div></div>`, e.timestamp);

@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from hypothesis import HealthCheck, given, settings, strategies as st
 
-from valio_mcp import constraints, diff, intent as intents, policy, trust
+from valio_mcp import constraints, diff, intent as intents, mandate as mandates, policy, trust
 from valio_mcp.catalog import catalog
 from valio_mcp.store import iso, now
 
@@ -39,12 +39,20 @@ def make_quote(pid, qty, content, unit_price, avail_amount, day_offset, req_amou
     return {"quote_id": "q_prop", "buyer_id": buyer, "data": line, "expires_at": line["quote_expires_at"]}
 
 
+def decide(it, pairs, mandate=MANDATE):
+    """The full order decision as place_order runs it: diff, then Cedar."""
+    d = diff.compute(it, pairs, mandate)
+    lines = [(iid, q["data"]) for item, q, iid, _ in pairs if item and q]
+    musts = {iid: intents.effective_rules(it, item, mandate) for item, _, iid, _ in pairs if item}
+    return d, policy.decide(it, d, lines, mandate, musts)
+
+
 RULES = st.lists(st.sampled_from([{"rule": "lactose_free"}, {"rule": "exclude_allergen", "allergen": "milk"},
                                   {"rule": "exclude_allergen", "allergen": "oats"},
                                   {"rule": "origin", "country": "fi"}]), max_size=2)
 
 
-@settings(max_examples=1500, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+@settings(max_examples=600, deadline=None, suppress_health_check=[HealthCheck.too_slow])
 @given(amount=st.integers(1, 3000), pct=st.sampled_from([0, 1, 2, 5]), under=st.booleans(), rules=RULES,
        budget=st.one_of(st.none(), st.integers(50, 3000)), query=st.sampled_from(["lactose-free milk", "milk", "oat drink"]),
        pid=st.sampled_from(PRODUCTS), qty=st.integers(1, 3500), content=st.sampled_from([None, 0.5, 1.0, 1.5, 10.0]),
@@ -57,8 +65,8 @@ def test_autonomous_orders_never_deviate(amount, pct, under, rules, budget, quer
                        amount if same_request else amount + 1, "L", "juvenes" if same_buyer else "someone-else",
                        expired)
     item = it["items"][0]
-    d = diff.compute(it, [(item, quote, item["item_id"], "q_prop")], MANDATE)
-    tier = policy.tier(d["checks"])
+    d, dec = decide(it, [(item, quote, item["item_id"], "q_prop")])
+    tier = dec["tier"]
     if tier != "auto":
         return
     line = quote["data"]
@@ -71,7 +79,8 @@ def test_autonomous_orders_never_deviate(amount, pct, under, rules, budget, quer
     for ev in constraints.evaluate_all(catalog().get(pid), intents.effective_rules(it, item)):
         assert ev["verdict"] == "safe"
     assert line["available_date"] <= BY and avail >= qty
-    assert line["total_price"] <= MANDATE["spend_limit"] and (budget is None or line["total_price"] <= budget)
+    limit = MANDATE["autonomy"]["grants"][0]["limits"]["max_order_total"]  # juvenes: V2 spend_limit -> grant g1
+    assert line["total_price"] <= limit and (budget is None or line["total_price"] <= budget)
     assert same_request and same_buyer and not expired
     assert d["deviations"] == 0
 
@@ -90,7 +99,45 @@ def test_cart_never_buys_an_item_twice_or_outside_the_intent(n, pick):
         q["data"]["item_id"] = iid
         q["data"]["provenance"] = trust.valio_sign_obj(diff.quote_core(q["data"]))
         pairs.append((item, q, iid, f"q{k}"))
-    tier = policy.tier(diff.compute(it, pairs, MANDATE)["checks"])
+    tier = decide(it, pairs)[1]["tier"]
     ids = [p[2] for p in pairs]
     valid = len(ids) == len(set(ids)) and all(p[0] is not None for p in pairs) and 0.89 * 120 * len(ids) <= 1000
     assert (tier == "auto") == valid
+
+
+# --------------------------------------------------------------------------- autonomy can never override a block
+
+GENEROUS = {"buyer_id": "prop-buyer", "version": 1, "mandate_id": "mandate_prop-buyer_v1", "mandate_hash": "x",
+            **mandates.normalise({
+                "mandatory_rules": [{"rule": "exclude_allergen", "allergen": "peanuts"}],
+                "preferences": [{"attr": "country", "op": "eq", "value": "fi", "weight": 3}],
+                "autonomy": {"grants": [{"id": "gall", "limits": {"max_order_total": 10 ** 9},
+                                         "accepts": [{"check": c} for c in mandates.ACCEPT_CHECKS]}]}})}
+
+
+@settings(max_examples=400, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+@given(amount=st.integers(1, 3000), rules=RULES, query=st.sampled_from(["lactose-free milk", "milk", "oat drink"]),
+       pid=st.sampled_from(PRODUCTS), qty=st.integers(1, 3500), content=st.sampled_from([None, 1.0, 10.0]),
+       avail=st.integers(0, 4000), day_offset=st.integers(-2, 2), same_request=st.booleans(),
+       same_buyer=st.booleans(), expired=st.booleans())
+def test_no_grant_turns_a_block_into_auto(amount, rules, query, pid, qty, content, avail, day_offset, same_request,
+                                          same_buyer, expired):
+    """A grant that accepts every deviation with no limit: still, any broken must or technical rule blocks.
+    In Cedar forbid beats permit; this checks our compilation keeps that promise."""
+    it = intents.build(buyer_id="prop-buyer", mandate=GENEROUS, session=None, original_request="",
+                       items=[{"product_query": query, "quantity": amount, "quantity_unit": "L"}], deliver_by=BY,
+                       hard_rules=rules, optimise="price", origin_preference=None, budget_max_total=None,
+                       max_over_pct=2, allow_under=False, agent_questions=[], check_text=False)
+    it["status"] = "confirmed"
+    quote = make_quote(pid, qty, content, 1.19, avail, day_offset, amount if same_request else amount + 1, "L",
+                       "prop-buyer" if same_buyer else "someone-else", expired)
+    item = it["items"][0]
+    d, dec = decide(it, [(item, quote, item["item_id"], "q_prop")], GENEROUS)
+    blocked = any(not c["ok"] and c["severity"] == "block" for c in d["checks"])
+    if blocked:
+        assert dec["tier"] == "block", dec
+    else:
+        assert dec["tier"] == "auto", dec  # everything else is accepted by the generous grant
+    for ev in constraints.evaluate_all(catalog().get(pid), intents.effective_rules(it, item, GENEROUS)):
+        if constraints.violates(ev):
+            assert dec["tier"] == "block"

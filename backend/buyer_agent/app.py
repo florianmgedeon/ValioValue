@@ -186,7 +186,51 @@ async def verify(order_id: str):
 
 @app.get("/mandate")
 async def mandate(buyer_id: str | None = None):
+    """Current mandate: mandatory_rules (Must), preferences (Prefer), autonomy.grants (Autonomy)."""
     return _passthrough(await _valio("GET", f"/internal/mandate/{buyer_id or config.DEFAULT_BUYER_ID}"))
+
+
+class MandateUpdate(BaseModel):
+    mandate: dict
+    buyer_id: str | None = None
+    updated_by: str | None = None
+    mandate_hash: str | None = None  # the hash the human was shown (from /mandate/preview); recommended
+
+
+@app.post("/mandate/preview")
+async def mandate_preview(body: MandateUpdate):
+    """Validate a new mandate. Returns the next version, its hash, a plain summary and the Cedar policies."""
+    bid = body.buyer_id or config.DEFAULT_BUYER_ID
+    return _passthrough(await _valio("POST", f"/internal/mandate/{bid}/preview", json={"mandate": body.mandate}))
+
+
+@app.put("/mandate")
+async def mandate_put(body: MandateUpdate):
+    """Store a new mandate version, signed with the buyer key. If mandate_hash is sent, it must match what the
+    preview gives now (the human saw exactly this). Changes apply to every order decided from now on."""
+    bid = body.buyer_id or config.DEFAULT_BUYER_ID
+    pre = _passthrough(await _valio("POST", f"/internal/mandate/{bid}/preview", json={"mandate": body.mandate}))
+    if body.mandate_hash and body.mandate_hash != pre["mandate_hash"]:
+        raise HTTPException(409, {"error": "The mandate changed since it was shown. Check it again.", "preview": pre})
+    return _passthrough(await _valio("PUT", f"/internal/mandate/{bid}", json={
+        "mandate": body.mandate, "mandate_hash": pre["mandate_hash"],
+        "signature": signing.sign(bid, pre["mandate_hash"]), "updated_by": body.updated_by or "buyer.human"}))
+
+
+@app.get("/mandate/history")
+async def mandate_history(buyer_id: str | None = None):
+    return _passthrough(await _valio("GET", f"/internal/mandate/{buyer_id or config.DEFAULT_BUYER_ID}/history"))
+
+
+@app.get("/mandate/cedar")
+async def mandate_cedar(buyer_id: str | None = None):
+    return _passthrough(await _valio("GET", f"/internal/mandate/{buyer_id or config.DEFAULT_BUYER_ID}/cedar"))
+
+
+@app.get("/policy-catalog")
+async def policy_catalog():
+    """Attributes, operators and example values a policy editor can offer."""
+    return _passthrough(await _valio("GET", "/internal/policy-catalog"))
 
 
 @app.get("/orders/{order_id}/audit")

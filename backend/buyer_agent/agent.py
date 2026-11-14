@@ -130,12 +130,28 @@ def unit_word(unit: str) -> str:
 
 # --------------------------------------------------------------------------- system prompt
 
-def system_prompt(session: Session) -> str:
+async def mandate_summary(buyer_id: str) -> str:
+    """The buyer's current mandate in plain text, read by the backend (not a tool the model can call)."""
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.get(f"{config.MCP_BASE_URL}/internal/mandate/{buyer_id}",
+                            headers={"Authorization": f"Bearer {config.APPROVER_TOKEN}"})
+            return r.json().get("summary") or ""
+    except Exception:  # noqa: BLE001 - the prompt works without it, Valio Aimo enforces the mandate anyway
+        log.warning("could not load mandate for %s", buyer_id)
+        return ""
+
+
+def system_prompt(session: Session, mandate: str = "") -> str:
     today = datetime.now(TZ)
+    mandate_block = (f"{mandate}\nValio Aimo applies this mandate itself: musts are added to every intent, preferences "
+                     "rank the offers, autonomy decides which orders go through without a human. Do not repeat musts or "
+                     "preferences in propose_intent unless the buyer said them in this request.\n") if mandate else ""
     return f"""You are the purchasing agent of buyer '{session.buyer_id}', ordering from Valio Aimo, a Finnish foodservice wholesaler, through its MCP tools.
 Now is {today:%A %Y-%m-%d %H:%M} ({config.TIMEZONE}). "By Monday" means the next Monday after today, as YYYY-MM-DD.
 
-Accuracy rule: you only ever buy what the buyer confirmed. Valio Aimo checks every order line against the confirmed intent, field by field. You never decide whether a product meets a rule, the data does.
+{mandate_block}Accuracy rule: you only ever buy what the buyer confirmed. Valio Aimo checks every order line against the confirmed intent, field by field. You never decide whether a product meets a rule, the data does.
 
 How to work:
 A) New request: call propose_intent FIRST, nothing else. original_request = the buyer's message verbatim.
@@ -169,7 +185,7 @@ async def run_turn(session: Session, user_text: str) -> None:
 
 async def _loop(session: Session) -> None:
     provider = make_provider(datetime.now(TZ).date())
-    system = system_prompt(session)
+    system = system_prompt(session, await mandate_summary(session.buyer_id))
     async with mcp_session(session) as mcp:
         tools = [ToolSpec(t.name, t.description or "", simplify_schema(t.inputSchema))
                  for t in (await mcp.list_tools()).tools]

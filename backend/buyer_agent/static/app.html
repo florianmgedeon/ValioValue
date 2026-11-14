@@ -204,7 +204,7 @@ const dt = (iso) => iso ? String(iso).replace("T", " ").slice(0, 16) : "";
 const time = (iso) => iso ? new Date(iso).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"}) : "";
 const unitW = (u) => ({L: "L", KG: "kg", SALES_UNIT: "units"}[u] || u);
 const FIELD = {binding: "Bound to intent", product: "Right product", hard_rules: "Rule", quantity: "Quantity", delivery_date: "Delivery",
-  availability: "Availability", budget: "Your budget", spend_limit: "Agent limit", quote_valid: "Price lock", order_cutoff: "Cut-off", quote_signature: "Valio signature"};
+  availability: "Availability", budget: "Your budget", spend_limit: "Agent limit", autonomy: "Agent autonomy", preference: "Preference", quote_valid: "Price lock", order_cutoff: "Cut-off", quote_signature: "Valio signature"};
 const ACTORS = {buyer_agent: ["Buyer agent", "#2454d6"], valio_mcp: ["Valio Aimo", "#137a49"], policy_engine: ["Policy engine", "#9a5b00"], human: ["Human", "#18211c"]};
 const PRESETS = {
   risotto: `Mushroom risotto, serves 4. We need 40 portions by Monday:
@@ -274,7 +274,7 @@ function renderConvo() {
       ${acts.map((a) => `<li>${a.done ? (a.ok ? "✓" : "✗") : '<span class="spin"></span>'} <code>${esc(a.tool)}</code> ${esc(a.label)}${a.summary ? ` <span class="muted">→ ${esc(a.summary)}</span>` : ""}</li>`).join("")}</ul></details>` : "");
 }
 
-function ruleLabel(r) { return r.rule === "lactose_free" ? "lactose-free" : r.rule === "exclude_allergen" ? `no ${r.allergen}${r.strictness === "contains_or_may_contain" ? " (incl. may contain)" : ""}` : r.rule === "origin" ? `origin ${String(r.country).toUpperCase()}` : r.rule; }
+function ruleLabel(r) { return r.label ? r.label : r.rule === "lactose_free" ? "lactose-free" : r.rule === "exclude_allergen" ? `no ${r.allergen}${r.strictness === "contains_or_may_contain" ? " (incl. may contain)" : ""}` : r.rule === "origin" ? `origin ${String(r.country).toUpperCase()}` : r.rule; }
 
 function renderIntent() {
   const el = $("#s-intent"), it = S.intent;
@@ -413,7 +413,7 @@ function renderReceipt() {
     <div class="sub">Signed by Valio Aimo. Anyone can recompute it, independent of the agent.</div>
     <div class="banner ok"><div class="kv">
       <div>Order</div><div><b>${esc(o.order_id)}</b> · ${money(o.total_price, o.currency)} net · delivery ${esc(o.delivery_date)}</div>
-      <div>Approved</div><div>${o.approved_by ? `${esc(o.approved_by)} signed cart <span class="fpt">${esc(o.fingerprint)}</span>` : "nobody needed: 0 deviations, within the mandate"}</div>
+      <div>Approved</div><div>${o.approved_by ? `${esc(o.approved_by)} signed cart <span class="fpt">${esc(o.fingerprint)}</span>` : `nobody needed: ${(o.receipt?.grants_used || []).length ? `auto under ${esc(o.receipt.grants_used.join(", "))}` : "within the mandate"}`}</div>
       <div>Receipt</div><div><span class="fpt" title="${esc(rc.receipt_hash)}">${esc(o.fingerprint)}</span> · Valio key <span class="fpt">${esc((rc.valio_key_id || "").slice(8, 20))}</span></div>
       ${open.length ? `<div>Still open</div><div>${open.map((x) => `<span class="iid">${esc(x)}</span>`).join(" ")} (no product met every rule and could deliver in full on time, see Sourcing)</div>` : ""}
     </div></div>
@@ -435,7 +435,7 @@ function renderChain() {
     step(MANDATE ? "on" : "", "1", "Mandate", MANDATE ? `${esc(MANDATE.mandate_id)} <span class="fpt">${fp(MANDATE.mandate_hash)}</span>` : "–"),
     step(S.intentConfirmed ? "on" : it ? "wait" : "", "2", "Intent", it ? `<span class="fpt">${fp(it.intent_hash)}</span> ${it.items.length} item${it.items.length > 1 ? "s" : ""} · ${S.intentConfirmed ? `signed by ${esc(it.confirmed_by)} (Ed25519)` : "waiting for your signature"}` : "–"),
     step(quotes.length ? "on" : "", "3", "Quotes", quotes.length ? `${quotes.length} price${quotes.length > 1 ? "s" : ""} signed by Valio Aimo <span class="fpt">${esc((key || "").slice(8, 16))}</span>` : "–"),
-    step(o ? "on" : a ? "wait" : "", "4", "Cart", (o || a) ? `<span class="fpt">${esc((o || a).fingerprint)}</span> names intent ${fp(it?.intent_hash)} · ${o?.approved_by ? `signed by ${esc(o.approved_by)}` : a && !o ? "waiting for your signature" : "auto, 0 deviations"}` : "–"),
+    step(o ? "on" : a ? "wait" : "", "4", "Cart", (o || a) ? `<span class="fpt">${esc((o || a).fingerprint)}</span> names intent ${fp(it?.intent_hash)} · ${o?.approved_by ? `signed by ${esc(o.approved_by)}` : a && !o ? "waiting for your signature" : `auto${(o?.receipt?.grants_used || []).length ? ` under ${esc(o.receipt.grants_used.join(", "))}` : ""}`}` : "–"),
     step(S.verify?.valid ? "on" : o ? "wait" : "", "5", "Receipt", o ? `signed by Valio Aimo · ${S.verify ? (S.verify.valid ? "verified ✓" : "INVALID") : "not verified yet"}` : "–"),
   ].join("");
 }
@@ -573,18 +573,26 @@ async function loadAudit(orderId) {
     return `<li style="--c:${c}"><div class="who">${esc(w)} <span class="muted" style="font-weight:400;text-transform:none">${time(a.timestamp)}</span></div>${esc(a.summary)}${a.reason ? `<div class="muted">Why: ${esc(a.reason)}</div>` : ""}</li>`; }).join("")}</ul>`;
 }
 
+function mandateHtml(m) {
+  const on = (xs) => (xs || []).filter((x) => x.enabled !== false);
+  const must = on(m.mandatory_rules).map((r) => `<span class="chip locked">🔒 ${esc(r.label || ruleLabel(r))}</span>`).join(" ") || '<span class="muted">none</span>';
+  const prefer = on(m.preferences).map((p) => `<span class="chip">${esc(p.label)} ${"★".repeat(p.weight || 1)}</span>`).join(" ");
+  const grants = on((m.autonomy || {}).grants);
+  return `<div class="kv">
+      <div>Buyer</div><div><b>${esc(m.display_name)}</b> <span class="muted">· v${esc(m.version)}${m.updated_by ? `, signed by ${esc(m.updated_by)}` : ""}</span></div>
+      <div>Must</div><div>${must}</div>
+      <div>Prefer</div><div>${prefer ? prefer + " " : ""}<span class="muted">then ${esc(m.optimise || "price")}</span></div>
+      <div>Agent alone</div><div>${grants.length ? grants.map((g) => `<div>${esc(g.label)}</div>`).join("") : "nothing: every order needs your signature"}</div>
+      <div>Human signs</div><div>anything no grant covers</div>
+      <div>Never</div><div>a broken must, an expired price, an item twice</div>
+      <div>Mandate</div><div><span class="fpt">${esc(m.mandate_id)}</span> <span class="fpt" title="${esc(m.mandate_hash)}">${fp(m.mandate_hash)}</span></div></div>`;
+}
+
 async function loadMandate() {
   try {
     MANDATE = await (await fetch(`/mandate?buyer_id=${encodeURIComponent($("#buyer").value)}`)).json();
-    const rules = (MANDATE.mandatory_rules || []).map((r) => `<span class="chip locked">🔒 ${esc(ruleLabel(r))}</span>`).join("") || '<span class="muted">none</span>';
     $("#mandate").className = "";
-    $("#mandate").innerHTML = `<div class="kv">
-      <div>Buyer</div><div><b>${esc(MANDATE.display_name)}</b></div>
-      <div>Agent alone</div><div>search, compare and order up to <b>${money(MANDATE.spend_limit, MANDATE.currency)}</b> per order, only with 0 deviations</div>
-      <div>Human signs</div><div>anything above, any deviation from your intent</div>
-      <div>Never</div><div>a broken allergen rule, an expired price, an item twice</div>
-      <div>Always</div><div>${rules}</div>
-      <div>Mandate</div><div><span class="fpt">${esc(MANDATE.mandate_id)}</span> <span class="fpt" title="${esc(MANDATE.mandate_hash)}">${fp(MANDATE.mandate_hash)}</span></div></div>`;
+    $("#mandate").innerHTML = mandateHtml(MANDATE);
   } catch { $("#mandate").textContent = "Cannot load mandate."; }
   renderChain();
 }

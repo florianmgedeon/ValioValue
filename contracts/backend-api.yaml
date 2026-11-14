@@ -158,13 +158,64 @@ paths:
 
   /mandate:
     get:
-      summary: The buyer's purchasing mandate as Valio Aimo enforces it
+      summary: The buyer's current mandate (Must, Prefer, Autonomy) as Valio Aimo enforces it
+      parameters:
+        - { name: buyer_id, in: query, required: false, schema: { type: string } }
       responses:
         "200":
           description: Mandate
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Mandate" }
+    put:
+      summary: Store a new mandate version, signed with the buyer key. Applies to every order decided from now on.
+      description: |
+        Human only, never an MCP tool: the agent cannot change its own mandate. Send the mandate_hash from
+        /mandate/preview that the human saw; if the mandate changed in between, 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MandateUpdate" }
+      responses:
+        "200": { description: The stored version, content: { application/json: { schema: { $ref: "#/components/schemas/Mandate" } } } }
+        "409": { description: Shown hash no longer matches }
+        "422": { description: Invalid mandate (unknown attribute, operator, limit ...) with a readable error }
+
+  /mandate/preview:
+    post:
+      summary: Validate a new mandate. Returns the next version, its hash, a plain summary and the generated Cedar.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MandateUpdate" }
+      responses:
+        "200": { description: Preview, content: { application/json: { schema: { $ref: "#/components/schemas/Mandate" } } } }
+        "422": { description: Invalid mandate }
+
+  /mandate/history:
+    get:
+      summary: All versions of the buyer's mandate, newest first
+      parameters:
+        - { name: buyer_id, in: query, required: false, schema: { type: string } }
+      responses:
+        "200": { description: Versions, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Mandate" } } } } }
+
+  /mandate/cedar:
+    get:
+      summary: The mandate compiled to Cedar (musts as forbid, grants as permit on order_alone)
+      parameters:
+        - { name: buyer_id, in: query, required: false, schema: { type: string } }
+      responses:
+        "200": { description: "{mandate_id, cedar, policy_ids}" }
+
+  /policy-catalog:
+    get:
+      summary: What a policy editor can offer, taken from the product data
+      description: Attributes with type, operators and example values; accept checks with parameters; limit keys.
+      responses:
+        "200": { description: Catalog }
 
   /intents/{intent_id}/confirm:
     post:
@@ -270,9 +321,9 @@ components:
     PolicyCheck:
       type: object
       properties:
-        rule: { type: string, example: "spend_limit" }
+        rule: { type: string, example: "autonomy" }
         passed: { type: boolean }
-        detail: { type: string, example: "Order total 1,290.00 EUR exceeds autonomous limit of 500.00 EUR" }
+        detail: { type: string, example: "A human must sign: g1 Orders anything alone up to 1,000 EUR: 1,199.52 over its limit 1,000.00" }
 
     Approval:
       type: object
@@ -318,15 +369,80 @@ components:
 
 
     # ---------- v0.2 trust objects ----------
-    HardRule:
+    Condition:
       type: object
-      required: [rule]
+      description: |
+        A condition over product data. Attributes and operators: GET /policy-catalog. No fixed rule kinds:
+        any attribute the data has can be used. Unknown data = verdict unknown.
+      required: [attr, op, value]
       properties:
-        rule: { type: string, enum: [lactose_free, exclude_allergen, origin] }
-        allergen: { type: string, description: "for exclude_allergen, e.g. milk, gluten, peanuts" }
-        strictness: { type: string, enum: [contains, contains_or_may_contain], default: contains_or_may_contain }
-        country: { type: string, description: "for origin, ISO alpha-2" }
-        source: { type: string, enum: [request, mandate], description: "mandate rules cannot be edited away" }
+        attr: { type: string, example: country, enum: [product_id, name, brand, vendor, category, country, labels, claims, allergens, allergens_contains, allergens_free_from, lactose_free, delivery_reliability, co2_kg_per_kg, unit_price, comparison_price, line_total] }
+        op: { type: string, enum: [eq, ne, in, not_in, contains, not_contains, lt, lte, gt, gte] }
+        value: { description: "string, number, boolean or list (in / not_in)", example: fi }
+
+    HardRule:
+      description: |
+        A must (mandate or request). A condition plus id and label. V2 shorthands are accepted on input and kept
+        on output: {rule: lactose_free}, {rule: exclude_allergen, allergen, strictness}, {rule: origin, country}.
+      allOf:
+        - $ref: "#/components/schemas/Condition"
+        - type: object
+          properties:
+            id: { type: string, example: m1, description: "m* mandate, r* request, <item>_r* item" }
+            label: { type: string, example: "no peanuts incl. 'may contain'" }
+            if_unknown: { type: string, enum: [exclude, ask], default: exclude, description: "ask = keep the product, a human decides" }
+            applies_to: { type: array, items: { $ref: "#/components/schemas/Condition" }, description: "Only for products matching all of these" }
+            enabled: { type: boolean, default: true }
+            source: { type: string, example: mandate, description: "mandate rules cannot be edited away" }
+            rule: { type: string, enum: [lactose_free, exclude_allergen, origin, condition], description: V2 shorthand }
+            allergen: { type: string }
+            strictness: { type: string, enum: [contains, contains_or_may_contain] }
+            country: { type: string }
+
+    Preference:
+      allOf:
+        - $ref: "#/components/schemas/Condition"
+        - type: object
+          properties:
+            id: { type: string, example: p1 }
+            label: { type: string }
+            weight: { type: integer, minimum: 1, maximum: 3, description: "Ranking: offers sorted by sum of weights met" }
+            enabled: { type: boolean, default: true }
+
+    Grant:
+      type: object
+      description: Inside this scope, up to these limits, the agent may accept these deviations on its own.
+      properties:
+        id: { type: string, example: g1 }
+        label: { type: string, example: "Orders origin FI alone up to 2,000 EUR, may accept quantity" }
+        scope: { type: array, items: { $ref: "#/components/schemas/Condition" }, description: "All must hold. Empty = every line" }
+        limits:
+          type: object
+          properties:
+            max_order_total: { type: number, description: "Summed over the lines assigned to this grant" }
+            max_line_total: { type: number }
+            max_unit_price: { type: number }
+        accepts:
+          type: array
+          items:
+            type: object
+            properties:
+              check: { type: string, enum: [quantity, delivery_date, preference, product, budget, availability] }
+              max_over_pct: { type: number, description: "quantity only" }
+              max_days_late: { type: integer, description: "delivery_date only" }
+              id: { type: string, description: "preference only: which preference, empty = all" }
+        enabled: { type: boolean, default: true }
+
+    MandateUpdate:
+      type: object
+      required: [mandate]
+      properties:
+        mandate:
+          type: object
+          description: "{display_name, currency, optimise, mandatory_rules: [HardRule], preferences: [Preference], autonomy: {grants: [Grant]}}"
+        buyer_id: { type: string }
+        updated_by: { type: string }
+        mandate_hash: { type: string, description: "From /mandate/preview, what the human saw" }
 
     OrderIntent:
       type: object
@@ -405,8 +521,10 @@ components:
     DiffCheck:
       type: object
       properties:
-        field: { type: string, enum: [product, hard_rules, quantity, delivery_date, budget, spend_limit, quote_valid, quote_signature, order_cutoff, availability, binding] }
-        item_id: { type: string, nullable: true, description: "Line check for this item. Null = whole cart (budget, spend_limit)" }
+        field: { type: string, enum: [product, hard_rules, preference, quantity, delivery_date, budget, autonomy, quote_valid, quote_signature, order_cutoff, availability, binding] }
+        item_id: { type: string, nullable: true, description: "Line check for this item. Null = whole cart (budget, autonomy)" }
+        pref_id: { type: string, description: "preference checks: which preference" }
+        grants_used: { type: array, items: { type: string }, description: "autonomy check: the grants that let the agent order alone" }
         intended: { type: string, example: "1,000 L" }
         cart: { type: string, example: "1,008 L (84 × 12 L)" }
         ok: { type: boolean }
@@ -416,8 +534,9 @@ components:
     Diff:
       type: object
       properties:
-        deviations: { type: integer, example: 0 }
+        deviations: { type: integer, example: 0, description: "Failed checks, autonomy not counted" }
         checks: { type: array, items: { $ref: "#/components/schemas/DiffCheck" } }
+        accepted: { type: array, items: { type: string }, example: ["preference:p1"], description: "Tier auto: deviations a grant accepted" }
 
     Receipt:
       type: object
@@ -425,6 +544,9 @@ components:
         order_id: { type: string }
         intent_hash: { type: string }
         cart_hash: { type: string }
+        mandate_id: { type: string, example: mandate_juvenes_v2, description: "The mandate version that decided" }
+        mandate_hash: { type: string }
+        grants_used: { type: array, items: { type: string }, description: "Tier auto: the grants that allowed it" }
         buyer_intent_signature: { type: string }
         buyer_cart_signature: { type: string, nullable: true, description: "Only when a human approved (tier ask)" }
         valio_signature: { type: string }
@@ -441,13 +563,26 @@ components:
     Mandate:
       type: object
       properties:
-        mandate_id: { type: string }
+        buyer_id: { type: string }
+        version: { type: integer }
+        mandate_id: { type: string, example: mandate_juvenes_v2 }
         mandate_hash: { type: string }
+        fingerprint: { type: string }
         display_name: { type: string }
-        spend_limit: { type: number }
         currency: { type: string }
-        allowed_categories: { type: array, nullable: true, items: { type: string } }
-        mandatory_rules: { type: array, items: { $ref: "#/components/schemas/HardRule" } }
+        optimise: { type: string, enum: [price, reliability, co2], description: "After preferences" }
+        mandatory_rules: { type: array, items: { $ref: "#/components/schemas/HardRule" }, description: "MUST: broken -> block" }
+        preferences: { type: array, items: { $ref: "#/components/schemas/Preference" }, description: "PREFER: ranking, a miss asks unless a grant accepts it" }
+        autonomy:
+          type: object
+          description: "AUTONOMY: no grants = every order needs a human signature"
+          properties:
+            grants: { type: array, items: { $ref: "#/components/schemas/Grant" } }
+        summary: { type: string, description: Plain text of all three levels }
+        updated_by: { type: string }
+        updated_at: { type: string, format: date-time }
+        signature: { type: string, nullable: true, description: "Buyer Ed25519 over mandate_hash (null for the seeded v1)" }
+        cedar: { type: string, description: "Preview only: generated Cedar policies" }
 
     IntentProposedEvent:
       allOf:

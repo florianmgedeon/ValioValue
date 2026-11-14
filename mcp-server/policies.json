@@ -1,5 +1,5 @@
 {
-  "_doc": "Buyer mandates enforced by the Valio Aimo MCP server on every place_order. Amounts are net (VAT excluded). mandatory_rules are added to every intent of this buyer and cannot be edited away. allowed_categories null = all.",
+  "_doc": "SEED mandates (V2 format), copied into the versioned mandates table on first read and upgraded to V3 (spend_limit -> autonomy grant g1, allowed_categories -> its scope). Change mandates via PUT /mandate, not here. Amounts are net (VAT excluded). See docs/policy-v3-plan.md.",
   "default": {
     "display_name": "Default buyer",
     "currency": "EUR",

@@ -6,9 +6,9 @@
     "reason": "Order total 1,290.00 EUR exceeds the autonomous spend limit of 500.00 EUR",
     "policy_checks": [
       {
-        "rule": "spend_limit",
+        "rule": "autonomy",
         "passed": false,
-        "detail": "1,290.00 EUR > 500.00 EUR autonomous limit"
+        "detail": "A human must sign: g1 Orders anything alone up to 500 EUR: 1,290.00 over its limit 500.00"
       },
       {
         "rule": "allowed_category",

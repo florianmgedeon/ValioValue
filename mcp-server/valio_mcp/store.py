@@ -23,6 +23,9 @@ CREATE TABLE IF NOT EXISTS approvals (
   approval_id TEXT PRIMARY KEY, order_id TEXT NOT NULL, status TEXT NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS intents (
   intent_id TEXT PRIMARY KEY, status TEXT NOT NULL, data TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS mandates (
+  buyer_id TEXT NOT NULL, version INTEGER NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL,
+  PRIMARY KEY (buyer_id, version));
 CREATE TABLE IF NOT EXISTS audit (
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, session TEXT, order_id TEXT,
   actor TEXT NOT NULL, action TEXT NOT NULL, summary TEXT NOT NULL, reason TEXT, data TEXT);
@@ -81,6 +84,23 @@ class Store:
     def get_quote(self, quote_id: str) -> dict | None:
         row = self._exec("SELECT * FROM quotes WHERE quote_id=?", (quote_id,)).fetchone()
         return dict(row) | {"data": json.loads(row["data"])} if row else None
+
+    # ---- mandates (append-only, one row per version)
+    def latest_mandate(self, buyer_id: str) -> dict | None:
+        row = self._exec("SELECT data FROM mandates WHERE buyer_id=? ORDER BY version DESC LIMIT 1",
+                         (buyer_id,)).fetchone()
+        return json.loads(row["data"]) if row else None
+
+    def mandate_version(self, buyer_id: str, version: int) -> dict | None:
+        row = self._exec("SELECT data FROM mandates WHERE buyer_id=? AND version=?", (buyer_id, version)).fetchone()
+        return json.loads(row["data"]) if row else None
+
+    def mandate_history(self, buyer_id: str) -> list[dict]:
+        rows = self._exec("SELECT data FROM mandates WHERE buyer_id=? ORDER BY version DESC", (buyer_id,)).fetchall()
+        return [json.loads(r["data"]) for r in rows]
+
+    def save_mandate(self, m: dict) -> None:
+        self._exec("INSERT INTO mandates VALUES (?,?,?,?)", (m["buyer_id"], m["version"], json.dumps(m), iso()))
 
     # ---- intents
     def save_intent(self, intent: dict) -> None:

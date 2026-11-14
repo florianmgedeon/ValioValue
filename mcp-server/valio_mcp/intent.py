@@ -17,17 +17,21 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from . import config, trust
-from .constraints import norm_allergen
+from . import config, rules as R, trust
 from .store import iso, new_id, now
 
 
 class HardRuleIn(BaseModel):
-    rule: Literal["lactose_free", "exclude_allergen", "origin"]
+    """A must. Either a shorthand (rule = lactose_free / exclude_allergen / origin) or a generic condition
+    {attr, op, value} over product data, e.g. {"attr": "labels", "op": "contains", "value": "EU-Bio"}."""
+    rule: Literal["lactose_free", "exclude_allergen", "origin", "condition"] = "condition"
     allergen: str | None = Field(None, description="For exclude_allergen: milk, gluten, egg, peanuts, tree nuts, soy, fish ...")
     strictness: Literal["contains", "contains_or_may_contain"] = Field(
         "contains_or_may_contain", description="Allergy: also exclude 'may contain'. Default for allergies.")
     country: str | None = Field(None, description="For origin: ISO alpha-2, e.g. 'fi'")
+    attr: str | None = Field(None, description=f"For a generic condition: one of {', '.join(R.ATTRIBUTES)}")
+    op: str | None = Field(None, description="eq, ne, in, not_in (text); contains, not_contains (lists); lt, lte, gt, gte (numbers)")
+    value: Any = Field(None, description="Value to compare with")
 
 
 class ItemIn(BaseModel):
@@ -68,49 +72,54 @@ def fmt_qty(amount: float, unit: str) -> str:
 
 
 def rule_label(r: dict) -> str:
-    if r["rule"] == "lactose_free":
-        return "lactose-free"
-    if r["rule"] == "exclude_allergen":
-        extra = " incl. 'may contain'" if r.get("strictness") == "contains_or_may_contain" else ""
-        return f"no {r['allergen']}{extra}"
-    if r["rule"] == "origin":
-        return f"origin {r['country'].upper()}"
-    return r["rule"]
+    return r.get("label") or R.label(R.condition(r))
 
 
-def _rule_key(r: dict) -> tuple:
-    if r["rule"] == "exclude_allergen":
-        return ("exclude_allergen", r.get("allergen"))
-    if r["rule"] == "origin":
-        return ("origin", r.get("country"))
-    return (r["rule"],)
+def _clean_rules(rules: list[dict], default_source: str = "request", prefix: str = "r",
+                 questions: list[str] | None = None) -> list[dict]:
+    """Normalise musts to conditions with ids. Unparseable rules become questions, never silent drops."""
+    out: list[dict] = []
+    done = [r for r in rules if r.get("id") and "attr" in r and "label" in r]  # already normalised, keep ids
+    taken = {r["id"] for r in done}
 
+    def fresh() -> str:
+        n = 1
+        while f"{prefix}{n}" in taken:
+            n += 1
+        taken.add(f"{prefix}{n}")
+        return f"{prefix}{n}"
 
-def _clean_rules(rules: list[dict], default_source: str = "request") -> list[dict]:
-    seen, out = set(), []
     for r in rules:
         r = {k: v for k, v in dict(r).items() if v is not None}
-        r.setdefault("source", default_source)
-        if r["rule"] == "exclude_allergen":
-            r["allergen"] = norm_allergen(r.get("allergen") or "")
-            r.setdefault("strictness", "contains_or_may_contain")
-            r.pop("country", None)
-        elif r["rule"] == "origin":
-            r["country"] = (r.get("country") or "").lower()
-            r.pop("allergen", None)
-            r.pop("strictness", None)
-        else:
-            r = {"rule": "lactose_free", "source": r["source"]}
-        if _rule_key(r) in seen:
+        if r.get("id") and "attr" in r and "label" in r:
+            out.append(r)
             continue
-        seen.add(_rule_key(r))
-        out.append(r)
-    return out
+        if r.get("rule") == "condition" and not r.get("attr"):
+            continue
+        try:
+            out.append(R.rule(r | {"id": None}, source=r.get("source") or default_source, rid=fresh()))
+        except R.RuleError as e:
+            if questions is not None:
+                questions.append(f"I could not understand a rule ({e}). What exactly must the products meet?")
+    return R.dedupe(out)
 
 
-def effective_rules(intent: dict, item: dict) -> list[dict]:
-    """Rules that apply to one item: mandate and request-wide rules plus the item's own."""
-    return _clean_rules(list(intent.get("hard_rules") or []) + list(item.get("hard_rules") or []))
+def mandate_musts(mandate: dict) -> list[dict]:
+    return [dict(r, source="mandate") for r in mandate.get("mandatory_rules") or [] if r.get("enabled", True)]
+
+
+def effective_rules(intent: dict, item: dict, mandate: dict | None = None) -> list[dict]:
+    """Musts for one item: the CURRENT mandate's musts (if given, else the snapshot in the intent), the
+    request-wide rules and the item's own."""
+    base = mandate_musts(mandate) if mandate else [r for r in intent.get("hard_rules") or [] if r.get("source") == "mandate"]
+    own = [r for r in intent.get("hard_rules") or [] if r.get("source") != "mandate"]
+    return R.dedupe(_clean_rules(base + own + list(item.get("hard_rules") or [])))
+
+
+def effective_preferences(intent: dict, mandate: dict) -> list[dict]:
+    """The current mandate's preferences plus preferences from this request."""
+    prefs = [p for p in mandate.get("preferences") or [] if p.get("enabled", True)]
+    return prefs + list((intent.get("preferences") or {}).get("rules") or [])
 
 
 def item_binding(item: dict) -> dict:
@@ -128,7 +137,7 @@ def intent_hash(intent: dict) -> str:
 
 
 def build(*, buyer_id: str, mandate: dict, session: str | None, original_request: str, items: list[dict],
-          deliver_by: str, hard_rules: list[dict], optimise: str, origin_preference: str | None,
+          deliver_by: str, hard_rules: list[dict], optimise: str | None, origin_preference: str | None,
           budget_max_total: float | None, max_over_pct: float, allow_under: bool, agent_questions: list[str],
           intent_id: str | None = None, check_text: bool = True, clarifications: list[str] | None = None) -> dict:
     today = now().date()
@@ -136,8 +145,8 @@ def build(*, buyer_id: str, mandate: dict, session: str | None, original_request
     clarifications = [c for c in (clarifications or []) if c and c.strip()]
     # The buyer's answers count as the buyer's own words for every cross-check below.
     text = ("\n".join([original_request or ""] + clarifications)).lower() if check_text else ""
-    global_rules = _clean_rules([dict(m, source="mandate") for m in mandate.get("mandatory_rules") or []]
-                                + [r for r in hard_rules if r.get("source") != "mandate"])
+    global_rules = _clean_rules(mandate_musts(mandate) + [r for r in hard_rules if r.get("source") != "mandate"],
+                                questions=questions)
 
     norm_items = []
     for n, it in enumerate(items, start=1):
@@ -150,12 +159,14 @@ def build(*, buyer_id: str, mandate: dict, session: str | None, original_request
             pct, under = float(max_over_pct), bool(allow_under)
         query = ((it.get("product") or {}).get("query") if isinstance(it.get("product"), dict)
                  else it.get("product_query")) or ""
-        rules = _clean_rules([r for r in it.get("hard_rules") or [] if r.get("source") != "mandate"])
+        iid = it.get("item_id") or f"i{n}"
+        rules = _clean_rules([r for r in it.get("hard_rules") or [] if r.get("source") != "mandate"],
+                             prefix=f"{iid}_r", questions=questions)
         # The buyer's own words win: "lactose-free" in the text or the item name becomes a rule.
         if not any(r["rule"] == "lactose_free" for r in rules + global_rules) and (
                 LACTOSE_FREE.search(query.lower()) or (len(items) == 1 and LACTOSE_FREE.search(text))):
-            rules.append({"rule": "lactose_free", "source": "request_text"})
-        norm_items.append({"item_id": it.get("item_id") or f"i{n}", "product": {"query": query.strip()},
+            rules.append(R.rule({"rule": "lactose_free"}, source="request_text", rid=f"{iid}_r{len(rules) + 1}"))
+        norm_items.append({"item_id": iid, "product": {"query": query.strip()},
                            "quantity": {"amount": amount, "unit": unit, "max_over_pct": pct, "allow_under": under},
                            "hard_rules": rules, "note": it.get("note"),
                            "status": "open", "order_id": None})
@@ -215,7 +226,10 @@ def build(*, buyer_id: str, mandate: dict, session: str | None, original_request
         "items": norm_items,
         "deliver_by": deliver_by,
         "hard_rules": global_rules,
-        "preferences": {"optimise": optimise, "origin": (origin_preference or None)},
+        "preferences": {"optimise": optimise or mandate.get("optimise") or "price",
+                        "rules": [R.rule({"rule": "origin", "country": origin_preference}, source="request",
+                                         rid="rp1") | {"weight": 2}] if origin_preference else []},
+        "mandate_preferences": [p["label"] for p in mandate.get("preferences") or [] if p.get("enabled", True)],
         "budget": {"max_total": float(budget_max_total), "currency": mandate.get("currency", "EUR")}
         if budget_max_total else None,
         "spent": 0.0,
@@ -315,7 +329,9 @@ def apply_edits(intent: dict, edits: dict[str, Any]) -> dict:
     budget = edits.get("budget", intent["budget"])
     q0 = intent["items"][0]["quantity"] if intent["items"] else {}
     return dict(items=items, deliver_by=edits.get("deliver_by", intent["deliver_by"]), hard_rules=rules,
-                optimise=prefs.get("optimise") or "price", origin_preference=prefs.get("origin"),
+                optimise=prefs.get("optimise") or "price",
+                origin_preference=next((r["value"] for r in prefs.get("rules") or [] if r.get("attr") == "country"),
+                                       prefs.get("origin")),
                 budget_max_total=(budget or {}).get("max_total"), max_over_pct=float(q0.get("max_over_pct", 2)),
                 allow_under=bool(q0.get("allow_under", False)), agent_questions=[],
                 original_request=intent.get("original_request", ""), check_text=False,

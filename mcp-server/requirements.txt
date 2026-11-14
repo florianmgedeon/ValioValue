@@ -6,3 +6,4 @@ uvicorn>=0.30
 fastapi>=0.115  # only for dev/fake_valio_api.py
 cryptography>=42
 rfc8785>=0.1.4
+cedarpy>=4.12  # Cedar policy engine (musts as forbid, autonomy grants as permit)

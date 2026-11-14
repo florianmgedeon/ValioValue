@@ -5,8 +5,6 @@ import asyncio
 import json
 from types import SimpleNamespace
 
-import pytest
-from starlette.testclient import TestClient
 
 from conftest import next_monday
 from valio_mcp import server, trust
@@ -24,10 +22,6 @@ def run(coro):
     return asyncio.run(coro)
 
 
-@pytest.fixture(scope="module")
-def http():
-    with TestClient(server.mcp.streamable_http_app()) as c:
-        yield c
 
 
 def propose(text, query, qty, unit="L", rules=(), buyer="juvenes", items=None, **kw):
@@ -93,7 +87,9 @@ def test_ask_tier_needs_signed_cart(http):
     res = order(it, o["quote_id"])
     assert res["tier"] == "ask" and res["status"] == "pending_approval"
     failed = {c["field"] for c in res["diff"]["checks"] if not c["ok"]}
-    assert failed == {"spend_limit"}, res["diff"]
+    assert failed == {"autonomy"}, res["diff"]
+    auto = next(c for c in res["diff"]["checks"] if c["field"] == "autonomy")
+    assert "over its limit" in auto["detail"]  # 1,008 L at 1.19 > the 1,000 EUR grant of juvenes
     qty = next(c for c in res["diff"]["checks"] if c["field"] == "quantity")
     assert qty["ok"] and "1,008" in qty["cart"]  # 84 packs of 12, +0.8 % is inside the 2 % tolerance
 

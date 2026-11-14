@@ -11,7 +11,12 @@ Human-only REST endpoints (bearer token, NOT MCP tools, so an agent cannot confi
   POST /internal/approvals/{approval_id}         buyer signature over cart_hash
   GET  /internal/orders/{order_id}
   GET  /internal/orders/{order_id}/audit
-  GET  /internal/mandate/{buyer_id}
+  GET  /internal/mandate/{buyer_id}              current mandate (Must, Prefer, Autonomy)
+  POST /internal/mandate/{buyer_id}/preview      validate a new version, returns its hash to sign
+  PUT  /internal/mandate/{buyer_id}              store it: hash + buyer signature required
+  GET  /internal/mandate/{buyer_id}/history      all versions
+  GET  /internal/mandate/{buyer_id}/cedar        the Cedar policies Valio Aimo enforces
+  GET  /internal/policy-catalog                  attributes, operators and examples for policy editors
 
 Public, read-only:
   GET  /verify/{order_id}    recompute hashes, check all signatures
@@ -31,7 +36,7 @@ from pydantic import BaseModel, Field
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from . import config, constraints, diff, intent as intents, policy, trust, valio_api
+from . import config, constraints, diff, intent as intents, mandate as mandates, policy, trust, valio_api
 from .catalog import catalog
 from .intent import HardRuleIn, ItemIn
 from .store import TransitionError, iso, new_id, now, store
@@ -110,8 +115,8 @@ async def propose_intent(
         "scaled to the portions the buyer needs, in buyable units (L, KG or sales units)."))],
     deliver_by: Annotated[str, Field(description="Latest delivery date, YYYY-MM-DD")],
     hard_rules: Annotated[list[HardRuleIn], Field(description="Must-haves for ALL items (e.g. a guest's milk allergy)")] = [],
-    optimise: Annotated[Literal["price", "reliability", "co2"], Field(description="What to optimise among offers that meet every rule")] = "price",
-    origin_preference: Annotated[str | None, Field(description="Soft preference only, ISO alpha-2")] = None,
+    optimise: Annotated[Literal["price", "reliability", "co2"] | None, Field(description="Only if the buyer asked for it in this request. Default: the mandate's choice")] = None,
+    origin_preference: Annotated[str | None, Field(description="Soft preference from this request only, ISO alpha-2. The mandate's preferences apply anyway")] = None,
     budget_max_total: Annotated[float | None, Field(description="Only if the buyer named a budget, for the whole intent")] = None,
     max_over_pct: Annotated[float, Field(ge=0, le=20, description="Allowed overshoot when rounding to whole packs")] = 2.0,
     allow_under: Annotated[bool, Field(description="Only true if the buyer accepts less than asked")] = False,
@@ -206,7 +211,7 @@ async def search_products(
     item, err2 = _item(it, item_id)
     if err or err2:
         return {"error": err or err2}
-    rules = intents.effective_rules(it, item) if it else []
+    rules = intents.effective_rules(it, item, policy.buyer_policy(it["buyer_id"])) if it else []
     # With an intent the hard rules are checked below from data, with evidence, so the name-based shortcut is off
     # and excluded products are reported instead of silently missing.
     pool, total = catalog().search(query, lactose_free=False if it else f.lactose_free,
@@ -218,7 +223,7 @@ async def search_products(
         hits = []
         for p in pool:
             evs = constraints.evaluate_all(p, rules)
-            bad = [e for e in evs if e["verdict"] != "safe" and not e["rule"].startswith("origin")]
+            bad = [e for e in evs if constraints.violates(e)]
             if bad:
                 excluded.append({"product_id": p.id, "name": p.name, "reason": constraints.one_line(bad[0]),
                                  "verdict": bad[0]["verdict"]})
@@ -259,7 +264,9 @@ async def check_offer(
     item, err2 = _item(it, item_id)
     if err or err2:
         return {"error": err or err2}
-    rules = intents.effective_rules(it, item) if it else []
+    mandate = policy.buyer_policy(it["buyer_id"]) if it else None
+    rules = intents.effective_rules(it, item, mandate) if it else []
+    prefs = intents.effective_preferences(it, mandate) if it else []
     if it:
         quantity, quantity_unit = item["quantity"]["amount"], item["quantity"]["unit"]
         requested_date = it["deliver_by"]
@@ -355,18 +362,22 @@ async def check_offer(
         offer["provenance"] = {"source": f"Valio Aimo API {config.VALIO_API_BASE}/api/price + /api/availability",
                                "fetched_at": iso(), "valid_until": offer["quote_expires_at"], **signed}
         if it and prod:
-            offer["evidence"] = constraints.evaluate_all(prod, rules)
-            if any(e["verdict"] != "safe" and not e["rule"].startswith("origin") for e in offer["evidence"]):
+            offer["evidence"] = constraints.evaluate_all(prod, rules, offer=offer)
+            if any(constraints.violates(e) for e in offer["evidence"]):
                 offer["can_fulfil"] = False
-                offer["fulfil_issues"] = issues + ["breaks a hard rule of the intent"]
+                offer["fulfil_issues"] = issues + ["breaks a must of the intent or mandate"]
+            met = [(p, constraints.evaluate(prod, p, offer=offer)) for p in prefs]
+            offer["preferences"] = [{"id": p["id"], "label": p["label"], "weight": p.get("weight", 1),
+                                     "met": ev["verdict"] == "safe"} for p, ev in met if ev]
+            offer["preference_score"] = sum(x["weight"] for x in offer["preferences"] if x["met"])
         offers.append(offer)
 
-    # Best first: can deliver in full on time, then the intent's preference (default: cheapest total).
+    # Best first: can deliver in full on time, then the preferences (sum of weights met), then optimise.
     opt = (it or {}).get("preferences", {}).get("optimise", "price")
     pref = {"price": lambda o: (o["total_price"], -(o["delivery_reliability"] or 0)),
             "reliability": lambda o: (-(o["delivery_reliability"] or 0), o["total_price"]),
             "co2": lambda o: (o["co2_kg_per_kg"] if o["co2_kg_per_kg"] is not None else 1e9, o["total_price"])}[opt]
-    offers.sort(key=lambda o: (not o["can_fulfil"], *pref(o)))
+    offers.sort(key=lambda o: (not o["can_fulfil"], -o.get("preference_score", 0), *pref(o)))
     for o, rank in zip([o for o in offers if o["can_fulfil"]], ["best", "better", "good"]):
         o["rank"] = rank
     for o in offers:
@@ -446,11 +457,21 @@ async def place_order(
             data={"lines": [{"item_id": a, "quote_id": b} for a, b in req], "intent_id": intent_id})
 
     d = diff.compute(it, pairs, mandate)
-    tier = policy.tier(d["checks"])
+    musts = {iid: intents.effective_rules(it, item, mandate) for item, _, iid, _ in pairs if item}
+    decision = policy.decide(it, d, quoted, mandate, musts)
+    tier = decision["tier"]
+    if tier != "block":
+        d["checks"].append(diff._check("autonomy", f"mandate v{mandate['version']}",
+                                       ", ".join(decision["grants_used"]) or "no grant", tier == "auto", "ask",
+                                       decision["detail"]) | {"grants_used": decision["grants_used"]})
+        d["deviations"] = sum(1 for c in d["checks"] if not c["ok"] and c["field"] != "autonomy")
     status = policy.STATUS[tier]
     the_cart = diff.cart(it["intent_hash"], quoted)
     cart_hash = trust.digest(the_cart)
-    public_diff = {"deviations": d["deviations"], "checks": d["checks"]}
+    public_diff = {"deviations": d["deviations"], "checks": d["checks"],
+                   "accepted": [c["field"] + (f":{c['pref_id']}" if c.get("pref_id") else "")
+                                for c in d["checks"] if not c["ok"] and c["field"] != "autonomy"]
+                   if tier == "auto" else []}
     failed = [c for c in d["checks"] if not c["ok"]]
     item_ids = [iid for iid, _ in quoted]
     open_after = [i["item_id"] for i in it["items"] if i["status"] == "open" and i["item_id"] not in item_ids]
@@ -460,15 +481,20 @@ async def place_order(
              "cart": the_cart, "cart_hash": cart_hash, "fingerprint": trust.fingerprint(cart_hash),
              "intent": intents.public(it), "agent_rationale": reason, "approved_by": None, "created_at": iso(),
              "receipt": None, "quote_id": quoted[0][1]["quote_id"] if quoted else None,
-             "items_open_after": open_after if tier != "block" else None}
+             "items_open_after": open_after if tier != "block" else None,
+             "mandate": {"mandate_id": mandate["mandate_id"], "version": mandate["version"],
+                         "mandate_hash": mandate["mandate_hash"], "grants_used": decision["grants_used"]},
+             "decision": decision}
 
     def label(c):
         item = intents.get_item(it, c.get("item_id") or "")
         return f"{item['product']['query']}: " if item and len(it["items"]) > 1 else ""
 
     if tier == "block":
-        order["message"] = "Blocked: " + "; ".join(f"{label(c)}{c['field']} ({c['intended']}): {c['detail']}"
-                                                   for c in failed if c["severity"] == "block")
+        order["message"] = "Blocked: " + ("; ".join(f"{label(c)}{c['field']} ({c['intended']}): {c['detail']}"
+                                                    for c in failed if c["severity"] == "block")
+                                          or "; ".join(f"{l['product_id']}: {', '.join(l.get('blocked_by') or [])}"
+                                                       for l in decision["lines"] if l["tier"] == "block"))
         s.audit("policy_engine", "policy_check", order["message"], session=session, order_id=order_id,
                 data={"tier": tier, "diff": public_diff, "intent_id": intent_id})
         s.save_order(order, session, it["buyer_id"])
@@ -486,11 +512,13 @@ async def place_order(
         order["approval_id"] = appr["approval_id"]
         s.save_approval(appr)
         s.audit("policy_engine", "policy_check",
-                f"{d['deviations']} deviation(s) a human may accept: {', '.join(sorted({c['field'] for c in failed}))}. "
-                f"Sent to human approval", session=session, order_id=order_id,
+                f"Mandate v{mandate['version']}: {decision['detail']}. Sent to human approval",
+                session=session, order_id=order_id,
                 data={"approval_id": appr["approval_id"], "tier": tier, "diff": public_diff, "intent_id": intent_id})
     else:
-        s.audit("policy_engine", "policy_check", f"0 deviations on {len(item_ids)} line(s), within the mandate",
+        s.audit("policy_engine", "policy_check",
+                f"{len(item_ids)} line(s) within mandate v{mandate['version']}: {decision['detail']}"
+                + (f" (accepted: {', '.join(public_diff['accepted'])})" if public_diff["accepted"] else ""),
                 session=session, order_id=order_id, data={"tier": tier, "diff": public_diff, "intent_id": intent_id})
         order["receipt"] = _receipt(order, it, approved_by=None, buyer_cart_signature=None)
         s.audit("valio_mcp", "order_confirmed",
@@ -536,8 +564,11 @@ def _order_result(order: dict) -> dict:
 
 def _receipt(order: dict, it: dict, *, approved_by: str | None, buyer_cart_signature: str | None) -> dict:
     confirmed_at = iso()
+    m = order.get("mandate") or {}
     body = {"order_id": order["order_id"], "intent_hash": it["intent_hash"], "cart_hash": order["cart_hash"],
-            "status": "confirmed", "tier": order["tier"], "approved_by": approved_by, "confirmed_at": confirmed_at}
+            "status": "confirmed", "tier": order["tier"], "approved_by": approved_by, "confirmed_at": confirmed_at,
+            "mandate_id": m.get("mandate_id"), "mandate_hash": m.get("mandate_hash"),
+            "grants_used": m.get("grants_used") or []}
     signed = trust.valio_sign_obj(body)
     return body | {"buyer_intent_signature": it["buyer_signature"], "buyer_cart_signature": buyer_cart_signature,
                    "receipt_hash": signed["hash"], "valio_signature": signed["signature"],
@@ -708,7 +739,82 @@ async def revise_intent(request: Request) -> JSONResponse:
 async def get_mandate(request: Request) -> JSONResponse:
     if not _authorised(request):
         return _deny()
-    return JSONResponse(policy.buyer_policy(request.path_params["buyer_id"]))
+    m = policy.buyer_policy(request.path_params["buyer_id"])
+    return JSONResponse(m | {"summary": mandates.summary(m)})
+
+
+async def _mandate_body(request: Request) -> tuple[dict | None, JSONResponse | None]:
+    try:
+        body = await request.json()
+    except ValueError:
+        return None, JSONResponse({"error": "body must be JSON"}, status_code=422)
+    return (body if isinstance(body, dict) else {}), None
+
+
+@mcp.custom_route("/internal/mandate/{buyer_id}/preview", methods=["POST"])
+async def preview_mandate(request: Request) -> JSONResponse:
+    """Validate a new mandate version. Returns it with the hash the buyer must sign. Nothing is stored."""
+    if not _authorised(request):
+        return _deny()
+    body, err = await _mandate_body(request)
+    if err:
+        return err
+    try:
+        m = policy.preview(request.path_params["buyer_id"], body.get("mandate", body))
+        text, _ = policy.to_cedar(m, m["mandatory_rules"])
+    except policy.RuleError as e:
+        return JSONResponse({"error": str(e)}, status_code=422)
+    return JSONResponse(m | {"summary": mandates.summary(m), "cedar": text})
+
+
+@mcp.custom_route("/internal/mandate/{buyer_id}", methods=["PUT"])
+async def put_mandate(request: Request) -> JSONResponse:
+    """Store a new version: {mandate, mandate_hash, signature, updated_by}. Never an MCP tool:
+    the agent cannot change its own mandate. Orders from now on are decided against this version."""
+    if not _authorised(request):
+        return _deny()
+    body, err = await _mandate_body(request)
+    if err:
+        return err
+    bid = request.path_params["buyer_id"]
+    try:
+        m = policy.save(bid, body.get("mandate") or {}, mandate_hash=body.get("mandate_hash") or "",
+                        signature=body.get("signature"), updated_by=body.get("updated_by") or "buyer.human")
+    except policy.RuleError as e:
+        return JSONResponse({"error": str(e)}, status_code=422)
+    except PermissionError as e:
+        return JSONResponse({"error": str(e)}, status_code=409 if "hash" in str(e).split(" ")[0] else 403)
+    store().audit("human", "mandate_changed", f"{m['updated_by']} signed mandate v{m['version']} "
+                                              f"({m['fingerprint']}): {mandates.summary(m)}",
+                  data={"buyer_id": bid, "mandate_id": m["mandate_id"], "mandate_hash": m["mandate_hash"]})
+    return JSONResponse(m | {"summary": mandates.summary(m)})
+
+
+@mcp.custom_route("/internal/mandate/{buyer_id}/history", methods=["GET"])
+async def mandate_history(request: Request) -> JSONResponse:
+    if not _authorised(request):
+        return _deny()
+    bid = request.path_params["buyer_id"]
+    policy.buyer_policy(bid)  # seeds v1 if needed
+    return JSONResponse(store().mandate_history(bid))
+
+
+@mcp.custom_route("/internal/mandate/{buyer_id}/cedar", methods=["GET"])
+async def mandate_cedar(request: Request) -> JSONResponse:
+    """The mandate as Cedar policies (musts as forbid, grants as permit). Request rules of an intent are
+    added per decision."""
+    if not _authorised(request):
+        return _deny()
+    m = policy.buyer_policy(request.path_params["buyer_id"])
+    text, ids = policy.to_cedar(m, m["mandatory_rules"])
+    return JSONResponse({"mandate_id": m["mandate_id"], "cedar": text, "policy_ids": ids})
+
+
+@mcp.custom_route("/internal/policy-catalog", methods=["GET"])
+async def policy_catalog(request: Request) -> JSONResponse:
+    if not _authorised(request):
+        return _deny()
+    return JSONResponse(policy.catalog_info())
 
 
 # --------------------------------------------------------------------------- public verification
@@ -763,10 +869,20 @@ def verify(order_id: str) -> dict:
                                                  rc.get("buyer_cart_signature")),
             f"{order.get('approved_by')} signed exactly this cart")
     else:
-        add("zero_deviations", order.get("diff", {}).get("deviations") == 0,
-            "Autonomous order: 0 deviations from the intent")
+        try:
+            again = policy.recheck(order["decision"])
+            ok = again["tier"] == "auto" and again["grants_used"] == rc.get("grants_used")
+            detail = (f"Re-ran Cedar on mandate v{again['mandate_version']}: auto under "
+                      f"{', '.join(again['grants_used'])}" if ok else f"Re-ran Cedar: {again['tier']}, not auto")
+        except (KeyError, LookupError) as e:
+            ok, detail = False, f"cannot re-run the decision: {e}"
+        add("autonomy", ok, detail)
+    m = store().mandate_version(order["buyer_id"], (order.get("mandate") or {}).get("version") or 0)
+    add("mandate_hash", bool(m) and trust.digest(mandates.content(m))
+        == m["mandate_hash"] == rc.get("mandate_hash"),
+        f"Receipt names mandate {rc.get('mandate_id')}, recomputed from the stored version")
     body = {k: rc.get(k) for k in ("order_id", "intent_hash", "cart_hash", "status", "tier", "approved_by",
-                                   "confirmed_at")}
+                                   "confirmed_at", "mandate_id", "mandate_hash", "grants_used")}
     add("valio_receipt_signature", rc and trust.digest(body) == rc.get("receipt_hash")
         and trust.verify(trust.valio_key().public_key(), rc.get("receipt_hash", ""), rc.get("valio_signature")),
         "Receipt signed by Valio Aimo")

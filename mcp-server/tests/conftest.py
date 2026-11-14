@@ -17,6 +17,7 @@ os.environ.update({
     "KEYS_DIR": str(TMP / "keys"),
     "PRODUCTS_FILE": str(ROOT / "data" / "products.sample.json"),
     "VALIO_API_KEY": "test",
+    "APPROVER_TOKEN": "dev-approver-token",
 })
 sys.path.insert(0, str(ROOT / "mcp-server"))
 
@@ -64,3 +65,13 @@ def fake_valio(monkeypatch):
 
     monkeypatch.setattr(valio_api, "price", price)
     monkeypatch.setattr(valio_api, "availability", availability)
+
+
+@pytest.fixture(scope="session")
+def http():
+    """One app for the whole run: the MCP session manager can only be started once per process."""
+    from starlette.testclient import TestClient
+
+    from valio_mcp import server
+    with TestClient(server.mcp.streamable_http_app()) as c:
+        yield c
