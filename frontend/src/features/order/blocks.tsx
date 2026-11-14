@@ -151,6 +151,27 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
     }
   };
 
+  /**
+   * Open questions block a plain confirm (Valio answers 409). "Confirm as is" is the buyer's answer: revise the
+   * intent unchanged (that drops the agent's own questions, Valio's own checks stay), then sign the new hash.
+   * If Valio still has a question, the new read-back shows it and nothing is signed.
+   */
+  const confirmAsIs = async () => {
+    if (!it.intent_hash) return;
+    setBusy(true);
+    try {
+      const next = await confirmIntent(it.intent_id, { intent_hash: it.intent_hash, edits: { preferences: {} } });
+      if ((next.questions ?? []).length || !next.intent_hash) return;
+      await confirmIntent(next.intent_id, { intent_hash: next.intent_hash, confirmed_by: SIGNER_NAME });
+      ctx.local({ type: "local/signed", intentId: it.intent_id });
+      ctx.local({ type: "local/signed", intentId: next.intent_id });
+    } catch (e) {
+      toast(`Not sent: ${errText(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <>
     <Card className="rise">
@@ -192,15 +213,15 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
       <CardFooter>
         <div className="fore">
           {questions.length ? (
-            <>Nothing is sent before you confirm.</>
+            <>Answer my question in the chat, or confirm as it is.</>
           ) : (
             <>Valio Aimo checks every line against your rules. Anything outside them comes back to you.</>
           )}
         </div>
         {b.signed ? (
           <Chip kind="prefer" icon="check">Sent</Chip>
-        ) : questions.length ? null : (
-          <Button variant="primary" icon="lock" disabled={busy || !it.intent_hash} onClick={() => void sign()}>
+        ) : (
+          <Button variant="primary" icon="lock" disabled={busy || !it.intent_hash} onClick={() => void (questions.length ? confirmAsIs() : sign())}>
             {busy ? "Sending…" : "Confirm & send to Valio Aimo"}
           </Button>
         )}
