@@ -1,0 +1,29 @@
+docs/work-packages/F1-frontend-order.md
+  s_1bfb11234b64f3::t_2bfea013af6be0 1-64
+docs/work-packages/F0-frontend-foundation.md
+  s_1bfb11234b64f3::t_b24424bb40a613 1-88
+docs/work-packages/F2-frontend-kitchen.md
+  s_1bfb11234b64f3::t_c332ab9192d6ca 1-56
+docs/work-packages/F3-frontend-onboarding-camera.md
+  s_1bfb11234b64f3::t_6ab342b215166b 1-42
+docs/work-packages/F4-frontend-activity.md
+  s_1bfb11234b64f3::t_98d1f78706a43d 1-38
+docs/work-packages/README.md
+  s_1bfb11234b64f3::t_01fcc3de6bd3b8 193-221
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8ff9598105cd78dd9473a407ba0ff9fa02c87a88",
+  "prompts": {},
+  "sessions": {
+    "s_1bfb11234b64f3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "69b7a2a3-5d49-49d9-a191-914ab89c9203",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
