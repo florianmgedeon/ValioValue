@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiUrl } from "../../api/client";
 import type { KitchenProfile, Schema } from "../../api/types";
-import { Button, Chip, Cond, Icon, KindTag, Mark, Paper, YesNo, type Kind } from "../../ui";
-import { condText } from "./model";
+import { Button, Chip, Icon, KindTag, Mark, Paper, YesNo, type Kind } from "../../ui";
 
 type Suggestion = Schema["Suggestion"];
 type Source = Schema["Source"];
@@ -63,18 +62,13 @@ export function TeachCard({ onPhone, onUpload, busy }: { onPhone: () => void; on
   );
 }
 
-function payloadText(s: Suggestion): string | null {
+/** For a usual-product suggestion: the word, the product and the usual amount. Rules need no extra line, the title says it. */
+function usualText(s: Suggestion): string | null {
+  if (s.kind !== "usual") return null;
   const p = (s.payload ?? {}) as Record<string, unknown>;
-  switch (s.kind) {
-    case "about": return null;
-    case "usual": {
-      const what = (p.product_name as string) || (p.product_query as string) || "";
-      const qty = p.typical_qty ? ` · ~${String(p.typical_qty)} ${unitText(p.unit as string)} / ${(p.per as string) || "week"}` : "";
-      return `usual product “${String(p.word ?? "")}”${what ? ` → ${what}` : ""}${qty}`;
-    }
-    case "autonomy": return p.scope === "usual" ? "scope your usual products" : "autonomy grant";
-    default: return condText(p) + (p.weight ? ` · weight ${String(p.weight)}` : "");
-  }
+  const what = (p.product_name as string) || (p.product_query as string) || "";
+  const qty = p.typical_qty ? ` · ~${String(p.typical_qty)} ${unitText(p.unit as string)} / ${(p.per as string) || "week"}` : "";
+  return `“${String(p.word ?? "")}”${what ? ` → ${what}` : ""}${qty}`;
 }
 
 export function Suggestions({ items, sources, onAccept, onReject, busy }: {
@@ -95,15 +89,15 @@ export function Suggestions({ items, sources, onAccept, onReject, busy }: {
         <span className="muted text-[13px]">I never turn these on without you</span>
       </div>
       {items.map((s) => {
-        const cond = payloadText(s);
+        const usual = usualText(s);
         return (
           <div key={s.id} className="rule new" aria-busy={busy === s.id}>
             <div className="grid gap-1">
               <div className="t">{s.kind && <KindTag kind={KIND_OF[s.kind]} />}{s.title}</div>
               <div className="s">
-                {cond && <Cond>{cond}</Cond>}
+                {usual && <span>{usual}</span>}
                 {src(s.source_id) && <span>from {src(s.source_id)}</span>}
-                {(s.kind === "must" || s.kind === "prefer" || s.kind === "autonomy") && <span>· needs your signature</span>}
+                {(s.kind === "must" || s.kind === "prefer" || s.kind === "autonomy") && <span>· needs your OK</span>}
               </div>
               {s.quote && !s.quote.startsWith(s.title ?? "\u0000") && <div className="q">“{s.quote}”</div>}
             </div>
@@ -136,7 +130,7 @@ export function About({ profile, onSave }: { profile: KitchenProfile; onSave: (t
         <div className="grid gap-2.5 px-5 pb-4">
           <textarea className="field" value={text} onChange={(e) => setText(e.target.value)} aria-label="About your kitchen" />
           <div className="frow">
-            <span className="muted text-[13px]">Saved to your kitchen profile, no signature needed.</span>
+            <span className="muted text-[13px]">Saved to your kitchen profile.</span>
             <span className="spacer" />
             <Button
               variant="primary"

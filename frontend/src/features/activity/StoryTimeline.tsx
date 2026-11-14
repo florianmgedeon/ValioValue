@@ -2,10 +2,8 @@ import type { ReactNode } from "react";
 import { apiUrl } from "../../api/client";
 import { Chip, Cond, Icon, Tier, eur, type IconName } from "../../ui";
 import { counts, type DecidedLine, type StoryModel } from "./model";
-import type { TrustView } from "./TrustDrawer";
 import { formatDay, formatTime } from "./format";
 
-const LATER = "Details come with the next backend version.";
 
 function Step({ icon, node = "", title, children }: { icon: IconName; node?: string; title: ReactNode; children?: ReactNode }) {
   return (
@@ -22,9 +20,8 @@ function Step({ icon, node = "", title, children }: { icon: IconName; node?: str
 function OutcomeChip({ line, grantLabel }: { line: DecidedLine; grantLabel: (id: string) => string | undefined }) {
   switch (line.outcome) {
     case "alone": {
-      const g = line.grant ?? "g1";
-      const label = grantLabel(g);
-      return <Chip kind="auto" icon="lock">Alone · {g}{label ? ` ${label}` : ""}</Chip>;
+      const label = line.grant ? grantLabel(line.grant) : undefined;
+      return <Chip kind="auto" icon="lock">Ordered alone{label ? ` · ${label}` : ""}</Chip>;
     }
     case "you":
       return <Chip kind="about" icon="hand">You decided</Chip>;
@@ -35,11 +32,10 @@ function OutcomeChip({ line, grantLabel }: { line: DecidedLine; grantLabel: (id:
   }
 }
 
-export function StoryTimeline({ model, grantLabel, ruleLabel, onTrust }: {
+export function StoryTimeline({ model, grantLabel, ruleLabel }: {
   model: StoryModel;
   grantLabel: (id: string) => string | undefined;
   ruleLabel: (id: string) => string | undefined;
-  onTrust: (v: TrustView) => void;
 }) {
   const c = counts(model);
   const meta = [
@@ -47,8 +43,6 @@ export function StoryTimeline({ model, grantLabel, ruleLabel, onTrust }: {
     !model.reduced || c.alone ? `${c.alone} alone` : null,
     !model.reduced || c.you ? `${c.you} by you` : null,
     !model.reduced || c.blocked ? `${c.blocked} blocked` : null,
-    model.mandateVersion !== undefined ? `mandate v${model.mandateVersion}` : null,
-    model.kitchenProfileVersion !== undefined ? `kitchen profile v${model.kitchenProfileVersion}` : null,
   ].filter(Boolean);
   const anyBlocked = c.blocked > 0 || model.tier === "block";
   const u = model.understood;
@@ -83,18 +77,10 @@ export function StoryTimeline({ model, grantLabel, ruleLabel, onTrust }: {
         )}
 
         {u && (
-          <Step icon="sig" title="I understood, you signed">
+          <Step icon="sig" title="I understood, you confirmed">
             <span className="act-muted">
-              {[u.items !== undefined ? `${u.items} ${u.items === 1 ? "item" : "items"}` : u.text, u.signedBy ? `signed by ${u.signedBy}` : null]
+              {[u.items !== undefined ? `${u.items} ${u.items === 1 ? "item" : "items"}` : u.text, u.signedBy ? `confirmed by ${u.signedBy}` : null]
                 .filter(Boolean).join(" · ")}
-              {u.intentHash && (
-                <>
-                  {" · intent "}<span className="font-mono">{u.intentHash.replace(/^sha256:/, "").slice(0, 6)}</span>{" "}
-                  <button type="button" className="link" onClick={() => onTrust({ kind: "intent", intentHash: u.intentHash, intentId: u.intentId, signedBy: u.signedBy })}>
-                    hash
-                  </button>
-                </>
-              )}
             </span>
           </Step>
         )}
@@ -110,7 +96,7 @@ export function StoryTimeline({ model, grantLabel, ruleLabel, onTrust }: {
                 <div key={l.itemId ?? i} className={`act-why${blocked ? " blocked" : ""}`}>
                   <span className="font-semibold">{l.name}</span>
                   <span className="act-f">{l.funnel ?? ""}</span>
-                  <span className="act-w">{model.reduced ? <>{l.why && <span>{l.why}.</span>}<span>{LATER}</span></> : l.why}</span>
+                  <span className="act-w">{model.reduced ? l.why && <span>{l.why}.</span> : l.why}</span>
                 </div>
               );
             })}
@@ -120,7 +106,7 @@ export function StoryTimeline({ model, grantLabel, ruleLabel, onTrust }: {
         {(model.decided.length > 0 || model.decidedNotes.length > 0) && (
           <Step icon="shield" node={anyBlocked ? "block" : c.you ? "you" : "ok"} title="Valio Aimo decided, line by line">
             <span className="act-muted">
-              Checked against your signed mandate{model.mandateVersion !== undefined ? ` v${model.mandateVersion}` : ""} in Cedar
+              Checked against your rules
             </span>
             {!model.reduced && model.decided.map((l, i) => (
               <div key={i} className={`act-why${l.outcome === "blocked" ? " blocked" : ""}`}>
@@ -149,8 +135,7 @@ export function StoryTimeline({ model, grantLabel, ruleLabel, onTrust }: {
         {model.confirmed && (
           <Step icon="check" node="ok" title={`Confirmed${model.confirmed.total !== undefined ? ` · ${eur(model.confirmed.total)}` : ""}`}>
             <span className="act-muted">
-              Prices locked, signed by Valio Aimo.{" "}
-              <button type="button" className="link" onClick={() => onTrust({ kind: "receipt", orderId: model.orderId })}>Verify receipt</button>
+              Prices locked, confirmed by Valio Aimo.
             </span>
           </Step>
         )}

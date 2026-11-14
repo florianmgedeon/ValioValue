@@ -359,7 +359,7 @@ export function orderReducer(state: OrderState, evt: OrderEvent): OrderState {
           waiting: openApprovals(blocks),
           total: evt.total_price ?? live.total,
           lines: evt.lines?.length ?? live.lines,
-          note: evt.tier === "auto" ? "ordered alone" : "confirmed after your signature",
+          note: evt.tier === "auto" ? "ordered alone" : "confirmed after your OK",
           deliverBy: evt.delivery_date ?? live.deliverBy,
           orderId,
         },

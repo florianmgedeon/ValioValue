@@ -47,7 +47,7 @@ function UsualCard({ onOrder }: { onOrder: () => void }) {
       <div className="head">
         <div className="eyebrow flex items-center gap-1" style={{ color: "var(--usual)" }}><Icon name="usual" size={12} /> Your usual order</div>
         <h2>{items.length} products, the usual amounts</h2>
-        <p>{usual.data?.based_on ? `Based on ${usual.data.based_on}.` : "From your kitchen profile."}{k.profileVersion ? ` Kitchen profile v${k.profileVersion}.` : ""}</p>
+        <p>{usual.data?.based_on ? `Based on ${usual.data.based_on}.` : "From your kitchen profile."}</p>
       </div>
       <div className="ulist">
         {items.map((i) => <div key={i.word}><span className="w">{i.word}</span><span className="q">{i.qty}</span></div>)}
@@ -56,8 +56,8 @@ function UsualCard({ onOrder }: { onOrder: () => void }) {
         <div className="est">
           {est !== null ? <>≈ <b className="num">{eur(est)}</b>{usual.data?.deliver_by ? ` · ${fmtDay(usual.data.deliver_by)}` : ""}<br /></> : null}
           {fits === true && `Inside your ${eur(k.limit)} limit: I can order it alone.`}
-          {fits === false && `Above your ${eur(k.limit)} limit: you sign the cart.`}
-          {fits === null && "Valio Aimo prices it after you sign."}
+          {fits === false && `Above your ${eur(k.limit)} limit: you approve the cart.`}
+          {fits === null && "Valio Aimo prices it after you confirm."}
         </div>
         <Button small onClick={() => setText("the usual, but ")}>Adjust</Button>
         <Button variant="primary" onClick={onOrder}>Order the usual</Button>

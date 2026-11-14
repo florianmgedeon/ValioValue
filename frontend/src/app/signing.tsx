@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
 import { ApiError } from "../api/client";
 import { previewMandate, saveMandate } from "../api/mandate";
-import { Button, CedarBlock, DiffList, HashRow, Modal, useToast, type DiffKind } from "../ui";
+import { Button, DiffList, Modal, useToast, type DiffKind } from "../ui";
 import { invalidateMandateViews, SIGNER_NAME } from "./queries";
 
 /** What Valio Aimo previews before a signature. */
@@ -76,14 +76,14 @@ export function SignProvider({ children }: { children: ReactNode }) {
               const out = await run(preview.mandate_hash);
               setPending(null);
               await invalidateMandateViews();
-              toast(`Mandate v${preview.version ?? "?"} signed. Valio Aimo enforces it from the next order.`);
+              toast("Saved. Valio Aimo applies it from the next order on.");
               resolve(out);
             } catch (e) {
               const again = needsSignature(e);
               if (again) {
                 // Something changed since the preview: show the new one, sign again.
                 setPending((p) => (p ? { ...p, preview: again } : p));
-                setError("The mandate changed since it was shown. Check it again.");
+                setError("Your rules changed in the meantime. Please check again.");
               } else {
                 setError((e as Error).message);
               }
@@ -119,27 +119,18 @@ export function SignProvider({ children }: { children: ReactNode }) {
   return (
     <SignContext.Provider value={sign}>
       {children}
-      <Modal open={!!pending} label="Review and sign" onClose={() => pending?.cancel()}>
+      <Modal open={!!pending} label="Check and confirm" onClose={() => pending?.cancel()}>
         {pending && (
           <>
-            <div className="eyebrow">{pending.title}{pending.preview.version ? ` · mandate v${pending.preview.version}` : ""}</div>
-            <h2>Review and sign</h2>
-            <p className="text-ink3">Valio Aimo enforces this version from the next order on. Orders already placed keep the version they were made with.</p>
+            <div className="eyebrow">{pending.title}</div>
+            <h2>Check and confirm</h2>
+            <p className="text-ink3">Valio Aimo applies this from the next order on. Orders already placed stay as they are.</p>
             {pending.lines.length > 0 && <DiffList lines={pending.lines} />}
-            {pending.preview.cedar && (
-              <details>
-                <summary className="link cursor-pointer text-sm">Show the generated policy (Cedar)</summary>
-                <div className="mt-2.5 max-h-72 overflow-auto rounded-xl">
-                  <CedarBlock text={pending.preview.cedar} />
-                </div>
-              </details>
-            )}
-            <HashRow label="You sign this hash" value={pending.preview.mandate_hash} />
             {error && <p className="rounded-xl bg-must-soft px-3.5 py-2.5 text-sm text-must">{error}</p>}
             <div className="flex flex-wrap justify-end gap-2.5">
               <Button onClick={pending.cancel} disabled={busy}>Cancel</Button>
               <Button variant="primary" icon="lock" onClick={() => void pending.confirm()} disabled={busy}>
-                {busy ? "Signing…" : `Sign as ${SIGNER_NAME}`}
+                {busy ? "Saving…" : "Confirm"}
               </Button>
             </div>
           </>

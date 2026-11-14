@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 import type { OrderSummary } from "../../api/types";
 import { useComposer } from "../../app/composer";
 import { useMandate } from "../../app/queries";
@@ -9,7 +9,6 @@ import { formatDay } from "./format";
 import { fromAudit, fromStory } from "./model";
 import { useOrderList, useOrderStory } from "./queries";
 import { StoryTimeline } from "./StoryTimeline";
-import { TrustDrawer, type TrustView } from "./TrustDrawer";
 
 /** Activity tab (F4): every order, what the agent did and why. `#activity/<order_id>` selects an order. */
 export function ActivityView({ orderId }: { orderId?: string }) {
@@ -63,10 +62,6 @@ function OrderItem({ o, current, onOpen }: { o: OrderSummary; current: boolean; 
 function Story({ orderId, summary }: { orderId: string; summary?: OrderSummary }) {
   const story = useOrderStory(orderId);
   const mandate = useMandate();
-  const [trust, setTrust] = useState<TrustView | null>(null);
-
-  useEffect(() => setTrust(null), [orderId]);
-
   const model = useMemo(() => {
     if (!story.data) return null;
     return "story" in story.data ? fromStory(story.data.story, summary) : fromAudit(orderId, story.data.audit, summary);
@@ -81,9 +76,6 @@ function Story({ orderId, summary }: { orderId: string; summary?: OrderSummary }
   if (story.isError) return <p className="text-sm text-must">Could not load order {orderId}: {story.error.message}</p>;
   if (!model) return null;
   return (
-    <>
-      <StoryTimeline model={model} grantLabel={grantLabel} ruleLabel={ruleLabel} onTrust={setTrust} />
-      <TrustDrawer view={trust} onClose={() => setTrust(null)} />
-    </>
+    <StoryTimeline model={model} grantLabel={grantLabel} ruleLabel={ruleLabel} />
   );
 }

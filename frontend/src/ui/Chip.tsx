@@ -24,7 +24,7 @@ export function SignedTag() {
   return (
     <span className="signed">
       <Icon name="lock" />
-      signed rule
+      only you can change this
     </span>
   );
 }

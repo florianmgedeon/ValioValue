@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useComposer, useComposerText } from "../../app/composer";
 import { usePhoneCamera } from "../../app/PhoneCamera";
 import { Button } from "../../ui";
@@ -6,7 +6,6 @@ import { TypingBlock, BlockView, type BlockCtx } from "./blocks";
 import { fmtTime } from "./data";
 import { KitchenPanel, LivePanel } from "./panels";
 import { StartView } from "./StartView";
-import { TrustDrawer, type TrustTarget } from "./TrustDrawer";
 import { useOrderSession } from "./useOrderSession";
 import "./order.css";
 
@@ -17,7 +16,6 @@ export default function OrderView() {
   const { sessionId, state, send, sending, newOrder, local } = useOrderSession();
   const { onPhoto } = usePhoneCamera();
   const prefill = useComposerText();
-  const [trust, setTrust] = useState<TrustTarget | null>(null);
   const inOrder = !!sessionId || sending;
   const { blocks, live } = state;
 
@@ -44,7 +42,6 @@ export default function OrderView() {
     return {
       local,
       retry: () => state.lastText && void send(state.lastText),
-      openTrust: setTrust,
       prefill,
       issues: f?.kind === "funnel" ? f.issues : {},
       intent: rb?.kind === "readback" ? rb.intent : null,
@@ -77,7 +74,6 @@ export default function OrderView() {
         {inOrder && <LivePanel live={live} />}
         <KitchenPanel />
       </aside>
-      <TrustDrawer target={trust} onClose={() => setTrust(null)} />
     </main>
   );
 }

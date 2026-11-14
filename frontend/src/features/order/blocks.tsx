@@ -3,14 +3,13 @@ import { decideApproval } from "../../api/approvals";
 import { ApiError, apiUrl } from "../../api/client";
 import { confirmIntent } from "../../api/intents";
 import { acceptKitchenSuggestions, rejectKitchenSuggestion } from "../../api/kitchen";
-import { getCompiledMandate } from "../../api/mandate";
 import type { Approval, OrderIntent, Schema } from "../../api/types";
 import { SIGNER_NAME } from "../../app/queries";
 import { navigate } from "../../app/route";
 import { useSignedChange } from "../../app/signing";
-import { Button, Card, CardFooter, CardHeader, CedarBlock, Chip, Cond, HashRow, Icon, KindTag, Typing, eur, useToast, type Kind } from "../../ui";
-import { fmtDay, shortHash, unitLabel, useKitchenContext } from "./data";
-import { lineDeviations, mandateVersion, mergeFunnel, type Block, type ItemIssue, type LocalAction, type UsualExcluded } from "./orderReducer";
+import { Button, Card, CardFooter, CardHeader, Chip, Cond, Icon, KindTag, Typing, eur, useToast, type Kind } from "../../ui";
+import { fmtDay, unitLabel, useKitchenContext } from "./data";
+import { lineDeviations, mergeFunnel, type Block, type ItemIssue, type LocalAction, type UsualExcluded } from "./orderReducer";
 
 type Check = ReturnType<typeof lineDeviations>[number];
 type BlockOf<K extends Block["kind"]> = Extract<Block, { kind: K }>;
@@ -18,7 +17,6 @@ type BlockOf<K extends Block["kind"]> = Extract<Block, { kind: K }>;
 export interface BlockCtx {
   local: (a: LocalAction) => void;
   retry: () => void;
-  openTrust: (t: { mode: "intent"; intent: OrderIntent } | { mode: "receipt"; orderId: string }) => void;
   /** Put text into the composer for the buyer to finish. */
   prefill: (text: string) => void;
   /** item_id -> why nothing could be ordered for it */
@@ -137,7 +135,7 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
       await confirmIntent(it.intent_id, { intent_hash: it.intent_hash, confirmed_by: SIGNER_NAME });
       ctx.local({ type: "local/signed", intentId: it.intent_id });
     } catch (e) {
-      toast(`Not signed: ${errText(e)}`);
+      toast(`Not sent: ${errText(e)}`);
     } finally {
       setBusy(false);
     }
@@ -147,18 +145,12 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
     <Card className="rise">
       <CardHeader title="Here's what I understood">
         <span className="text-[13px] text-ink3">from your {it.items.some((i) => i.note === "from your photo") ? "photo" : "message"}</span>
-        <span className="flex-1" />
-        {it.intent_hash && (
-          <button className="link text-[13px]" onClick={() => ctx.openTrust({ mode: "intent", intent: it })}>
-            intent {shortHash(it.intent_hash)}
-          </button>
-        )}
       </CardHeader>
       {it.items.map((i) => (
         <div key={i.item_id} className="order-item">
           <div className="min-w-0">
             <div className="ask">{i.quantity?.amount} {unitLabel(i.quantity?.unit)} {i.product?.query}</div>
-            <div className="nm">{i.usual?.name ?? "I search the catalog after you sign"}</div>
+            <div className="nm">{i.usual?.name ?? "I search the catalog after you confirm"}</div>
             {i.quantity?.max_over_pct ? <div className="qty">rounding up to whole packs, at most +{i.quantity.max_over_pct} %</div> : null}
           </div>
           <div className="px" />
@@ -191,16 +183,16 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
       <CardFooter>
         <div className="fore">
           {questions.length ? (
-            <><b>Answer below and I write it down again.</b> Nothing is sent before you sign.</>
+            <><b>Answer below and I write it down again.</b> Nothing is sent before you confirm.</>
           ) : (
-            <><b>You sign exactly this.</b> Valio Aimo checks every line against your mandate{k.limit ? ` and orders alone up to ${eur(k.limit)}` : ""}. Anything else comes back to you.</>
+            <><b>This is what I order.</b> Valio Aimo checks every line against your rules{k.limit ? ` and orders alone up to ${eur(k.limit)}` : ""}. Anything else comes back to you.</>
           )}
         </div>
         {b.signed ? (
-          <Chip kind="prefer" icon="check">Signed</Chip>
+          <Chip kind="prefer" icon="check">Sent</Chip>
         ) : questions.length ? null : (
           <Button variant="primary" icon="lock" disabled={busy || !it.intent_hash} onClick={() => void sign()}>
-            {busy ? "Signing…" : "Sign & send to Valio Aimo"}
+            {busy ? "Sending…" : "Confirm & send to Valio Aimo"}
           </Button>
         )}
       </CardFooter>
@@ -273,7 +265,7 @@ function checkTitle(c: Check, ctx: BlockCtx): { title: string; text: string; usu
     };
   }
   if (c.field === "usual") return { title: `${cap(q)}: not your usual product.`, text: `Your usual is ${c.intended}. I found ${c.cart}.` };
-  return { title: `${cap(q)}: ${c.detail ?? c.field}.`, text: `You signed ${c.intended ?? "—"}. The cart has ${c.cart ?? "—"}.` };
+  return { title: `${cap(q)}: ${c.detail ?? c.field}.`, text: `You asked for ${c.intended ?? "—"}. The cart has ${c.cart ?? "—"}.` };
 }
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -300,7 +292,7 @@ function Decision({ b, n, ctx }: { b: BlockOf<"decision">; n: number; ctx: Block
     <Card variant="decision" className="rise">
       <CardHeader title={<span className="flex items-center gap-2.5"><span className="dnum">{n}</span>A decision for you</span>}>
         <span className="flex-1" />
-        {ruleId ? <Chip kind="must" icon="lock">Rule {ruleId}</Chip> : <Chip kind="auto" icon="lock">No grant accepts this</Chip>}
+        {ruleId ? <Chip kind="must" icon="lock">Your rule</Chip> : <Chip kind="auto" icon="lock">Needs your OK</Chip>}
       </CardHeader>
       <div className="grid gap-1.5 px-5 pt-4">
         <b className="text-base">{head.title}</b>
@@ -321,11 +313,11 @@ function Decision({ b, n, ctx }: { b: BlockOf<"decision">; n: number; ctx: Block
         ))}
       </div>
       <CardFooter>
-        <div className="fore">You sign this cart. Valio Aimo checks it again before it goes out.</div>
+        <div className="fore">Valio Aimo checks the cart again before it goes out.</div>
         {done ? (
           <Chip kind="prefer" icon="check">{done === "approve" ? "Decided" : "Rejected"}</Chip>
         ) : (
-          <Button variant="primary" icon="lock" disabled={busy} onClick={() => void decide(pick)}>{busy ? "Sending…" : "Sign decision"}</Button>
+          <Button variant="primary" icon="lock" disabled={busy} onClick={() => void decide(pick)}>{busy ? "Sending…" : "Confirm"}</Button>
         )}
       </CardFooter>
     </Card>
@@ -341,21 +333,20 @@ function Approve({ b, n, ctx }: { b: BlockOf<"approve">; n: number; ctx: BlockCt
     <Card variant="decision" className="rise">
       <CardHeader title={<span className="flex items-center gap-2.5"><span className="dnum">{n}</span>Above your limit</span>}>
         <span className="flex-1" />
-        {k.limit !== null && <Chip kind="auto" icon="lock">Grant g1 · up to {eur(k.limit)}</Chip>}
+        {k.limit !== null && <Chip kind="auto" icon="lock">Your limit · {eur(k.limit)}</Chip>}
       </CardHeader>
       <div className="grid gap-1.5 px-5 py-4">
         <b className="text-base">This cart is {eur(total)}{over !== null && over > 0 ? `, ${eur(over)} more than I may order alone` : ""}.</b>
-        <p className="text-sm text-ink3">Every line passes your rules. Only the total needs your signature. You sign exactly this cart; if anything changes, Valio Aimo asks again.</p>
-        {b.approval.cart_hash && <div className="mt-1.5"><HashRow label="Cart you sign" value={b.approval.cart_hash} /></div>}
+        <p className="text-sm text-ink3">Every line passes your rules. Only the total needs your OK. If anything changes, I ask you again.</p>
       </div>
       <CardFooter>
         <div className="fore">Want this to go through alone next time? Raise the limit in your kitchen profile.</div>
         {b.decided ? (
-          <Chip kind="prefer" icon="check">{b.decided === "approve" ? "Signed" : "Rejected"}</Chip>
+          <Chip kind="prefer" icon="check">{b.decided === "approve" ? "Approved" : "Rejected"}</Chip>
         ) : (
           <>
             <Button small disabled={busy} onClick={() => void decide("reject")}>Reject</Button>
-            <Button variant="primary" icon="lock" disabled={busy} onClick={() => void decide("approve")}>{busy ? "Signing…" : `Sign cart ${eur(total)}`}</Button>
+            <Button variant="primary" icon="lock" disabled={busy} onClick={() => void decide("approve")}>{busy ? "Sending…" : `Approve ${eur(total)}`}</Button>
           </>
         )}
       </CardFooter>
@@ -365,45 +356,20 @@ function Approve({ b, n, ctx }: { b: BlockOf<"approve">; n: number; ctx: BlockCt
 
 // ---------------------------------------------------------------- blocked
 
-/** The Cedar policy with this @id, cut out of the compiled mandate. */
-function policyFor(cedar: string, ruleId: string | undefined): string {
-  if (!ruleId) return cedar;
-  const chunks = cedar.split(/\n\s*\n/);
-  const hit = chunks.filter((c) => c.includes(`@id("${ruleId}")`));
-  return hit.length ? hit.join("\n\n") : cedar;
-}
-
 function Blocked({ b, ctx }: { b: BlockOf<"block">; ctx: BlockCtx }) {
-  const toast = useToast();
-  const k = useKitchenContext();
-  const [cedar, setCedar] = useState<string | null>(null);
   const c = b.checks[0];
   const ev = c?.evidence;
-  const ruleId = ev?.id;
-  const version = mandateVersion(ctx.mandateId) ?? k.mandateVersion;
   const usual = ctx.usualExcluded.find((u) => u.item_id === c?.item_id);
-
-  const showPolicy = async () => {
-    try {
-      const res = (await getCompiledMandate()) as { cedar?: string };
-      if (!res.cedar) throw new Error("no policy text");
-      setCedar(policyFor(res.cedar, ruleId) + `\n\n// verdict for this line: ${ruleId ?? "rule"} = "${ev?.verdict ?? "excluded"}"  →  forbid wins over every permit`);
-    } catch (e) {
-      toast(`Could not load the policy: ${errText(e)}`);
-    }
-  };
 
   return (
     <Card variant="block" className="rise">
       <CardHeader title={<span className="flex items-center gap-2"><Icon name="ban" />Blocked by Valio Aimo</span>}>
-        <span className="flex-1" />
-        {ruleId && <span className="font-mono text-xs">forbid · {ruleId}</span>}
       </CardHeader>
       <div className="evidence">
-        <p className="text-[15px]">I passed your request on, but I can't override this. Your rule is part of your signed mandate, and Valio Aimo checks it on every line, no matter what I'm told in chat.</p>
+        <p className="text-[15px]">I passed your request on, but I can't override this. It's one of your fixed rules, and Valio Aimo checks it on every line, no matter what I'm told in chat.</p>
         <dl>
           {c && <><dt>Product</dt><dd>{usual?.name ?? productOf(b, c.item_id) ?? queryOf(ctx.intent, c.item_id)}</dd></>}
-          {c && <><dt>Rule</dt><dd><Chip kind="must" icon="lock">{[ruleId, ev?.rule ?? c.intended].filter(Boolean).join(" · ")}</Chip></dd></>}
+          {c && <><dt>Rule</dt><dd><Chip kind="must" icon="lock">{ev?.rule ?? c.intended ?? "Your rule"}</Chip></dd></>}
           {c && (
             <>
               <dt>Evidence</dt>
@@ -416,14 +382,12 @@ function Blocked({ b, ctx }: { b: BlockOf<"block">; ctx: BlockCtx }) {
             </>
           )}
           {!c && b.message && <><dt>Why</dt><dd>{b.message}</dd></>}
-          <dt>Who decided</dt><dd>Valio Aimo{version ? `, mandate v${version}` : ""}{k.signedBy ? `, signed by ${k.signedBy}` : ""}</dd>
-          <dt>To change it</dt><dd>Edit the rule in your kitchen profile and sign a new mandate version. Not in chat.</dd>
+          <dt>Who decided</dt><dd>Valio Aimo, using your rules</dd>
+          <dt>To change it</dt><dd>Change the rule in your kitchen profile. Not in chat.</dd>
         </dl>
-        {cedar && <CedarBlock text={cedar} />}
       </div>
       <CardFooter>
-        <div className="fore">No autonomy level can turn a block into an order. That's a property of the policy language, not a promise from me.</div>
-        {!cedar && <Button small onClick={() => void showPolicy()}>Show the policy</Button>}
+        <div className="fore">No setting lets me order this anyway. Only changing the rule does.</div>
         <Button small variant="primary" onClick={() => navigate("kitchen")}>Open kitchen profile</Button>
       </CardFooter>
     </Card>
@@ -437,17 +401,14 @@ function productOf(b: BlockOf<"block">, itemId: string | null | undefined) {
 // ---------------------------------------------------------------- receipt
 
 function Receipt({ b, ctx }: { b: BlockOf<"receipt">; ctx: BlockCtx }) {
-  const k = useKitchenContext();
   const deviations = lineDeviations(b.diff);
-  const grants = b.receipt?.grants_used ?? [];
-  const version = mandateVersion(b.receipt?.mandate_id ?? ctx.mandateId) ?? k.mandateVersion;
   const why = (itemId: string | undefined, usual: boolean | null | undefined): ReactNode => {
     if (b.tier === "auto") {
-      return <><Chip kind="auto" icon="lock">Alone · {grants.join(", ") || "grant"}</Chip>{usual ? "your usual, " : ""}passed every must, no deviation</>;
+      return <><Chip kind="auto" icon="lock">Ordered alone</Chip>{usual ? "your usual, " : ""}passed every must, no deviation</>;
     }
     const dev = deviations.find((d) => d.item_id === itemId);
-    if (dev) return <><Chip kind="about">You decided</Chip>{dev.detail ?? "a change you signed"}</>;
-    return <><Chip kind="about">You signed the cart</Chip>passed every must</>;
+    if (dev) return <><Chip kind="about">You decided</Chip>{dev.detail ?? "a change you approved"}</>;
+    return <><Chip kind="about">You approved the cart</Chip>passed every must</>;
   };
   return (
     <Card variant="receipt" className="rise">
@@ -464,13 +425,9 @@ function Receipt({ b, ctx }: { b: BlockOf<"receipt">; ctx: BlockCtx }) {
       <div className="rtotal"><span>Total</span><span className="num">{eur(b.total)}</span></div>
       {b.openItems.length > 0 && <StillOpen ids={b.openItems} ctx={ctx} />}
       <div className="proof">
-        <span className="ok"><Icon name="shield" />Signed by Valio Aimo</span>
-        {b.receipt?.fingerprint && <span className="font-mono">{b.receipt.fingerprint}</span>}
-        {version && <span>mandate v{version}</span>}
-        {k.profileVersion && <span>kitchen profile v{k.profileVersion}</span>}
+        <span className="ok"><Icon name="shield" />Confirmed by Valio Aimo</span>
         <span className="flex-1" />
         <button className="link" onClick={() => navigate("activity", b.orderId)}>Why, line by line</button>
-        <button className="link" onClick={() => ctx.openTrust({ mode: "receipt", orderId: b.orderId })}>Verify</button>
       </div>
     </Card>
   );

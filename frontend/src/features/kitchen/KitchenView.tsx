@@ -185,7 +185,7 @@ export default function KitchenView() {
         title: `Accept: ${s.title ?? s.kind}`,
         call: (mandate_hash) => acceptKitchenSuggestions({ ids: [s.id], by: SIGNER_NAME, mandate_hash }),
       })) as { profile?: KitchenProfile; mandate?: unknown } | null;
-      if (out && !out.mandate) toast(`Added to your kitchen profile · v${out.profile?.version ?? "?"}`);
+      if (out && !out.mandate) toast("Added to your kitchen profile");
     } catch (e) {
       toast(errText(e));
     } finally {
@@ -209,7 +209,7 @@ export default function KitchenView() {
       const p = await patchKitchenProfile({ about: { text }, by: SIGNER_NAME });
       queryClient.setQueryData(keys.kitchen, (old: KitchenProfile | undefined) => ({ ...old, ...p }));
       await queryClient.invalidateQueries({ queryKey: keys.kitchen });
-      toast(`Kitchen profile v${p.version ?? "?"}`);
+      toast("Saved to your kitchen profile");
     } catch (e) {
       toast(errText(e));
       throw e;
@@ -218,13 +218,12 @@ export default function KitchenView() {
 
   // ---- review & sign
   const pendingCount = ops.length + (levelChange ? 1 : 0);
-  const steps = (ops.length ? 1 : 0) + (levelChange ? 1 : 0);
   const review = async () => {
     try {
       if (ops.length) {
         const next = applyOps(m, ops);
         const res = await sign({
-          title: plural(ops.length, "change") + " to signed rules",
+          title: plural(ops.length, "change") + " to your rules",
           lines: ops.map((o) => ({ text: o.text, kind: o.kind })),
           mandate: next as unknown as Record<string, unknown>,
         });
@@ -241,7 +240,7 @@ export default function KitchenView() {
         setLevelChange(null);
       }
     } catch (e) {
-      toast(`Could not sign: ${errText(e)}`);
+      toast(`Could not save: ${errText(e)}`);
     }
   };
 
@@ -253,8 +252,8 @@ export default function KitchenView() {
         <div>
           <h1>{name}</h1>
           <p>
-            Kitchen profile v{profile.version ?? 0} · mandate v{m.version} signed by {m.updated_by || "you"}{m.updated_at ? `, ${shortDate(m.updated_at)}` : ""} · Valio Aimo enforces every{" "}
-            <Icon name="lock" size={13} style={{ verticalAlign: -2 }} /> rule
+            Last changed by {m.updated_by || "you"}{m.updated_at ? `, ${shortDate(m.updated_at)}` : ""} · Valio Aimo checks every{" "}
+            <Icon name="lock" size={13} style={{ verticalAlign: -2 }} /> rule on every order
           </p>
         </div>
         <span className="spacer" />
@@ -296,10 +295,10 @@ export default function KitchenView() {
       {pendingCount > 0 && (
         <div className="k-changebar rise" role="status">
           <span>
-            <b>{plural(pendingCount, "change")} to signed rules</b> · mandate v{m.version} → v{(m.version ?? 0) + steps}
+            <b>{plural(pendingCount, "change")} to your rules</b> · not saved yet
           </span>
           <Button variant="link" className="text-[13px]" onClick={() => { setOps([]); setLevelChange(null); }}>Discard</Button>
-          <Button small onClick={() => void review()}>Review & sign</Button>
+          <Button small onClick={() => void review()}>Check & save</Button>
         </div>
       )}
 
@@ -323,7 +322,7 @@ function HistoryDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           what: "mandate" as const,
           version: x.version ?? 0,
           by: x.updated_by,
-          text: `${plural(x.mandatory_rules?.length ?? 0, "must")} · ${plural(x.preferences?.length ?? 0, "preference")} · ${plural(x.autonomy?.grants?.length ?? 0, "grant")}${x.signature ? " · signed" : ""}`,
+          text: `${plural(x.mandatory_rules?.length ?? 0, "must")} · ${plural(x.preferences?.length ?? 0, "preference")} · ${plural(x.autonomy?.grants?.length ?? 0, "permission")}`,
         })),
         ...(((kh.history as { version?: number; at?: string; by?: string; summary?: string }[] | undefined) ?? []).map((h) => ({
           at: h.at ?? "", what: "profile" as const, version: h.version ?? 0, by: h.by, text: h.summary ?? "",
@@ -334,13 +333,13 @@ function HistoryDrawer({ open, onClose }: { open: boolean; onClose: () => void }
   });
   return (
     <Drawer open={open} onClose={onClose} title="History">
-      <p className="text-ink3">Every signed mandate version and every change to your kitchen profile.</p>
+      <p className="text-ink3">Every change to your rules and your kitchen profile.</p>
       {q.isLoading && <Typing />}
       {q.isError && <div className="err">{errText(q.error)}</div>}
       <div className="k-hist">
         {q.data?.map((r, i) => (
           <div key={i}>
-            <span className={`chip ${r.what === "mandate" ? "k-auto" : "k-about"}`}>{r.what === "mandate" ? <><Icon name="lock" />Mandate v{r.version}</> : <>Profile v{r.version}</>}</span>
+            <span className={`chip ${r.what === "mandate" ? "k-auto" : "k-about"}`}>{r.what === "mandate" ? <><Icon name="lock" />Rules</> : <>Kitchen</>}</span>
             <div>
               <div>{r.text}</div>
               <div className="when">{r.at ? new Date(r.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}{r.by ? ` · ${r.by}` : ""}</div>

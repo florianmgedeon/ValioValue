@@ -1,11 +1,11 @@
 import { navigate } from "../../app/route";
 import { Chip, Icon, eur } from "../../ui";
 import { fmtDay, useKitchenContext } from "./data";
-import { mandateVersion, STEPS, type LiveState, type Step } from "./orderReducer";
+import { STEPS, type LiveState, type Step } from "./orderReducer";
 
 const LABEL: Record<Step, string> = {
   asked: "You asked",
-  understood: "You signed what I understood",
+  understood: "You confirmed my list",
   searching: "I searched Valio Aimo",
   checking: "Valio Aimo checked every line",
   done: "Confirmed",
@@ -15,18 +15,18 @@ function nowLine(L: LiveState): [string, "" | "wait" | "block" | "done"] {
   const key = L.now ?? L.step ?? "asked";
   switch (key) {
     case "asked": return ["Reading your request…", ""];
-    case "understood": return ["Waiting for your signature", "wait"];
+    case "understood": return ["Waiting for your OK", "wait"];
     case "searching": return ["Searching the catalog…", ""];
     case "checking": return ["Valio Aimo is checking every line…", ""];
     case "wait":
       if (L.waiting) return [`${L.waiting} decision${L.waiting > 1 ? "s wait" : " waits"} for you`, "wait"];
-      return [L.step === "understood" ? "Waiting for your signature" : "Waiting for you", "wait"];
+      return [L.step === "understood" ? "Waiting for your OK" : "Waiting for you", "wait"];
     case "block": return ["Blocked by Valio Aimo", "block"];
     case "done": return ["Confirmed by Valio Aimo", "done"];
   }
 }
 
-/** "This order": status, total against the level limit, the five steps, delivery and versions. */
+/** "This order": status, total against the level limit, the five steps, delivery. */
 export function LivePanel({ live }: { live: LiveState }) {
   const k = useKitchenContext();
   const [text, cls] = nowLine(live);
@@ -34,7 +34,6 @@ export function LivePanel({ live }: { live: LiveState }) {
   const limit = k.limit;
   const total = live.total;
   const over = total !== null && limit !== null && total > limit;
-  const version = mandateVersion(live.mandateId) ?? k.mandateVersion;
   return (
     <div className="live" aria-live="polite">
       <div className="eyebrow">This order</div>
@@ -52,7 +51,7 @@ export function LivePanel({ live }: { live: LiveState }) {
           {limit !== null && (
             <div className={`limitbar ${over ? "over" : ""}`}>
               <div className="track"><i style={{ width: `${Math.min(100, (total / limit) * 100)}%` }} /></div>
-              <span>{over ? `${eur(total - limit)} over your ${eur(limit)} limit: you sign the cart` : `Inside your ${eur(limit)} limit (g1)`}</span>
+              <span>{over ? `${eur(total - limit)} over your ${eur(limit)} limit: you approve the cart` : `Inside your ${eur(limit)} limit`}</span>
             </div>
           )}
         </>
@@ -67,8 +66,6 @@ export function LivePanel({ live }: { live: LiveState }) {
       </ol>
       <dl className="kv">
         <dt>Delivery</dt><dd>{fmtDay(live.deliverBy)}</dd>
-        <dt>Mandate</dt><dd>{version ? `v${version} · signed` : "—"}</dd>
-        <dt>Kitchen profile</dt><dd>{k.profileVersion ? `v${k.profileVersion}` : "—"}</dd>
       </dl>
     </div>
   );

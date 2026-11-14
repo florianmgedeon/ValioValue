@@ -330,15 +330,15 @@ export function OnboardingView() {
               <>
                 <b>{keep.length} thing{keep.length === 1 ? "" : "s"} to remember.</b>{" "}
                 {signedCount > 0
-                  ? `${signedCount} of them ${signedCount === 1 ? "is a signed rule" : "are signed rules"}: Valio Aimo enforces ${signedCount === 1 ? "it" : "them"} on every order, I can't change ${signedCount === 1 ? "it" : "them"}.`
+                  ? `${signedCount} of them ${signedCount === 1 ? "is a fixed rule" : "are fixed rules"}: Valio Aimo checks ${signedCount === 1 ? "it" : "them"} on every order, I can't change ${signedCount === 1 ? "it" : "them"}.`
                   : needsMandate
-                    ? "Your preferences go into the signed mandate."
-                    : "Nothing here needs a signature."}
+                    ? "Your preferences go into your rules."
+                    : "Nothing here needs your OK."}
               </>
             )}
           </p>
           <Button variant="inverse" iconAfter="arrow" disabled={adopting} onClick={() => void adopt()}>
-            {adopting ? "Saving…" : learned.length === 0 ? "Start ordering" : needsMandate ? "Sign & start ordering" : "Save & start ordering"}
+            {adopting ? "Saving…" : learned.length === 0 ? "Start ordering" : needsMandate ? "Confirm & start ordering" : "Save & start ordering"}
           </Button>
         </div>
       )}

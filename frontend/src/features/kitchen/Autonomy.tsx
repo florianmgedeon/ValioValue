@@ -2,12 +2,12 @@ import { useState } from "react";
 import { draftGrant } from "../../api/mandate";
 import type { AutonomyView, DraftGrantResponse } from "../../api/types";
 import { navigate } from "../../app/route";
-import { Button, Chip, Cond, KindTag, Modal, SignedTag, Toggle, DiffList } from "../../ui";
+import { Button, Chip, Cond, Icon, KindTag, Modal, SignedTag, Toggle, DiffList } from "../../ui";
 import { acceptsText, condText, limitText, ruleLabel, scopeText, type Grant, type HardRule, type LevelChange } from "./model";
 import { errText } from "./Rules";
 
 export const LEVELS: { n: 0 | 1 | 2 | 3; name: string; text: (limit: number) => string }[] = [
-  { n: 0, name: "Suggest", text: () => "I prepare, you sign every order" },
+  { n: 0, name: "Suggest", text: () => "I prepare, you approve every order" },
   { n: 1, name: "Within your rules", text: (l) => `I order alone whatever passes every must, no deviations, up to €${l.toLocaleString("en-GB")}` },
   { n: 2, name: "Small deviations", text: () => "Also pack rounding up to +5 %, 1 day late, a missed preference" },
   { n: 3, name: "Standing orders", text: () => "I reorder your usual order on a schedule" },
@@ -81,13 +81,13 @@ export function AutonomySection(p: AutonomyProps) {
             <div className="track"><i style={{ width: `${Math.min(100, (clean / needed) * 100)}%` }} /></div>
           </>
         ) : (
-          <div>Level 2 since mandate v{a.mandate_version ?? p.mandateVersion}. Every deviation I accept alone is marked in Activity, so you can see what I decided.</div>
+          <div>Level 2 is on. Every deviation I accept alone is marked in Activity, so you can see what I decided.</div>
         )}
       </div>
 
       {shown > 0 ? (
         <div className={`grant ${p.pendingLevel ? "changed" : ""}`}>
-          <span className="gid">g1</span>
+          <span className="gid"><Icon name="check" size={12} /></span>
           <div>
             <b>{shown >= 2 ? "Within your rules + small deviations" : "Within your rules"}</b>
             <div className="muted text-[12.5px]">
@@ -117,7 +117,7 @@ export function AutonomySection(p: AutonomyProps) {
       ) : (
         <div className="grant">
           <span className="gid">—</span>
-          <div><b>No grants</b><div className="muted text-[12.5px]">I prepare every order, you sign every order</div></div>
+          <div><b>Nothing alone</b><div className="muted text-[12.5px]">I prepare every order, you approve every order</div></div>
         </div>
       )}
 
@@ -131,24 +131,23 @@ export function AutonomySection(p: AutonomyProps) {
         const cls = [g.enabled === false ? "off" : "", g.id && p.freshGrants.has(g.id) ? "fresh rise" : g.id && p.changedGrants.has(g.id) ? "changed" : ""].join(" ");
         return (
           <div key={g.id} className={`grant ${cls}`}>
-            <span className="gid x">{g.id}</span>
+            <span className="gid x"><Icon name="check" size={12} /></span>
             <div>
               <b>{g.label || g.id}</b>
               <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[12.5px] text-ink3">
                 {inMandate ? (
                   <>
-                    {!!g.scope?.length && <Cond>{g.scope.map(condText).join(" · ")}</Cond>}
                     <span>{limitText(g.limits)} · {acceptsText(g.accepts)}{source ? ` · ${source}` : ""}</span>
                   </>
                 ) : (
-                  <span>{summary}{source ? ` · ${source}` : ""} · example (VITE_MOCK), not in your mandate</span>
+                  <span>{summary}{source ? ` · ${source}` : ""} · example</span>
                 )}
               </div>
             </div>
             {inMandate ? (
               <Toggle checked={g.enabled !== false} onChange={() => p.onToggleGrant(g)} label={`Permission on: ${g.label ?? g.id}`} />
             ) : (
-              <Toggle checked={g.enabled !== false} onChange={() => p.locked("This permission is example data from the mock layer, it is not in your mandate.")} label={`Permission on: ${g.label ?? g.id}`} />
+              <Toggle checked={g.enabled !== false} onChange={() => p.locked("This permission is only an example and can't be changed yet.")} label={`Permission on: ${g.label ?? g.id}`} />
             )}
           </div>
         );
@@ -177,7 +176,7 @@ export function AutonomySection(p: AutonomyProps) {
             { kind: "chg", text: `Unchanged: every must still blocks, the €${limit.toLocaleString("en-GB")} limit still holds` },
           ]}
         />
-        <p className="text-[13px] text-ink3">It's a change to your signed mandate, so you sign it like any rule. You can go back to level 1 at any time.</p>
+        <p className="text-[13px] text-ink3">Like every rule change, you confirm it first. You can go back to level 1 at any time.</p>
         <div className="flex flex-wrap justify-end gap-2.5">
           <Button onClick={() => setAskLevel2(false)}>Keep level {level}</Button>
           <Button variant="primary" onClick={() => { setAskLevel2(false); p.onLevel(2); }}>Unlock anyway</Button>

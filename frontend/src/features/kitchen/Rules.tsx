@@ -66,7 +66,7 @@ export function MustSection({ rules, flags, coverage, onToggle, onUnknown, onAdd
           <div key={r.id} className={rowCls(r.id, r.enabled, flags)}>
             <div className="grid gap-1">
               <div className="t">{ruleLabel(r)}</div>
-              <div className="s"><Cond>{condText(r)}</Cond>{r.source && <span>{r.source}</span>}</div>
+              {r.source && r.source !== "mandate" && <div className="s"><span>{r.source}</span></div>}
               <div className="s">
                 {cov && <span>{cov} ·</span>}
                 <span>if unknown</span>
@@ -119,7 +119,7 @@ export function PreferSection({ rules, flags, onToggle, onWeight, onAdd }: {
         <div key={r.id} className={rowCls(r.id, r.enabled, flags)}>
           <div className="grid gap-1">
             <div className="t">{ruleLabel(r)}</div>
-            <div className="s"><Cond>{condText(r)}</Cond>{(r as { source?: string }).source && <span>{(r as { source?: string }).source}</span>}</div>
+            {(r as { source?: string }).source && (r as { source?: string }).source !== "mandate" && <div className="s"><span>{(r as { source?: string }).source}</span></div>}
           </div>
           <div className="flex items-center gap-3">
             <Weight value={r.weight ?? 1} onChange={(w) => onWeight(r, w)} />
