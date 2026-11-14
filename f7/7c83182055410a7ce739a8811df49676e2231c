@@ -1,0 +1,19 @@
+render.yaml
+  s_1010a528576322::t_d2f32debae8e57 20-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f77c83182055410a7ce739a8811df49676e2231c",
+  "prompts": {},
+  "sessions": {
+    "s_1010a528576322": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cc381f25-f5b9-446f-9877-2a339fe9ddd2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
