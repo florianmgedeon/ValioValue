@@ -11,6 +11,7 @@ import { DriftCard } from "./DriftCard";
 import { fmtTime, levelLimit } from "./data";
 import { KitchenPanel, LivePanel } from "./panels";
 import { StartView } from "./StartView";
+import type { Block } from "./orderReducer";
 import { useOrderSession } from "./useOrderSession";
 import "./order.css";
 
@@ -20,6 +21,18 @@ const HINTS = ["the usual", "120 L milk by Monday", "the usual, but double the o
  * The Order tab (F1): photo tile + chat until an order starts, then only this order. Every way in (photo, typed,
  * spoken, "Order the usual" from the Kitchen tab via `#order/usual`) ends in this one thread.
  */
+/**
+ * A chat reply while the newest read-back still has open questions is the answer to them. Say so in the format the
+ * agent expects ("Answers to your questions about intent …", one "question → answer" per line), so it writes the
+ * read-back again instead of treating "ok" as a new request.
+ */
+function answerFor(blocks: Block[], text: string): string {
+  const rb = [...blocks].reverse().find((b) => b.kind === "readback");
+  const qs = rb?.kind === "readback" && !rb.signed ? rb.intent.questions ?? [] : [];
+  if (!qs.length || !rb || rb.kind !== "readback") return text;
+  return `Answers to your questions about intent ${rb.intent.intent_id}:\n${qs.map((q) => `${q} → ${text}`).join("\n")}`;
+}
+
 export default function OrderView({ start }: { start?: string }) {
   const { sessionId, state, send, sending, newOrder, local } = useOrderSession();
   const { onPhoto } = usePhoneCamera();
@@ -32,7 +45,7 @@ export default function OrderView({ start }: { start?: string }) {
   const { blocks, live } = state;
 
   useComposer({
-    onSubmit: (t) => void send(t),
+    onSubmit: (t) => void send(answerFor(blocks, t)),
     hints: inOrder ? [] : HINTS,
     placeholder: inOrder ? "Answer me or add something…" : "What do you need?",
     camera: "order",
@@ -59,8 +72,11 @@ export default function OrderView({ start }: { start?: string }) {
   }, [start, sessionId, send]);
   useEffect(() => { if (!sessionId && !sending && !pre) setChecked(null); }, [sessionId, sending, pre]);
 
-  // A photo for "order" starts (or continues) the chat with the upload attached (decision W2).
-  useEffect(() => onPhoto("order", (u) => { if (u.upload_id) void send("", [{ upload_id: u.upload_id }]); }), [onPhoto, send]);
+  // Photos for "order" start (or continue) the chat with the uploads attached, all in one message (decision W2).
+  useEffect(() => onPhoto("order", (ups) => {
+    const att = ups.flatMap((u) => (u.upload_id ? [{ upload_id: u.upload_id }] : []));
+    if (att.length) void send("", att);
+  }), [onPhoto, send]);
 
   // Keep the newest block in view.
   const end = useRef<HTMLDivElement>(null);
@@ -76,6 +92,7 @@ export default function OrderView({ start }: { start?: string }) {
       local,
       retry: () => state.lastText && void send(state.lastText),
       prefill,
+      send: (t: string) => void send(t),
       issues: f?.kind === "funnel" ? f.issues : {},
       intent: rb?.kind === "readback" ? rb.intent : null,
       usualExcluded: f?.kind === "funnel" ? f.usualExcluded : [],

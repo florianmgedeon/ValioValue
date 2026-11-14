@@ -1,0 +1,14 @@
+.git
+.env
+.env.*
+!.env.example
+.venv
+**/node_modules
+**/__pycache__
+frontend/dist
+data/raw
+data/keys
+data/uploads
+data/kitchen
+*.db
+.claude

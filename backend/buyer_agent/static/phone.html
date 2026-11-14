@@ -95,7 +95,7 @@
     xhr.onload = () => {
       $('sendBtn').disabled = false; $('sendBtn').textContent = 'Upload';
       $('bar').style.display = 'none';
-      if (xhr.status >= 200 && xhr.status < 300) { show('again'); $('sub').textContent = 'Sent. Look at the kitchen screen.'; }
+      if (xhr.status >= 200 && xhr.status < 300) { show('again'); $('sub').textContent = 'Sent. Take another, or finish on the kitchen screen.'; }
       else {
         let msg = 'Could not send the photo.';
         try { msg = JSON.parse(xhr.responseText).detail || msg; } catch (_) {}

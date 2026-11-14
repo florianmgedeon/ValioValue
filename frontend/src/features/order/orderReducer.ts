@@ -192,7 +192,11 @@ export function orderReducer(state: OrderState, evt: OrderEvent): OrderState {
 
   switch (evt.type) {
     case "user_message": {
-      const text = evt.text ?? "";
+      // An answer to the read-back's questions is sent wrapped for the agent: show only what the buyer wrote.
+      const raw = evt.text ?? "";
+      const text = /^Answers to your questions about intent /.test(raw)
+        ? [...new Set(raw.split("\n").slice(1).map((l) => l.split(" → ").slice(1).join(" → ").trim()).filter(Boolean))].join("\n") || raw
+        : raw;
       const atts = (evt.attachments ?? []) as Attachment[];
       const key = `me:${evt.timestamp}:${text}`;
       blocks = upsert(blocks, atts.length ? { kind: "photo", key, attachments: atts, text: text || undefined } : { kind: "me", key, text });

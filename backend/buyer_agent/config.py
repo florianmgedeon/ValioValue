@@ -44,7 +44,11 @@ def _lan_ip() -> str:
 
 # Phone pairing: the phone opens {PUBLIC_BASE_URL}/phone?pair=... "localhost" would point at the phone itself,
 # so the default is the laptop's LAN address. Override for a tunnel or a fixed host, e.g. http://192.168.1.20:8000
-PUBLIC_BASE_URL = (os.getenv("PUBLIC_BASE_URL") or f"http://{_lan_ip()}:{BACKEND_PORT}").rstrip("/")
+# On Render, RENDER_EXTERNAL_URL is set automatically to the service's https URL.
+PUBLIC_BASE_URL = (os.getenv("PUBLIC_BASE_URL") or os.getenv("RENDER_EXTERNAL_URL")
+                   or f"http://{_lan_ip()}:{BACKEND_PORT}").rstrip("/")
+# Built React UI (npm run build in frontend/). Served at / when present.
+FRONTEND_DIST = Path(os.getenv("FRONTEND_DIST", REPO_ROOT / "frontend" / "dist"))
 UPLOADS_DIR = Path(os.getenv("UPLOADS_DIR", DATA_DIR / "uploads"))
 KITCHEN_DIR = Path(os.getenv("KITCHEN_DIR", DATA_DIR / "kitchen"))
 FIXTURES_DIR = REPO_ROOT / "contracts" / "fixtures"

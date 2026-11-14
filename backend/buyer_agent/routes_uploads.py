@@ -104,9 +104,17 @@ async def create_pairing(body: PairingIn | None = None):
             "purpose": p.purpose, "expires_at": expires.isoformat(timespec="seconds")}
 
 
+@router.delete("/pairings/{pair_id}", status_code=204)
+async def end_pairing(pair_id: str):
+    """The desktop closed the camera dialog: further phone uploads get a 404 ("scan the QR code again")."""
+    p = PAIRINGS.pop(pair_id, None)
+    if p:
+        p.emit("expired")
+
+
 @router.get("/pairings/{pair_id}/stream")
 async def pairing_stream(pair_id: str):
-    """SSE for the desktop: `paired` when the phone opens the page, `photo_received` per photo."""
+    """SSE for the desktop: `paired` when the phone opens the page, `photo_received` per photo (any number)."""
     p = _pairing(pair_id)
     if not p:
         raise HTTPException(404, "unknown or expired pairing")
@@ -123,9 +131,13 @@ async def pairing_stream(pair_id: str):
                 yield frame(evt)
             while not p.expired:
                 try:
-                    yield frame(await asyncio.wait_for(queue.get(), timeout=15))
+                    evt = await asyncio.wait_for(queue.get(), timeout=15)
                 except asyncio.TimeoutError:
                     yield ": keep-alive\n\n"
+                    continue
+                yield frame(evt)
+                if evt["type"] == "expired":  # ended by the desktop
+                    return
             yield frame({"type": "expired", "pair_id": p.pair_id})
         finally:
             p.subscribers.discard(queue)
