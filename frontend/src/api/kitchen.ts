@@ -1,5 +1,4 @@
 import { apiRequest, apiUrl } from "./client";
-import { mock, MOCK, usualOrder } from "./mock";
 import type { IngestResponse, KitchenProfile, Pairing, PairingStreamEvent, UploadMeta, UsualOrder } from "./types";
 
 export function getKitchenProfile(buyerId?: string): Promise<KitchenProfile> {
@@ -104,9 +103,8 @@ export function subscribeToPairingStream(
   return () => source.close();
 }
 
-/** GET /kitchen/usual-order (2c). Mocked with VITE_MOCK=1 until 2c is built. */
+/** GET /kitchen/usual-order (2c): usual products, usual amounts, last price paid. */
 export function getUsualOrder(buyerId?: string): Promise<UsualOrder> {
-  if (MOCK) return mock.delay(usualOrder);
   const query = buyerId ? `?buyer_id=${encodeURIComponent(buyerId)}` : "";
   return apiRequest<UsualOrder>(`/kitchen/usual-order${query}`);
 }

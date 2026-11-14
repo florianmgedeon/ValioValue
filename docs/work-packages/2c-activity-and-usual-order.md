@@ -1,6 +1,6 @@
 # 2c · Activity (what the agent did and why) and "Your usual order"
 
-Status: open · Wave 2: start after 1b, 1c and 2b are merged · Shared contract: [`README.md`](README.md).
+Status: done 14 Nov 2026 · Shared contract: [`README.md`](README.md).
 
 ## Why
 

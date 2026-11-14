@@ -403,6 +403,16 @@ def _attachment_metas(history: list[dict]) -> list[dict]:
 
 
 ORDER_WORDS = re.compile(r"\border|\bbuy|\bneed|\bget\b|portions|\bfor\s+\d+|\bthis list\b|\bby\s+\w+day", re.I)
+TEACHING = re.compile(r"^\s*(we['’]re|we are|our\b|from now on)", re.I)
+
+
+def teaching_clause(text: str) -> str | None:
+    """2a: the part of a message that tells the agent about the kitchen ("We're closed on Friday ..."), or None.
+    Only the first clause counts, and only if it does not itself ask to order something."""
+    if not TEACHING.match(text or ""):
+        return None
+    first = re.split(r"(?<=[.!?])\s+|,\s*(?=order|buy|get|and order)", text.strip(), maxsplit=1)[0].strip()
+    return None if ORDER_WORDS.search(first) else first
 
 
 class ScriptedProvider:
@@ -418,6 +428,8 @@ class ScriptedProvider:
         users = [m for m in history if m["role"] == "user"]
         text = users[-1]["text"] if users else ""
         last_user = max(i for i, m in enumerate(history) if m["role"] == "user")
+        tool_msgs = [(m["name"], json.loads(m["content"])) for m in history[last_user:] if m["role"] == "tool"]
+        cid = f"call_{uuid.uuid4().hex[:8]}"
         photo_text = None
         metas = _attachment_metas(history)
         if metas:  # no vision here: demo fixtures carry their text in the upload meta
@@ -426,13 +438,37 @@ class ScriptedProvider:
                 return AssistantTurn("I cannot read photos in offline mode. Please type the list, one item per line.")
             kinds = {m.get("document_type") or "order_list" for m in known}
             if "order_list" not in kinds and not ORDER_WORDS.search(text):
+                # 2a: a context document without an order request becomes suggestions, never an order
+                read = {r.get("source", {}).get("upload_id") for n, r in tool_msgs if n == "learn_from_document"}
+                todo = [m for m in known if m.get("fixture") and m.get("upload_id") not in read]
+                if todo:
+                    return AssistantTurn(None, [ToolCall(cid, "learn_from_document", {"upload_id": todo[0]["upload_id"]})])
+                results = [r for n, r in tool_msgs if n == "learn_from_document"]
+                if results:
+                    n = sum(len(r.get("suggestions") or []) for r in results)
+                    title = (results[0].get("source") or {}).get("title") or "your document"
+                    return AssistantTurn(f"I read **{title}** and found {n} thing{'s' * (n != 1)} to remember. "
+                                         "Nothing is ordered: accept what is right below or in the Kitchen tab."
+                                         if n else f"I read **{title}**, but found nothing new to remember.")
                 what = {"menu": "a lunch menu", "allergy_note": "an allergy note", "invoice": "an invoice"}.get(
                     sorted(kinds)[0], "a document")
                 return AssistantTurn(f"This looks like {what}, not an order. You can add it to your kitchen profile "
                                      f"from the Kitchen tab, then I will remember what it says.")
             photo_text = "\n".join(m["text"] for m in known)
-        tool_msgs = [(m["name"], json.loads(m["content"])) for m in history[last_user:] if m["role"] == "tool"]
-        cid = f"call_{uuid.uuid4().hex[:8]}"
+        clause = None if metas or re.search(r"signed intent|Answers to your questions", text) else teaching_clause(text)
+        if clause:  # 2a: the buyer teaches the agent something about the kitchen
+            done = [r for n, r in tool_msgs if n == "remember_about_kitchen"]
+            if not done:
+                return AssistantTurn(None, [ToolCall(cid, "remember_about_kitchen", {
+                    "kind": "about", "title": clause.rstrip("."), "payload": {"text": clause}, "quote": clause})])
+            rest = text.strip()[len(clause):].strip(" ,.;")
+            if not rest or not ORDER_WORDS.search(rest):
+                if any(n == "propose_intent" for n, _ in tool_msgs):
+                    return AssistantTurn(None)
+                return AssistantTurn("Noted. I suggest adding this to your kitchen profile: accept it below. "
+                                     "Nothing was ordered." if done[0].get("suggestions")
+                                     else "I already know that about your kitchen. Nothing was ordered.")
+            text = rest  # the order part goes on as a normal request
         confirmed = re.search(r"signed intent (int_\w+)", text)
 
         answers = re.match(r"Answers to your questions about intent (int_\w+)", text)

@@ -1,6 +1,6 @@
 # 2a · Learning in the chat and from orders
 
-Status: open · Wave 2: start after 1a, 1b and 1c are merged · Shared contract: [`README.md`](README.md).
+Status: done 14 Nov 2026 (optional autonomy-accepts suggestion not built) · Shared contract: [`README.md`](README.md).
 
 ## Why
 

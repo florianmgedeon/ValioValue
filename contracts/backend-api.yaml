@@ -69,7 +69,7 @@ paths:
       description: |
         `text/event-stream`. Each SSE message has `event: <type>` and `data: <json>`.
         Types: user_message, reasoning, message, intent_proposed, intent_confirmed, tool_call, tool_result,
-        offers, approval_required, order_confirmed, order_rejected, autonomy_progress, error, done.
+        offers, approval_required, order_confirmed, order_rejected, autonomy_progress, context_suggestion, error, done.
         Ignore unknown types.
       parameters:
         - in: path
@@ -97,6 +97,7 @@ paths:
                   - $ref: "#/components/schemas/DoneEvent"
                   - $ref: "#/components/schemas/UserMessageEvent"
                   - $ref: "#/components/schemas/AutonomyProgressEvent"
+                  - $ref: "#/components/schemas/ContextSuggestionEvent"
 
   /tools:
     get:
@@ -173,7 +174,8 @@ paths:
       summary: What happened to one order and why, in plain sentences (Activity tab, package 2c)
       description: >
         Built from the order, its intent and its audit trail. `why` sentences come from templates, never from an LLM,
-        and contain no hashes, rule ids or grant ids. Steps: asked, understood, searched, decided, confirmed.
+        and contain no hashes, rule ids or grant ids. Steps: asked, understood, searched, decided, confirmed, learned
+        (an accepted suggestion whose source is this order, 2a). Fixture: contracts/fixtures/order-story.json.
         `funnel` per searched item is catalog → after your musts → can deliver → picked (only recorded counts).
       parameters:
         - in: path
@@ -194,6 +196,7 @@ paths:
                   tier: { type: string, enum: [auto, ask, block] }
                   total: { type: number }
                   mandate: { type: object, properties: { version: { type: integer }, grants_used: { type: array, items: { type: string } } } }
+                  kitchen_profile_version: { type: integer, description: "Kitchen profile version the agent read when it proposed the intent. Only while the backend knows it." }
                   steps: { type: array, items: { type: object, required: [kind], properties: { kind: { type: string, enum: [asked, understood, searched, decided, confirmed, learned] }, at: { type: string } }, additionalProperties: true } }
         "404": { description: Unknown order }
 
@@ -486,6 +489,20 @@ paths:
       responses:
         "200": { description: New version, content: { application/json: { schema: { $ref: "#/components/schemas/KitchenProfile" } } } }
         "422": { description: Nothing to change }
+  /kitchen/usual-order:
+    get:
+      summary: '"Your usual order" card (2c): usual products, usual amounts, last price paid'
+      description: >
+        Active usual products with a product and a typical amount. last_unit_price = price per usual unit (L, kg,
+        piece) from the newest confirmed order line with that product; none yet → last_unit_price and estimate null.
+        "Order the usual" sends POST /chat {"message": "Order the usual"}: the agent uses the same profile amounts.
+      parameters: [{ in: query, name: buyer_id, schema: { type: string } }]
+      responses:
+        "200":
+          description: The usual order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UsualOrder" }
   /kitchen/history:
     get:
       summary: Profile versions with summaries, newest first
@@ -1030,6 +1047,7 @@ components:
             tool: { type: string, example: "check_offer" }
             label: { type: string, description: "Human-readable, show this in the UI", example: "Checking price and availability for 3 products" }
             args: { type: object, additionalProperties: true }
+            side: { type: string, enum: [valio, buyer], description: "valio = Valio Aimo MCP tool; buyer = runs in this backend and only creates suggestions (2a)" }
 
     ToolResultEvent:
       allOf:
@@ -1043,6 +1061,7 @@ components:
             summary: { type: string }
             result: { type: object, additionalProperties: true, description: "Full tool output" }
             duration_ms: { type: integer }
+            side: { type: string, enum: [valio, buyer] }
 
     OffersEvent:
       allOf:
@@ -1142,6 +1161,41 @@ components:
             offer_next: { type: boolean }
             level: { type: integer }
             name: { type: string }
+
+    ContextSuggestionEvent:
+      description: >
+        2a: the agent proposes something to remember (status proposed, nothing is active). after_order: at most one
+        per order, "Remember" = POST /kitchen/suggestions/accept, "Just this time" = POST /kitchen/suggestions/{id}/reject.
+        from_chat: remember_about_kitchen. from_photo: learn_from_document. Must / prefer need a signature on accept.
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { const: context_suggestion }
+            reason: { type: string, enum: [after_order, from_chat, from_photo] }
+            order_id: { type: string, description: "Only for after_order" }
+            suggestions: { type: array, items: { $ref: "#/components/schemas/Suggestion" } }
+
+    UsualOrder:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              word: { type: string, example: milk }
+              product_id: { type: string }
+              product_name: { type: string, nullable: true }
+              quantity: { type: number, example: 120 }
+              unit: { type: string, example: L }
+              last_unit_price: { type: number, nullable: true, example: 1.09 }
+              estimate: { type: number, nullable: true, example: 130.8 }
+        estimate_total: { type: number, nullable: true, description: "Sum of the known estimates" }
+        estimate_complete: { type: boolean, description: "Every item has an estimate" }
+        deliver_by: { type: string, format: date, description: "Next Monday" }
+        based_on: { type: string, example: "your usual amounts per week" }
+        kitchen_profile_version: { type: integer }
 
     PairedEvent:
       type: object
@@ -1306,6 +1360,7 @@ components:
         label: { type: string, example: "Ordered alone", description: "Ordered alone | You decided N | N line(s) blocked (rule) | Waiting for you | You rejected it | Quote expired" }
         clean: { type: boolean }
         clean_reason: { type: string }
+        kitchen_profile_version: { type: integer, description: "2c, only while the backend knows it" }
 
     AutonomyState:
       type: object

@@ -6,7 +6,7 @@ import { keys, useAutonomy, useKitchen, useMandate } from "../../app/queries";
 
 export const useRecentOrders = () => useQuery({ queryKey: [...keys.orders, "recent"], queryFn: () => listOrders({ limit: 3 }) });
 
-/** GET /kitchen/usual-order (2c, mocked with VITE_MOCK=1). Not retried: without 2c the card falls back to the profile. */
+/** GET /kitchen/usual-order (2c). Not retried: if it fails, the card falls back to the profile. */
 export const useUsualOrder = () => useQuery({ queryKey: ["usual-order"], queryFn: () => getUsualOrder(), retry: false });
 
 /** The level grant g1's order limit, from the signed mandate. */

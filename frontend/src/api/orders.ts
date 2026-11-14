@@ -1,5 +1,4 @@
 import { apiRequest } from "./client";
-import { mock, MOCK, orderStory } from "./mock";
 import type { AuditEntry, OrderStory, OrderSummary, Verification } from "./types";
 
 export interface ListOrdersOptions {
@@ -27,8 +26,7 @@ export function verifyOrder(orderId: string): Promise<Verification> {
   );
 }
 
-/** GET /orders/{id}/story (2c). With VITE_MOCK=1 it answers from a fixture. */
+/** GET /orders/{id}/story (2c): the plain-language timeline of one order. */
 export function getOrderStory(orderId: string): Promise<OrderStory> {
-  if (MOCK) return mock.delay(orderStory(orderId));
   return apiRequest<OrderStory>(`/orders/${encodeURIComponent(orderId)}/story`);
 }

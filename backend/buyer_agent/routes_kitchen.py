@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from . import config, ingest, kitchen, uploads, valio
+from . import config, ingest, kitchen, learning, uploads, valio
 
 router = APIRouter()
 
@@ -39,6 +39,12 @@ async def get_kitchen(buyer_id: str | None = None):
     except Exception:  # noqa: BLE001 - the profile is useful without the mandate (Valio Aimo down)
         ms = None
     return profile | {"mandate_summary": ms}
+
+
+@router.get("/kitchen/usual-order")
+async def usual_order(buyer_id: str | None = None):
+    """2c: the usual products with their usual amounts and the last price paid, for the start screen card."""
+    return await learning.usual_order(_bid(buyer_id))
 
 
 @router.get("/kitchen/history")

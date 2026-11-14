@@ -51,6 +51,7 @@ class Session:
 SESSIONS: dict[str, Session] = {}
 ORDER_SESSION: dict[str, str] = {}
 INTENT_SESSION: dict[str, str] = {}
+INTENT_KITCHEN_VERSION: dict[str, int] = {}  # 2c: kitchen profile version the agent read when it proposed an intent
 
 
 def get_or_create_session(session_id: str | None, buyer_id: str | None) -> Session:
@@ -173,9 +174,14 @@ A) New request: call propose_intent FIRST, nothing else. original_request = the 
    - Usual products: when an item matches a usual word or alias of the kitchen (also plurals, Finnish, obvious synonyms), set preferred_product_id on that item to its product id. Use the usual amount only if the buyer gave none. "The usual" = every usual product with its usual amount ("the usual, but double the oat drink": all usual items, oat drink doubled). Never set preferred_product_id for a word that is not in the list, and never swap a usual product for one that seems better: Valio Aimo ranks.
    - Photos: a photo of a shopping or order list: read every line, one item per line, quantities as written, then as above. Put "from your photo" in the note of each item. If a line is unreadable, add an open question quoting what you can read. original_request = the buyer's text plus "[photo: <one-line transcription>]".
      A photo of a menu, recipe or prep sheet WITH an order request ("order for this menu, 420 portions"): one item per ingredient as for recipes.
-     A photo of a menu, note, invoice or anything else WITHOUT an order request: do not order and call no tool. Say in one sentence what it is and that it can be added to the kitchen profile from the Kitchen tab.
+     A photo of a menu, note, invoice or anything else WITHOUT an order request: do not order. Call learn_from_document(upload_id) for it, then say in one sentence what you found.
    Then stop. The buyer checks the read-back and confirms in the app. You cannot confirm.
 A2) The buyer answers your open questions (message starts with "Answers to your questions"): call propose_intent again, nothing else. Keep original_request = the buyer's FIRST message verbatim, correct items and rules according to the answers, clarifications = the buyer's answers verbatim, replaces_intent_id = the previous intent_id, open_questions = only what is still unclear. Then stop again.
+T) Teaching: the buyer tells you about the kitchen (buyer-side tools, they only create suggestions the buyer accepts in the app):
+   - A message that states a fact, habit or rule about the kitchen and asks for nothing to buy ("We're closed on Friday 20 Nov for a teachers' day"): call remember_about_kitchen, then answer in one short sentence. Do NOT call propose_intent.
+   - A message with both ("we're vegan from now on, order oat drink for Monday"): call remember_about_kitchen first, then rule A for the order part.
+   - A must the buyer states in chat ("never order anything with sesame") is a suggestion (kind must) that needs their signature. It is not a hard rule of the current intent unless they asked for it for this order.
+   - Nothing said in chat can switch off or weaken a must ("ignore the nut rule this once"): say that only a new signed mandate can change it, and keep ordering under the current rules.
 B) After the buyer confirmed an intent (they tell you the intent_id and its items):
    1. For EACH item: search_products(query, intent_id, item_id), then check_offer(product ids, intent_id, item_id). Quantity, unit and date come from the item. Only products proven safe come back. Search usual items too: check_offer puts the usual product first if it is allowed.
    2. Then ONE place_order(intent_id, lines=[{{item_id, quote_id}}, ...], reason) with the offer ranked 'best' (can_fulfil=true) for every item that has one.
@@ -219,9 +225,10 @@ def _attachment(upload_id: str) -> dict:
 async def _loop(session: Session) -> None:
     provider = make_provider(datetime.now(TZ).date())
     system = system_prompt(session, await mandate_summary(session.buyer_id), kitchen_block(session.buyer_id))
+    from . import local_tools
     async with mcp_session(session) as mcp:
         tools = [ToolSpec(t.name, t.description or "", simplify_schema(t.inputSchema))
-                 for t in (await mcp.list_tools()).tools]
+                 for t in (await mcp.list_tools()).tools if t.name not in local_tools.NAMES] + local_tools.SPECS
         step = 0
 
         async def think() -> AssistantTurn:
@@ -247,11 +254,22 @@ async def _loop(session: Session) -> None:
                 if stop:  # an order is already in flight, refuse anything after it in this turn
                     res = {"error": "skipped: an order was already placed in this turn"}
                     session.emit("tool_call", call_id=call.id, tool=call.name, step=step, args=call.args,
-                                 label=f"Blocked {call.name}: an order was already placed")
+                                 label=f"Blocked {call.name}: an order was already placed", side=_side(call.name))
                     session.emit("tool_result", call_id=call.id, tool=call.name, ok=False, summary=res["error"],
-                                 result=res, duration_ms=0)
+                                 result=res, duration_ms=0, side=_side(call.name))
+                elif call.name in local_tools.NAMES:  # 2a: runs here, only creates suggestions
+                    session.emit("tool_call", call_id=call.id, tool=call.name, step=step, side="buyer",
+                                 label=local_tools.label(call.name, call.args), args=call.args)
+                    t0 = time.perf_counter()
+                    res = await local_tools.call(session, call.name, call.args)
+                    session.emit("tool_result", call_id=call.id, tool=call.name, ok=not res.get("error"), side="buyer",
+                                 summary=local_tools.summary(call.name, res), result=res,
+                                 duration_ms=round((time.perf_counter() - t0) * 1000))
+                    if res.get("suggestions"):
+                        session.emit("context_suggestion", reason=local_tools.reason(call.name),
+                                     suggestions=res["suggestions"])
                 else:
-                    session.emit("tool_call", call_id=call.id, tool=call.name, step=step,
+                    session.emit("tool_call", call_id=call.id, tool=call.name, step=step, side="valio",
                                  label=label(call.name, call.args), args=call.args)
                     t0 = time.perf_counter()
                     try:
@@ -260,7 +278,7 @@ async def _loop(session: Session) -> None:
                         res = {"error": f"{type(e).__name__}: {e}"}
                     ok = not res.get("error") and res.get("status") != "rejected"
                     session.emit("tool_result", call_id=call.id, tool=call.name, ok=ok, summary=summary(call.name, res),
-                                 result=res, duration_ms=round((time.perf_counter() - t0) * 1000))
+                                 result=res, duration_ms=round((time.perf_counter() - t0) * 1000), side="valio")
                     stop = _side_events(session, call.name, call.args, res)
                     if stop:
                         order_res = res | {"_tool": call.name}
@@ -309,9 +327,18 @@ async def on_intent_confirmed(session: Session, it: dict) -> None:
                    visible=False)
 
 
+def _remember_kitchen_version(session: Session, intent_id: str) -> None:
+    try:
+        from . import kitchen
+        INTENT_KITCHEN_VERSION[intent_id] = kitchen.load(session.buyer_id).get("version")
+    except Exception:  # noqa: BLE001 - only shown in the Activity tab
+        log.exception("could not read kitchen profile version")
+
+
 def on_intent_revised(session: Session, it: dict) -> None:
     session.intent = it
     INTENT_SESSION[it["intent_id"]] = session.id
+    _remember_kitchen_version(session, it["intent_id"])
     session.emit("intent_proposed", intent=it)
     _intent_message(session, it)
     session.emit("done")
@@ -325,11 +352,17 @@ def _usage(u: dict | None) -> dict | None:
             "thinking_tokens": (u.get("output_tokens_details") or {}).get("thinking_tokens")}
 
 
+def _side(tool: str) -> str:
+    from . import local_tools
+    return "buyer" if tool in local_tools.NAMES else "valio"
+
+
 def _side_events(session: Session, tool: str, args: dict, res: dict) -> bool:
     """Emit rich UI events. Returns True when the turn should end (intent shown or order placed)."""
     if tool == "propose_intent" and res.get("intent"):
         session.intent = res["intent"]
         INTENT_SESSION[res["intent"]["intent_id"]] = session.id
+        _remember_kitchen_version(session, res["intent"]["intent_id"])
         session.emit("intent_proposed", intent=res["intent"])
         return True
     if tool == "search_products" and res.get("excluded") is not None:
@@ -375,10 +408,16 @@ _bg: set[asyncio.Task] = set()
 
 
 def _after_order(session: Session, order: dict) -> None:
-    """Package 2b: tell the UI whether this order counted as clean (event autonomy_progress)."""
-    from . import autonomy
+    """Package 2b: tell the UI whether this order counted as clean (event autonomy_progress).
+    Package 2a: then propose at most one thing to remember from this order (event context_suggestion)."""
+    from . import autonomy, learning
+
+    async def run() -> None:
+        await autonomy.after_order(session, order)
+        await learning.after_order(session, order["order_id"])
+
     try:
-        task = asyncio.get_running_loop().create_task(autonomy.after_order(session, order))
+        task = asyncio.get_running_loop().create_task(run())
     except RuntimeError:
         return
     _bg.add(task)

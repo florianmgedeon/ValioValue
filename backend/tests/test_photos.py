@@ -118,9 +118,14 @@ async def test_menu_photo_without_request_does_not_order(client):
     up = (await client.post("/uploads", files={"file": ("m.jpg", (FIX / "menu-w47.jpg").read_bytes(), "image/jpeg")})).json()
     s = agent.get_or_create_session(None, "photo-buyer")
     await agent.run_turn(s, "", images=[up["upload_id"]])
-    assert not any(e["type"] in ("tool_call", "intent_proposed") for e in s.events)
+    # 2a: the menu becomes suggestions for the kitchen profile, never an order
+    assert not any(e["type"] == "intent_proposed" for e in s.events)
+    calls = [e for e in s.events if e["type"] == "tool_call"]
+    assert [c["tool"] for c in calls] == ["learn_from_document"] and calls[0]["side"] == "buyer"
+    sug = next(e for e in s.events if e["type"] == "context_suggestion")
+    assert sug["reason"] == "from_photo" and sug["suggestions"]
     msg = next(e for e in s.events if e["type"] == "message")["text"]
-    assert "lunch menu" in msg and "Kitchen tab" in msg
+    assert "Lunch menu" in msg and "Nothing is ordered" in msg
 
 
 async def test_chat_endpoint_accepts_attachments(client):

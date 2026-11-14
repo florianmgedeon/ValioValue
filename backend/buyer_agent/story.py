@@ -138,7 +138,8 @@ def _label(order: dict, decided: list[dict]) -> str:
     return f"You decided {sum(d['outcome'] == 'you' for d in decided) or 1}"
 
 
-def build(order: dict, audit: list[dict], history: list[dict], attachments: list[str] | None = None) -> dict:
+def build(order: dict, audit: list[dict], history: list[dict], attachments: list[str] | None = None,
+          learned: list[dict] | None = None, kitchen_version: int | None = None) -> dict:
     it = order.get("intent") or {}
     items = {i["item_id"]: i for i in it.get("items") or []}
     item_ids = order.get("item_ids") or [l.get("item_id") for l in order.get("lines") or []]
@@ -178,16 +179,21 @@ def build(order: dict, audit: list[dict], history: list[dict], attachments: list
         steps.append({"kind": "confirmed", "at": rc.get("confirmed_at") or order.get("created_at"),
                       "verify_url": f"/orders/{order['order_id']}/verify"})
 
+    steps += learned or []  # 2a: what the kitchen profile learned from this order (accepted suggestions)
+
     m = order.get("mandate") or {}
-    return {"order_id": order["order_id"], "label": _label(order, decided), "tier": order.get("tier"),
-            "total": order.get("total_price"),
-            "mandate": {"version": m.get("version"), "grants_used": m.get("grants_used") or []},
-            "steps": steps}
+    out = {"order_id": order["order_id"], "label": _label(order, decided), "tier": order.get("tier"),
+           "total": order.get("total_price"),
+           "mandate": {"version": m.get("version"), "grants_used": m.get("grants_used") or []},
+           "steps": steps}
+    if kitchen_version is not None:
+        out["kitchen_profile_version"] = kitchen_version
+    return out
 
 
 async def load(order_id: str) -> dict:
     """Fetch order, audit trail and mandate history from Valio Aimo, then build the story."""
-    from . import agent  # late: agent imports a lot
+    from . import agent, kitchen, learning  # late: agent imports a lot
 
     order = valio.passthrough(await valio.call("GET", f"/internal/orders/{order_id}"))
     audit = valio.passthrough(await valio.call("GET", f"/internal/orders/{order_id}/audit"))
@@ -198,4 +204,6 @@ async def load(order_id: str) -> dict:
         for e in session.events:
             if e.get("type") == "user_message":
                 attachments += [a["upload_id"] for a in e.get("attachments") or [] if a.get("upload_id")]
-    return build(order, audit, history, attachments)
+    learned = learning.learned_steps(kitchen.load(order.get("buyer_id")), order_id) if order.get("buyer_id") else []
+    return build(order, audit, history, attachments, learned,
+                 agent.INTENT_KITCHEN_VERSION.get(order.get("intent_id") or ""))

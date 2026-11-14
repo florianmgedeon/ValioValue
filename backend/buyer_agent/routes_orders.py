@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from . import autonomy, config, kitchen, story, valio
+from . import agent, autonomy, config, kitchen, story, valio
 
 router = APIRouter()
 
@@ -17,7 +17,10 @@ async def list_orders(buyer_id: str | None = None, limit: int = 20, before: str 
     out = []
     for r in rows:
         clean, reason = autonomy.is_clean(r, rows)
-        out.append(r | {"clean": clean, "clean_reason": reason})
+        row = r | {"clean": clean, "clean_reason": reason}
+        if (v := agent.INTENT_KITCHEN_VERSION.get(r.get("intent_id") or "")) is not None:
+            row["kitchen_profile_version"] = v
+        out.append(row)
     return out
 
 
