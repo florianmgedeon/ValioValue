@@ -283,7 +283,8 @@ async def _loop(session: Session) -> None:
                     if stop:
                         order_res = res | {"_tool": call.name}
                 session.history.append({"role": "tool", "tool_call_id": call.id, "name": call.name,
-                                        "content": json.dumps(res, ensure_ascii=False)[:15000]})
+                                        "content": json.dumps(res, ensure_ascii=False)[:15000],
+                                        "result": res})  # untruncated, for the scripted provider
             if stop:
                 if order_res.get("_tool") == "propose_intent":
                     _intent_message(session, order_res["intent"])

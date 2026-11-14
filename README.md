@@ -58,6 +58,18 @@ Open **http://localhost:8000/app**: the buyer UI. Paste or upload a recipe or a 
 No LLM key: `LLM_PROVIDER=scripted` runs a deterministic agent through the same MCP flow.
 No network to the Valio API: `FAKE_VALIO=1 scripts/dev.sh` with `VALIO_API_BASE=http://127.0.0.1:8099`.
 
+## Deploy for a demo
+
+**Hosted link (free, Render):** push to GitHub, then Render dashboard → New → Blueprint → this repo. Render reads `render.yaml` and builds the `Dockerfile`: one container with the built React UI and buyer backend (public) plus the mcp-server (internal only, `127.0.0.1:8001`). In the dashboard set `VALIO_API_KEY` (empty = offline fake Valio API, set = full catalog downloaded on start) and, only for the demo itself, `LLM_PROVIDER` + `LLM_API_KEY` (default `scripted`, no cost). The QR code for the phone points at the Render URL automatically. The free plan sleeps after 15 min idle (about 1 min to wake), so open the URL before the demo. Data resets on every restart.
+
+Dress rehearsal with the same image and Render's limits (512 MB, `PORT`), then open http://localhost:8000:
+
+```bash
+docker build -t valiovalue . && docker run --rm --memory 512m -p 8000:8000 -e PORT=8000 --env-file .env valiovalue
+```
+
+**Live from the laptop:** `scripts/dev.sh` with the phone in the same Wi-Fi works as is (the phone page uses the camera via a file input, plain http is fine). Cloudflare quick tunnels (`cloudflared tunnel --url …`) do **not** work: they do not stream Server-Sent Events, so the chat and pairing updates never arrive.
+
 ## Quick start for frontend work
 
 ```bash

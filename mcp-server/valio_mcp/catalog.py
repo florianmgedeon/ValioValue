@@ -193,9 +193,24 @@ def _load_csv(path: Path, value_col: str) -> dict[str, float]:
         return out
 
 
+def _iter_json_array(text: str):
+    """Yield the items of a top-level JSON array one at a time. json.loads on the full catalog (about 90 MB)
+    builds every raw object at once and peaks above 500 MB; this keeps one raw item alive at a time."""
+    decoder = json.JSONDecoder()
+    i = text.index("[") + 1
+    n = len(text)
+    while True:
+        while i < n and text[i] in " \t\r\n,":
+            i += 1
+        if i >= n or text[i] == "]":
+            return
+        item, i = decoder.raw_decode(text, i)
+        yield item
+
+
 class Catalog:
     def __init__(self, products_path: Path, data_dir: Path):
-        raw = json.loads(products_path.read_text(encoding="utf-8"))
+        raw = _iter_json_array(products_path.read_text(encoding="utf-8"))
         reliability = _load_csv(data_dir / "delivery_reliability.csv", "deliveryReliability")
         co2 = _load_csv(data_dir / "carbon_footprint.csv", "AVG kg CO2-eq/kg")
         self.products: dict[str, Product] = {}

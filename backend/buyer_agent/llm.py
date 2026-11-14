@@ -428,7 +428,9 @@ class ScriptedProvider:
         users = [m for m in history if m["role"] == "user"]
         text = users[-1]["text"] if users else ""
         last_user = max(i for i, m in enumerate(history) if m["role"] == "user")
-        tool_msgs = [(m["name"], json.loads(m["content"])) for m in history[last_user:] if m["role"] == "tool"]
+        # "content" is cut at 15,000 chars for the LLM; with the full catalog a check_offer result is longer.
+        tool_msgs = [(m["name"], m["result"] if "result" in m else json.loads(m["content"]))
+                     for m in history[last_user:] if m["role"] == "tool"]
         cid = f"call_{uuid.uuid4().hex[:8]}"
         photo_text = None
         metas = _attachment_metas(history)
