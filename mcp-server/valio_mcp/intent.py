@@ -130,10 +130,12 @@ def intent_hash(intent: dict) -> str:
 def build(*, buyer_id: str, mandate: dict, session: str | None, original_request: str, items: list[dict],
           deliver_by: str, hard_rules: list[dict], optimise: str, origin_preference: str | None,
           budget_max_total: float | None, max_over_pct: float, allow_under: bool, agent_questions: list[str],
-          intent_id: str | None = None, check_text: bool = True) -> dict:
+          intent_id: str | None = None, check_text: bool = True, clarifications: list[str] | None = None) -> dict:
     today = now().date()
     questions: list[str] = [q for q in agent_questions if q]
-    text = (original_request or "").lower() if check_text else ""
+    clarifications = [c for c in (clarifications or []) if c and c.strip()]
+    # The buyer's answers count as the buyer's own words for every cross-check below.
+    text = ("\n".join([original_request or ""] + clarifications)).lower() if check_text else ""
     global_rules = _clean_rules([dict(m, source="mandate") for m in mandate.get("mandatory_rules") or []]
                                 + [r for r in hard_rules if r.get("source") != "mandate"])
 
@@ -160,8 +162,8 @@ def build(*, buyer_id: str, mandate: dict, session: str | None, original_request
 
     # Deterministic cross-checks between the buyer's own words and what the agent filled in.
     all_rules = global_rules + [r for i in norm_items for r in i["hard_rules"]]
-    if NON_DAIRY.search(text) and not any(r["rule"] == "exclude_allergen" and r.get("allergen") == "milk"
-                                          for r in all_rules):
+    if NON_DAIRY.search(text) and not any((r["rule"] == "exclude_allergen" and r.get("allergen") == "milk")
+                                          or r["rule"] == "lactose_free" for r in all_rules):
         questions.append("You wrote non-dairy. Does that mean a milk allergy (no milk protein at all, lactose-free "
                          "milk is not allowed) or lactose intolerance (lactose-free milk is fine)?")
     if len(norm_items) == 1:  # with recipes the agent scales, so numbers legitimately differ from the text
@@ -209,6 +211,7 @@ def build(*, buyer_id: str, mandate: dict, session: str | None, original_request
         "mandate_id": mandate["mandate_id"],
         "mandate_hash": mandate["mandate_hash"],
         "original_request": original_request,
+        "clarifications": clarifications,
         "items": norm_items,
         "deliver_by": deliver_by,
         "hard_rules": global_rules,
@@ -315,4 +318,5 @@ def apply_edits(intent: dict, edits: dict[str, Any]) -> dict:
                 optimise=prefs.get("optimise") or "price", origin_preference=prefs.get("origin"),
                 budget_max_total=(budget or {}).get("max_total"), max_over_pct=float(q0.get("max_over_pct", 2)),
                 allow_under=bool(q0.get("allow_under", False)), agent_questions=[],
-                original_request=intent.get("original_request", ""), check_text=False)
+                original_request=intent.get("original_request", ""), check_text=False,
+                clarifications=intent.get("clarifications"))

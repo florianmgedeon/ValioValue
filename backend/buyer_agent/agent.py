@@ -143,6 +143,7 @@ A) New request: call propose_intent FIRST, nothing else. original_request = the 
    - A recipe, menu or shopping list is one item per ingredient. Scale to the portions the buyer needs and convert to buyable units (L, KG, or SALES_UNIT for pieces). Put the scaling in each item's note (e.g. "180 g x 40 portions").
    - hard_rules for what applies to everything (a guest's milk allergy), item hard_rules for one ingredient only. Only what the buyer actually required. Never guess: if "non-dairy", an allergy or anything else is ambiguous, put it in open_questions.
    Then stop. The buyer checks the read-back and confirms in the app. You cannot confirm.
+A2) The buyer answers your open questions (message starts with "Answers to your questions"): call propose_intent again, nothing else. Keep original_request = the buyer's FIRST message verbatim, correct items and rules according to the answers, clarifications = the buyer's answers verbatim, replaces_intent_id = the previous intent_id, open_questions = only what is still unclear. Then stop again.
 B) After the buyer confirmed an intent (they tell you the intent_id and its items):
    1. For EACH item: search_products(query, intent_id, item_id), then check_offer(product ids, intent_id, item_id). Quantity, unit and date come from the item. Only products proven safe come back.
    2. Then ONE place_order(intent_id, lines=[{{item_id, quote_id}}, ...], reason) with the offer ranked 'best' (can_fulfil=true) for every item that has one.

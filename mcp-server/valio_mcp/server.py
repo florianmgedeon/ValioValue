@@ -115,7 +115,9 @@ async def propose_intent(
     budget_max_total: Annotated[float | None, Field(description="Only if the buyer named a budget, for the whole intent")] = None,
     max_over_pct: Annotated[float, Field(ge=0, le=20, description="Allowed overshoot when rounding to whole packs")] = 2.0,
     allow_under: Annotated[bool, Field(description="Only true if the buyer accepts less than asked")] = False,
-    open_questions: Annotated[list[str], Field(description="Anything ambiguous you could not resolve, one question each")] = [],
+    open_questions: Annotated[list[str], Field(description="Anything ambiguous you could not resolve, one question each. Leave out what the buyer already answered")] = [],
+    clarifications: Annotated[list[str], Field(description="The buyer's answers to earlier questions, verbatim, one per answer")] = [],
+    replaces_intent_id: Annotated[str | None, Field(description="When re-proposing after the buyer answered questions: the previous intent_id")] = None,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Turn the buyer's request (a product, a list or a recipe) into an OrderIntent and show it back.
@@ -134,10 +136,18 @@ async def propose_intent(
                        items=[dump(i, ItemIn) for i in items], deliver_by=deliver_by,
                        hard_rules=[dump(r, HardRuleIn) for r in hard_rules], optimise=optimise,
                        origin_preference=origin_preference, budget_max_total=budget_max_total,
-                       max_over_pct=max_over_pct, allow_under=allow_under, agent_questions=open_questions)
+                       max_over_pct=max_over_pct, allow_under=allow_under, agent_questions=open_questions,
+                       clarifications=clarifications)
+    old = store().get_intent(replaces_intent_id) if replaces_intent_id else None
+    if old and old["status"] == "proposed" and old["buyer_id"] == it["buyer_id"]:
+        old["status"], old["superseded_by"] = "superseded", it["intent_id"]
+        store().update_intent(old)
+        it["revises"] = old["intent_id"]
     store().save_intent(it)
-    store().audit("buyer_agent", "propose_intent", f"Proposed intent: {it['readback']}", session=session,
-                  data={"intent_id": it["intent_id"], "intent_hash": it["intent_hash"], "questions": it["questions"]})
+    store().audit("buyer_agent", "propose_intent", f"Proposed intent: {it['readback']}"
+                  + (f" (after the buyer's answers, replaces {old['intent_id']})" if it.get("revises") else ""),
+                  session=session, data={"intent_id": it["intent_id"], "intent_hash": it["intent_hash"],
+                                         "questions": it["questions"], "clarifications": it["clarifications"]})
     return {"intent": intents.public(it),
             "next": "Wait. The buyer must answer the questions and confirm. Do not call more tools in this turn."
             if it["questions"] else "Wait for the buyer to confirm. Do not call more tools in this turn."}

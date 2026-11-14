@@ -276,6 +276,25 @@ class ScriptedProvider:
         cid = f"call_{uuid.uuid4().hex[:8]}"
         confirmed = re.search(r"signed intent (int_\w+)", text)
 
+        answers = re.match(r"Answers to your questions about intent (int_\w+)", text)
+        if answers and not any(n == "propose_intent" for n, _ in tool_msgs):
+            prev = next((c["args"] for m in reversed(history) if m["role"] == "assistant"
+                         for c in m.get("tool_calls") or [] if c["name"] == "propose_intent"), None)
+            if prev:
+                said = [ln.split("→", 1)[-1].strip() for ln in text.splitlines()[1:] if "→" in ln]
+                low = " ".join(said).lower()
+                rules = [r for r in prev.get("hard_rules", [])]
+                if "allerg" in low and not any(r.get("allergen") == "milk" for r in rules):
+                    rules.append({"rule": "exclude_allergen", "allergen": "milk", "strictness": "contains_or_may_contain"})
+                if "intoleran" in low or "lactose-free" in low:
+                    rules.append({"rule": "lactose_free"})
+                items = prev["items"]
+                m = re.search(r"(\d[\d,.]*)\s*(l|litres?|kg)\b", low)
+                if m and len(items) == 1:
+                    items = [dict(items[0], quantity=float(m.group(1).replace(",", "")))]
+                return AssistantTurn(None, [ToolCall(cid, "propose_intent", dict(
+                    prev, items=items, hard_rules=rules, clarifications=said, replaces_intent_id=answers.group(1),
+                    open_questions=[]))])
         if not confirmed:
             if any(n == "propose_intent" for n, _ in tool_msgs):
                 return AssistantTurn(None)

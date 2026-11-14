@@ -257,3 +257,16 @@ def test_multi_item_needs_item_id(http):
     it = confirm(http, propose("two things", None, None, items=RECIPE))
     r = run(server.check_offer(product_ids=["DEMO-1001"], intent_id=it["intent_id"], ctx=ctx()))
     assert "item_id required" in r["error"]
+
+
+def test_answers_resolve_questions_and_supersede(http):
+    q = propose("Need 100 l non-dairy milk", "milk", 1000)
+    assert len(q["questions"]) == 2
+    a = run(server.propose_intent(original_request="Need 100 l non-dairy milk",
+                                  items=[{"product_query": "lactose-free milk", "quantity": 1000, "quantity_unit": "L"}],
+                                  deliver_by=next_monday(), clarifications=["Lactose intolerance, lactose-free is fine",
+                                                                            "1000 l, the 100 was a typo"],
+                                  replaces_intent_id=q["intent_id"], ctx=ctx()))["intent"]
+    assert a["questions"] == [] and a["revises"] == q["intent_id"]
+    assert store().get_intent(q["intent_id"])["status"] == "superseded"
+    confirm(http, a)

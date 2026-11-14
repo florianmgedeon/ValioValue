@@ -268,8 +268,14 @@ function renderIntent() {
       ${it.budget ? `<span class="chip">budget ${money(it.budget.max_total, it.budget.currency)}</span>` : ""}
       <span class="chip">${esc({price: "cheapest in full", reliability: "most reliable", co2: "lowest CO₂"}[it.preferences.optimise])}</span>
     </div>
-    ${(it.questions || []).map((q) => `<div class="q">❓ ${esc(q)}${/non-dairy/i.test(q) ? `<div class="row" style="margin-top:8px">
-        <button onclick="answerDairy('allergy')">Milk allergy: no milk at all</button><button onclick="answerDairy('lactose')">Lactose intolerance: lactose-free is fine</button></div>` : ""}</div>`).join("")}
+    ${(it.clarifications || []).length ? `<div class="muted" style="margin-top:10px;font-size:12.5px"><b>Your answers so far:</b> ${it.clarifications.map((c) => `“${esc(c)}”`).join(" · ")}</div>` : ""}
+    ${(it.questions || []).length ? `<div class="q" style="margin-top:12px"><b>Before I search, please answer</b>
+      ${it.questions.map((q, n) => `<div style="margin-top:10px">❓ ${esc(q)}
+        ${/non-dairy/i.test(q) ? `<div class="row" style="margin:6px 0"><button class="linebtn" onclick="fillAnswer(${n}, 'Milk allergy: no milk protein at all, plant-based instead')">Milk allergy</button>
+          <button class="linebtn" onclick="fillAnswer(${n}, 'Lactose intolerance: lactose-free milk is fine')">Lactose intolerance</button></div>` : ""}
+        <input type="text" class="answer" data-n="${n}" style="width:100%;margin-top:6px" placeholder="Your answer"></div>`).join("")}
+      <div class="row" style="margin-top:12px"><span class="muted" style="font-size:12px">The agent revises the intent with your answers. Valio checks them again, then you sign the new version.</span>
+        <span class="grow"></span><button class="primary" onclick="sendAnswers()">Send answers</button></div></div>` : ""}
     ${conf ? `<div class="row" style="margin-top:12px"><span style="color:var(--ok)">✓ Signed by <b>${esc(it.confirmed_by)}</b> at ${dt(it.confirmed_at)}</span> · intent <span class="fpt" title="${esc(it.intent_hash)}">${fp(it.intent_hash)}</span></div>`
     : `<div class="row" style="margin-top:12px">
         <label><input type="checkbox" id="allergy" ${milkAllergy ? "checked" : ""}> milk allergy for all items</label>
@@ -491,6 +497,19 @@ async function answerDairy(kind) {
   const rule = kind === "allergy" ? {rule: "exclude_allergen", allergen: "milk", strictness: "contains_or_may_contain"} : {rule: "lactose_free"};
   const items = S.intent.items.map((i) => ({item_id: i.item_id, product: {query: kind === "allergy" ? i.product.query.replace(/non-?dairy\s*/i, "plant-based ") : i.product.query.replace(/non-?dairy/i, "lactose-free")}}));
   await postIntent({intent_hash: S.intent.intent_hash, edits: {hard_rules: [...keep, rule], items}});
+}
+
+function fillAnswer(n, text) { const el = document.querySelector(`.answer[data-n="${n}"]`); if (el) el.value = text; }
+
+async function sendAnswers() {
+  const it = S.intent;
+  const pairs = it.questions.map((q, n) => [q, (document.querySelector(`.answer[data-n="${n}"]`)?.value || "").trim()]);
+  if (pairs.some(([, a]) => !a)) { alert("Please answer every question (or write what the agent should assume)."); return; }
+  const message = `Answers to your questions about intent ${it.intent_id}:\n` + pairs.map(([q, a], n) => `${n + 1}. ${q} → ${a}`).join("\n");
+  document.querySelectorAll("#s-intent button").forEach((b) => b.disabled = true);
+  S.msgs.push({role: "user", text: pairs.map(([, a]) => a).join("\n")}); S.busy = true; render();
+  await fetch("/chat", {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({message, session_id: S.session, buyer_id: $("#buyer").value})});
 }
 
 async function decide(decision) {
