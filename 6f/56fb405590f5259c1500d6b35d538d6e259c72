@@ -1,0 +1,42 @@
+frontend/src/features/onboarding/LearnCard.tsx
+  s_dbf7609225a270::t_0e6084e30102df 2-12,70-72,86-88
+frontend/src/app/App.tsx
+  s_dbf7609225a270::t_e0da328a74f1fb 14,51
+frontend/src/ui/index.ts
+  s_dbf7609225a270::t_0e6084e30102df 8
+frontend/src/features/onboarding/OnboardingView.tsx
+  s_dbf7609225a270::t_0e6084e30102df 237,342,353-374
+  s_dbf7609225a270::t_e0da328a74f1fb 9,217
+  s_dbf7609225a270::t_b49490dbc09f93 375-377
+frontend/src/features/onboarding/DemoMenu.tsx
+  s_dbf7609225a270::t_e0da328a74f1fb 2,13-15
+  s_dbf7609225a270::t_e51fe8e57c90f3 16
+frontend/src/ui/InfoTip.tsx
+  s_dbf7609225a270::t_244ab1b4de2cff 1-20,22-36
+  s_dbf7609225a270::t_801a64ddc2c7e0 21
+frontend/src/features/tour/Tour.tsx
+  s_dbf7609225a270::t_2ea8f00624324e 1-51,53-153,155-157,159-164,166-202
+  s_dbf7609225a270::t_a0ea0dd7847d42 52
+  s_dbf7609225a270::t_fc729c19304a28 165
+  s_dbf7609225a270::t_bc6c85c9cab036 154
+  s_dbf7609225a270::t_fc8b311180dacc 158
+frontend/src/app/Header.tsx
+  s_dbf7609225a270::t_e0da328a74f1fb 4,44,59,70-72
+  s_dbf7609225a270::t_ca0acbbb4b131a 73-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6f56fb405590f5259c1500d6b35d538d6e259c72",
+  "prompts": {},
+  "sessions": {
+    "s_dbf7609225a270": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0c1280e-3ea2-4c75-8768-667b1c274479",
+        "model": "unknown"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
