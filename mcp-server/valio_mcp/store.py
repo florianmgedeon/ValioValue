@@ -133,6 +133,25 @@ class Store:
         row = self._exec("SELECT * FROM orders WHERE order_id=?", (order_id,)).fetchone()
         return json.loads(row["data"]) | {"_session": row["session"]} if row else None
 
+    def list_orders(self, buyer_id: str | None, limit: int = 20, before: str | None = None) -> list[dict]:
+        """Newest first. `before`: an order_id or ISO timestamp; only orders created before it."""
+        sql, args = "SELECT * FROM orders WHERE 1=1", []
+        if buyer_id:
+            sql += " AND buyer_id=?"
+            args.append(buyer_id)
+        if before:
+            ref = self._exec("SELECT created_at, rowid FROM orders WHERE order_id=?", (before,)).fetchone()
+            if ref:
+                sql += " AND rowid < ?"
+                args.append(ref["rowid"])
+            else:
+                sql += " AND created_at < ?"
+                args.append(before)
+        sql += " ORDER BY rowid DESC LIMIT ?"
+        args.append(int(limit))
+        rows = self._exec(sql, tuple(args)).fetchall()
+        return [json.loads(r["data"]) | {"_session": r["session"], "_created_at": r["created_at"]} for r in rows]
+
     # ---- approvals
     def save_approval(self, appr: dict) -> None:
         self._exec("INSERT INTO approvals VALUES (?,?,?,?)",

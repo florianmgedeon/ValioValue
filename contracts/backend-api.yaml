@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ValioValue Buyer Agent API
-  version: 0.3.0
+  version: 0.4.0
   description: |
     Contract between the frontend and the buyer-side backend.
     The frontend talks ONLY to this API. It never talks to the MCP server directly.
@@ -20,6 +20,15 @@ info:
 
     Event payloads are defined in components/schemas/*Event and have example
     files in contracts/fixtures/events/.
+
+    Kitchen agent (work packages 1a, 1b, 1c, 2b, see docs/work-packages/):
+      * Photos and PDFs: POST /uploads, then POST /chat with attachments (order) or POST /kitchen/ingest
+        (learn, never order). Phone as camera: POST /pairings, show phone_url as QR, listen on
+        GET /pairings/{id}/stream for photo_received.
+      * Kitchen profile: GET/PATCH /kitchen, suggestions with verbatim quotes, accept with the mandate
+        signature round trip (409 needs_signature -> resend with mandate_hash).
+      * Usual products: intent items carry product.preferred_product_id; offers carry `usual` and a funnel.
+      * Orders and autonomy: GET /orders, GET /autonomy, POST /autonomy/level, POST /autonomy/sync-usual.
 servers:
   - url: http://localhost:8000
     description: Local backend (or mock-backend for frontend dev)
@@ -59,8 +68,9 @@ paths:
       summary: Server-sent events stream of the agent's progress
       description: |
         `text/event-stream`. Each SSE message has `event: <type>` and `data: <json>`.
-        Types: reasoning, message, intent_proposed, intent_confirmed, tool_call, tool_result,
-        offers, approval_required, order_confirmed, order_rejected, error, done. Ignore unknown types.
+        Types: user_message, reasoning, message, intent_proposed, intent_confirmed, tool_call, tool_result,
+        offers, approval_required, order_confirmed, order_rejected, autonomy_progress, error, done.
+        Ignore unknown types.
       parameters:
         - in: path
           name: session_id
@@ -85,6 +95,8 @@ paths:
                   - $ref: "#/components/schemas/OrderRejectedEvent"
                   - $ref: "#/components/schemas/ErrorEvent"
                   - $ref: "#/components/schemas/DoneEvent"
+                  - $ref: "#/components/schemas/UserMessageEvent"
+                  - $ref: "#/components/schemas/AutonomyProgressEvent"
 
   /tools:
     get:
@@ -267,13 +279,249 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Verification" }
 
+  # ---------- 1a: photos, phone as camera ----------
+  /uploads:
+    post:
+      summary: Upload a photo or PDF (1a)
+      description: |
+        JPEG, PNG, WebP, HEIC (converted to JPEG) or PDF. Images are EXIF-rotated and downscaled to at most
+        1600 px on the long edge, JPEG quality 85. Max 15 MB (PDF 10 MB). With pair_id the pairing stream
+        gets `photo_received`.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                buyer_id: { type: string }
+                pair_id: { type: string }
+                source: { type: string, enum: [upload, phone] }
+      responses:
+        "200": { description: Stored, content: { application/json: { schema: { $ref: "#/components/schemas/UploadMeta" } } } }
+        "404": { description: Unknown or expired pair_id }
+        "413": { description: Too large }
+        "415": { description: Unsupported type }
+  /uploads/{upload_id}:
+    get:
+      summary: The stored file (thumbnails in the UI)
+      parameters: [{ in: path, name: upload_id, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: The bytes, content: { image/jpeg: {}, application/pdf: {} } }
+        "404": { description: Unknown upload }
+  /uploads/{upload_id}/meta:
+    get:
+      summary: Upload metadata
+      parameters: [{ in: path, name: upload_id, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: Meta, content: { application/json: { schema: { $ref: "#/components/schemas/UploadMeta" } } } }
+  /pairings:
+    post:
+      summary: Pair a phone as camera (1a). The frontend draws the QR code from phone_url.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                buyer_id: { type: string }
+                purpose: { type: string, enum: [order, kitchen], description: "Where the desktop sends the photo (W2)" }
+      responses:
+        "200": { description: Pairing, content: { application/json: { schema: { $ref: "#/components/schemas/Pairing" } } } }
+  /pairings/{pair_id}/stream:
+    get:
+      summary: SSE for the desktop, events `paired`, `photo_received`, `expired`. Pairings live 30 min in memory.
+      parameters: [{ in: path, name: pair_id, required: true, schema: { type: string } }]
+      responses:
+        "200":
+          description: Event stream
+          content:
+            text/event-stream:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/PairedEvent"
+                  - $ref: "#/components/schemas/PhotoReceivedEvent"
+        "404": { description: Unknown or expired pairing }
+  /phone:
+    get:
+      summary: The phone camera page (HTML). Opening it emits `paired`.
+      parameters: [{ in: query, name: pair, schema: { type: string } }]
+      responses:
+        "200": { description: HTML page, content: { text/html: {} } }
+
+  # ---------- 1b: kitchen profile ----------
+  /kitchen:
+    get:
+      summary: Kitchen profile plus the current mandate's Must / Prefer / Autonomy (1b)
+      parameters: [{ in: query, name: buyer_id, schema: { type: string } }]
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/KitchenProfile"
+                  - type: object
+                    properties: { mandate_summary: { $ref: "#/components/schemas/MandateSummary" } }
+    patch:
+      summary: Edit About and the usual products directly. New profile version.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                buyer_id: { type: string }
+                by: { type: string }
+                about: { type: object, properties: { text: { type: string } } }
+                usual:
+                  type: object
+                  properties:
+                    add: { type: array, items: { $ref: "#/components/schemas/UsualProduct" }, description: "Without product_id: resolved via catalog search" }
+                    update: { type: array, items: { $ref: "#/components/schemas/UsualProduct" }, description: "By id" }
+                    remove: { type: array, items: { type: string }, description: "Usual ids, kept with status removed" }
+      responses:
+        "200": { description: New version, content: { application/json: { schema: { $ref: "#/components/schemas/KitchenProfile" } } } }
+        "422": { description: Nothing to change }
+  /kitchen/history:
+    get:
+      summary: Profile versions with summaries, newest first
+      parameters: [{ in: query, name: buyer_id, schema: { type: string } }]
+      responses:
+        "200": { description: History }
+  /kitchen/ingest:
+    post:
+      summary: Read documents into suggestions (status proposed). Never orders (W2).
+      description: |
+        One LLM call per document, processed in order. Every suggestion quotes the document verbatim.
+        Musts and preferences that Valio Aimo's mandate preview refuses are dropped, usual products are
+        resolved against the catalog (token overlap >= 0.6, else candidates). Offline: fixed answers for
+        the demo fixtures. An order list returns `hint` and orders nothing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                buyer_id: { type: string }
+                upload_ids: { type: array, items: { type: string } }
+                text: { type: string, example: "We're a school canteen in Espoo, nut-free." }
+                title: { type: string }
+          multipart/form-data:
+            schema: { type: object, properties: { file: { type: string, format: binary }, buyer_id: { type: string }, title: { type: string } } }
+      responses:
+        "200":
+          description: One result per document (a single document's result is also merged into the top level)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  buyer_id: { type: string }
+                  results: { type: array, items: { $ref: "#/components/schemas/IngestResult" } }
+  /kitchen/suggestions/accept:
+    post:
+      summary: Accept suggestions. Must / Prefer / Autonomy need a signed mandate version.
+      description: |
+        About and Usual are applied to the profile. If the batch has must, prefer or autonomy items, the
+        backend builds the new mandate and previews it: without mandate_hash (or with an outdated one) the
+        answer is 409 NeedsSignature and nothing is applied. With the previewed hash the backend signs and
+        stores the mandate, then applies the rest. One request = one mandate version + one profile version.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                buyer_id: { type: string }
+                ids: { type: array, items: { type: string } }
+                by: { type: string, example: "Anna Virtanen" }
+                mandate_hash: { type: string }
+      responses:
+        "200":
+          description: Applied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile: { $ref: "#/components/schemas/KitchenProfile" }
+                  mandate: { $ref: "#/components/schemas/MandateSummary" }
+                  accepted: { type: array, items: { type: string } }
+        "409": { description: "needs_signature (show preview, resend with its mandate_hash) or already decided", content: { application/json: { schema: { $ref: "#/components/schemas/NeedsSignature" } } } }
+        "422": { description: Valio Aimo refused the new mandate }
+  /kitchen/suggestions/{suggestion_id}/reject:
+    post:
+      summary: Reject a suggestion. It stays in the list with status rejected.
+      parameters: [{ in: path, name: suggestion_id, required: true, schema: { type: string } }]
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { buyer_id: { type: string }, by: { type: string } } } } }
+      responses:
+        "200": { description: New profile version, content: { application/json: { schema: { $ref: "#/components/schemas/KitchenProfile" } } } }
+        "409": { description: Already decided }
+
+  # ---------- 2b: orders and autonomy ----------
+  /orders:
+    get:
+      summary: Recent orders, newest first, with a label for the start screen (2b)
+      parameters:
+        - { in: query, name: buyer_id, schema: { type: string } }
+        - { in: query, name: limit, schema: { type: integer, default: 20 } }
+        - { in: query, name: before, schema: { type: string }, description: "order_id or timestamp, for paging" }
+      responses:
+        "200": { description: Orders, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/OrderSummary" } } } } }
+  /autonomy:
+    get:
+      summary: Autonomy level, clean-order counter and grants (2b)
+      parameters: [{ in: query, name: buyer_id, schema: { type: string } }]
+      responses:
+        "200": { description: State, content: { application/json: { schema: { $ref: "#/components/schemas/AutonomyState" } } } }
+  /autonomy/level:
+    post:
+      summary: Change the level (0 suggest, 1 usual products, 2 within mandate). Signature round trip as in accept.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [level]
+              properties:
+                buyer_id: { type: string }
+                level: { type: integer, enum: [0, 1, 2] }
+                max_order_total: { type: number, description: "Default: keep the current one (else 600)" }
+                by: { type: string }
+                mandate_hash: { type: string }
+      responses:
+        "200": { description: New state, content: { application/json: { schema: { $ref: "#/components/schemas/AutonomyState" } } } }
+        "409": { description: needs_signature, content: { application/json: { schema: { $ref: "#/components/schemas/NeedsSignature" } } } }
+        "422": { description: "Level 3, or level 1 without usual products" }
+  /autonomy/sync-usual:
+    post:
+      summary: Put the current usual products into the level-1 grant ("Update your usual products in the grant")
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { buyer_id: { type: string }, by: { type: string }, mandate_hash: { type: string } } } } }
+      responses:
+        "200": { description: "New state, `changed` false if already in sync", content: { application/json: { schema: { $ref: "#/components/schemas/AutonomyState" } } } }
+        "409": { description: needs_signature, or the level is not 1 }
+
 components:
   schemas:
     ChatRequest:
       type: object
-      required: [message]
       properties:
-        message: { type: string, example: "I need 1,000 litres of lactose-free milk by Monday." }
+        message: { type: string, example: "I need 1,000 litres of lactose-free milk by Monday.", description: "May be empty when a photo is attached" }
+        attachments:
+          type: array
+          description: "Photos or PDFs from POST /uploads (1a). Sent to the model on this turn only."
+          items: { type: object, required: [upload_id], properties: { upload_id: { type: string, example: up_3f9a1c2d } } }
         session_id: { type: string, nullable: true }
         buyer_id: { type: string, example: "hotel-chain-helsinki", description: "Which buyer mandate/policy applies" }
 
@@ -309,6 +557,8 @@ components:
         co2_kg_per_kg: { type: number, nullable: true, description: "Category average, not product measurement" }
         certificates: { type: array, items: { type: string } }
         allergens: { type: array, items: { type: string } }
+        usual: { type: boolean, description: "The buyer's usual product for this item (1c). Ranked first if it can deliver and breaks no rule" }
+        preference_score: { type: number }
         quote_id: { type: string, description: "Binds the order to this fixed price" }
         item_id: { type: string, description: "The intent item this quote is for" }
         quote_expires_at: { type: string, format: date-time }
@@ -427,7 +677,7 @@ components:
           items:
             type: object
             properties:
-              check: { type: string, enum: [quantity, delivery_date, preference, product, budget, availability] }
+              check: { type: string, enum: [quantity, delivery_date, preference, product, usual, budget, availability], description: "usual: another product than the buyer's usual one (1c)" }
               max_over_pct: { type: number, description: "quantity only" }
               max_days_late: { type: integer, description: "delivery_date only" }
               id: { type: string, description: "preference only: which preference, empty = all" }
@@ -469,7 +719,14 @@ components:
         readback: { type: string, example: "1,000 L lactose-free milk, delivered by Mon 16 Nov 2026, cheapest that delivers in full." }
         chips:
           type: array
-          items: { type: object, properties: { field: { type: string }, label: { type: string }, locked: { type: boolean } } }
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              label: { type: string, example: "120 L milk → your usual: Valio Eila® semi skimmed milk drink 10 l novobox lactose free" }
+              locked: { type: boolean }
+              usual: { type: object, properties: { product_id: { type: string }, name: { type: string } }, description: "Item chips only: the 'Your usual' chip" }
+        notes: { type: array, items: { type: string }, description: "E.g. a usual product id that is not in the catalog was ignored" }
         questions: { type: array, items: { type: string }, description: "Non-empty = cannot be confirmed yet" }
         intent_hash: { type: string, description: "SHA-256 over RFC 8785 canonical JSON of the binding fields" }
         buyer_signature: { type: string, nullable: true, description: "Ed25519, base64url" }
@@ -481,7 +738,13 @@ components:
       type: object
       properties:
         item_id: { type: string, example: "i1" }
-        product: { type: object, properties: { query: { type: string, example: "lactose-free milk" } } }
+        product:
+          type: object
+          description: "Signed. preferred_product_id is the buyer's usual product (1c), part of the intent hash"
+          properties:
+            query: { type: string, example: "milk" }
+            preferred_product_id: { type: string, example: "463038" }
+        usual: { type: object, nullable: true, description: "Not signed, for display", properties: { product_id: { type: string }, name: { type: string } } }
         quantity:
           type: object
           properties:
@@ -682,7 +945,12 @@ components:
             excluded:
               type: array
               description: "Rejected options, one line each, e.g. 'Valio X 1 L: contains milk (GS1 AM CONTAINS)'"
-              items: { type: object, properties: { product_id: { type: string }, name: { type: string }, reason: { type: string } } }
+              items: { type: object, properties: { product_id: { type: string }, name: { type: string }, reason: { type: string }, rule_id: { type: string }, usual: { type: boolean, description: "The usual product broke a rule (e.g. label changed: may contain nuts)" } } }
+            funnel:
+              type: array
+              description: "How I narrowed it down: catalog matches, then one step per must in mandate order, then available, usual or preferences, pick. Each count <= the previous"
+              items: { $ref: "#/components/schemas/FunnelStep" }
+            usual_product: { type: object, nullable: true, description: "Only on the empty offer card", properties: { product_id: { type: string }, name: { type: string }, allowed: { type: boolean }, reason: { type: string, nullable: true } } }
 
     ApprovalRequiredEvent:
       allOf:
@@ -725,3 +993,223 @@ components:
         - type: object
           properties:
             type: { const: done }
+
+    FunnelStep:
+      type: object
+      properties:
+        step: { type: string, enum: [catalog, must, rule, available, usual, prefer, pick] }
+        rule_id: { type: string, nullable: true }
+        label: { type: string, example: "no peanuts incl. 'may contain'" }
+        count: { type: integer }
+
+    UserMessageEvent:
+      description: The buyer's message as sent, with photos (so a second screen can show them)
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { const: user_message }
+            text: { type: string }
+            attachments:
+              type: array
+              items: { type: object, properties: { upload_id: { type: string }, url: { type: string }, media_type: { type: string }, filename: { type: string } } }
+
+    AutonomyProgressEvent:
+      description: After order_confirmed (2b). Toast "Clean order. 7 of 10 towards level 2"
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { const: autonomy_progress }
+            order_id: { type: string }
+            clean: { type: boolean }
+            reason: { type: string, example: "Clean order" }
+            clean_orders: { type: integer }
+            needed: { type: integer }
+            offer_next: { type: boolean }
+            level: { type: integer }
+            name: { type: string }
+
+    PairedEvent:
+      type: object
+      properties:
+        type: { const: paired }
+        pair_id: { type: string }
+        purpose: { type: string, enum: [order, kitchen] }
+
+    PhotoReceivedEvent:
+      type: object
+      properties:
+        type: { const: photo_received }
+        pair_id: { type: string }
+        upload_id: { type: string }
+        url: { type: string, example: "/uploads/up_3f9a1c2d" }
+        media_type: { type: string }
+        purpose: { type: string, enum: [order, kitchen] }
+
+    UploadMeta:
+      type: object
+      properties:
+        upload_id: { type: string, example: up_3f9a1c2d }
+        media_type: { type: string, enum: [image/jpeg, application/pdf] }
+        filename: { type: string }
+        bytes: { type: integer }
+        width: { type: integer, nullable: true }
+        height: { type: integer, nullable: true }
+        created_at: { type: string, format: date-time }
+        buyer_id: { type: string }
+        source: { type: string, enum: [upload, phone] }
+        pair_id: { type: string, nullable: true }
+        url: { type: string }
+        text: { type: string, description: "Demo fixtures only: what the document says (scripted provider)" }
+        fixture: { type: string, description: "Demo fixtures only" }
+
+    Pairing:
+      type: object
+      properties:
+        pair_id: { type: string, example: pair_8c1d }
+        phone_url: { type: string, example: "http://192.168.1.20:8000/phone?pair=pair_8c1d" }
+        purpose: { type: string, enum: [order, kitchen] }
+        expires_at: { type: string, format: date-time }
+
+    UsualProduct:
+      type: object
+      properties:
+        id: { type: string, example: u1 }
+        word: { type: string, example: milk }
+        aliases: { type: array, items: { type: string }, example: [maito] }
+        product_id: { type: string, nullable: true, example: "463038" }
+        product_name: { type: string, nullable: true }
+        product_query: { type: string, description: "Input only: name as written, resolved via catalog search" }
+        typical_qty: { type: number, example: 120 }
+        unit: { type: string, enum: [L, KG, SALES_UNIT] }
+        per: { type: string, example: week }
+        source_id: { type: string }
+        status: { type: string, enum: [active, replaced, removed] }
+
+    Source:
+      type: object
+      properties:
+        id: { type: string, example: s1 }
+        type: { type: string, enum: [photo, pdf, text, order, correction] }
+        title: { type: string, example: "Lunch menu, week 47" }
+        upload_id: { type: string, nullable: true }
+        order_id: { type: string, nullable: true }
+        document_type: { type: string }
+        created_at: { type: string, format: date-time }
+
+    Suggestion:
+      type: object
+      properties:
+        id: { type: string, example: sg4 }
+        kind: { type: string, enum: [about, usual, must, prefer, autonomy] }
+        status: { type: string, enum: [proposed, accepted, rejected] }
+        title: { type: string, example: "No peanuts or tree nuts, including \"may contain\"" }
+        quote: { type: string, description: "Verbatim from the source (W1)" }
+        source_id: { type: string }
+        payload:
+          type: object
+          description: |
+            about {text} or {fact}; usual {word, aliases, product_id, product_name, product_query, typical_qty, unit, per,
+            candidates?}; must {attr, op, value (a list = one rule per value), if_unknown?, applies_to?, label?};
+            prefer {attr, op, value, weight}; autonomy {scope ("usual" = the usual products) | [Condition], limits, accepts?}
+        mandate_version: { type: integer, nullable: true, description: "Set when a signed kind was accepted" }
+
+    KitchenProfile:
+      type: object
+      properties:
+        buyer_id: { type: string }
+        version: { type: integer }
+        updated_at: { type: string, format: date-time }
+        about:
+          type: object
+          properties:
+            text: { type: string }
+            facts: { type: array, items: { type: object, properties: { id: { type: string }, label: { type: string }, source_id: { type: string } } } }
+        usual: { type: array, items: { $ref: "#/components/schemas/UsualProduct" } }
+        suggestions: { type: array, items: { $ref: "#/components/schemas/Suggestion" } }
+        sources: { type: array, items: { $ref: "#/components/schemas/Source" } }
+        history: { type: array, items: { type: object, properties: { version: { type: integer }, at: { type: string }, by: { type: string }, summary: { type: string } } } }
+
+    MandateSummary:
+      type: object
+      properties:
+        mandate_id: { type: string }
+        version: { type: integer }
+        fingerprint: { type: string }
+        must: { type: array, items: { type: object } }
+        prefer: { type: array, items: { type: object } }
+        autonomy: { type: array, items: { type: object } }
+        summary: { type: string }
+
+    IngestResult:
+      type: object
+      properties:
+        source: { $ref: "#/components/schemas/Source" }
+        document_type: { type: string, enum: [menu, allergy_note, invoice, order_list, sustainability_report, other] }
+        suggestions: { type: array, items: { $ref: "#/components/schemas/Suggestion" } }
+        hint: { type: string, description: "order_list only: send it in the Order tab" }
+        note: { type: string, description: "Why nothing was read, if so" }
+
+    NeedsSignature:
+      type: object
+      properties:
+        detail:
+          type: object
+          properties:
+            needs_signature: { const: true }
+            preview:
+              type: object
+              properties:
+                mandate: { type: object }
+                mandate_hash: { type: string, description: "Send this back to sign and store" }
+                version: { type: integer }
+                fingerprint: { type: string }
+                summary: { type: string }
+                cedar: { type: string }
+                diff: { type: array, items: { type: string }, example: ["Add must: No peanuts or tree nuts, including \"may contain\" (from Allergy note)"] }
+
+    OrderSummary:
+      type: object
+      properties:
+        order_id: { type: string }
+        created_at: { type: string, format: date-time }
+        status: { type: string, enum: [confirmed, pending_approval, rejected, quote_expired] }
+        tier: { type: string, enum: [auto, ask, block] }
+        total: { type: number }
+        currency: { type: string }
+        lines: { type: integer }
+        title: { type: string, description: "Item queries joined, max 60 characters" }
+        decided_by: { type: string, nullable: true }
+        blocked_rules: { type: array, items: { type: string } }
+        blocked_labels: { type: array, items: { type: string } }
+        blocked_lines: { type: integer }
+        asked_lines: { type: integer }
+        mandate_version: { type: integer }
+        grants_used: { type: array, items: { type: string } }
+        intent_id: { type: string }
+        intent_revised: { type: boolean }
+        product_changed: { type: boolean }
+        label: { type: string, example: "Ordered alone", description: "Ordered alone | You decided N | N line(s) blocked (rule) | Waiting for you | You rejected it | Quote expired" }
+        clean: { type: boolean }
+        clean_reason: { type: string }
+
+    AutonomyState:
+      type: object
+      properties:
+        level: { type: integer, enum: [0, 1, 2] }
+        name: { type: string, example: "Usual products" }
+        clean_orders: { type: integer, description: "Since the last level change" }
+        needed: { type: integer, example: 10 }
+        offer_next: { type: boolean }
+        since: { type: string, nullable: true }
+        mandate_version: { type: integer }
+        grants: { type: array, items: { type: object, properties: { id: { type: string }, label: { type: string }, summary: { type: string }, scope: { type: string } } } }
+        levels: { type: array, items: { type: object, properties: { level: { type: integer }, name: { type: string }, locked: { type: boolean } } } }
+        usual_scope:
+          type: object
+          properties:
+            in_sync: { type: boolean }
+            missing: { type: array, items: { type: string }, description: "Usual products not in the level-1 grant" }
+            extra: { type: array, items: { type: string } }
+            grant_id: { type: string, nullable: true }

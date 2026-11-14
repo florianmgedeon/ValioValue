@@ -1,0 +1,42 @@
+{
+  "fixture": "allergy-note",
+  "document_type": "allergy_note",
+  "text": "NO NUTS – not even 'may contain'!! 18 milk-free diets → oat drink. 9 gluten-free. Kitchen, 1 Sep",
+  "extraction": {
+    "document_type": "allergy_note",
+    "title": "Allergy note",
+    "suggestions": [
+      {
+        "kind": "must",
+        "title": "No peanuts or tree nuts, including \"may contain\"",
+        "quote": "NO NUTS – not even 'may contain'!!",
+        "payload": {
+          "attr": "allergens",
+          "op": "not_contains",
+          "value": [
+            "peanuts",
+            "tree nuts"
+          ],
+          "if_unknown": "exclude"
+        }
+      },
+      {
+        "kind": "usual",
+        "title": "\"oat drink\" means oat drink 1 L, for 18 milk-free diets",
+        "quote": "18 milk-free diets → oat drink",
+        "payload": {
+          "word": "oat drink",
+          "aliases": [
+            "kaurajuoma"
+          ],
+          "product_id": "473609",
+          "product_name": "Oddlygood® Barista oat drink 1 l UHT gluten free",
+          "product_query": "oat drink 1 l",
+          "typical_qty": 35,
+          "unit": "L",
+          "per": "week"
+        }
+      }
+    ]
+  }
+}

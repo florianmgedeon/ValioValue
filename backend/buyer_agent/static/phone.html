@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111111">
+<title>Kitchen camera</title>
+<style>
+  :root { --bg:#111; --ink:#f5f5f7; --ink2:#a1a1a6; --accent:#2f7d4f; --bad:#d2453a; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+    font:16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { min-height:100%; display:flex; flex-direction:column; padding:20px 16px calc(24px + env(safe-area-inset-bottom)); gap:16px; }
+  h1 { font-size:20px; margin:0; }
+  p { margin:0; color:var(--ink2); }
+  .view { flex:1; border-radius:18px; background:#1d1d1f; display:grid; place-items:center; overflow:hidden; min-height:50vh; position:relative; }
+  .view img { width:100%; height:100%; object-fit:contain; }
+  .hint { color:var(--ink2); text-align:center; padding:24px; }
+  .bar { height:6px; border-radius:3px; background:#2c2c2e; overflow:hidden; display:none; }
+  .bar i { display:block; height:100%; width:0; background:var(--accent); transition:width .2s; }
+  button, label.btn { appearance:none; border:0; border-radius:999px; font:600 17px/1 inherit; padding:18px; width:100%;
+    text-align:center; cursor:pointer; }
+  .primary { background:var(--accent); color:#fff; }
+  .secondary { background:#2c2c2e; color:var(--ink); }
+  .shutter { width:84px; height:84px; padding:0; border-radius:50%; background:#fff; border:6px solid #3a3a3c; margin:0 auto; display:block; }
+  .done { position:absolute; inset:0; display:none; place-items:center; background:rgba(0,0,0,.55); font-size:72px; color:#4cd07d; }
+  .err { color:var(--bad); display:none; }
+  input[type=file] { display:none; }
+  .row { display:flex; flex-direction:column; gap:10px; }
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <h1 id="title">Kitchen camera</h1>
+    <p id="sub">Take a photo. It appears on the kitchen screen.</p>
+  </div>
+  <div class="view" id="view">
+    <div class="hint" id="hint">Tap the button below to open the camera.</div>
+    <img id="preview" alt="" hidden>
+    <div class="done" id="done">✓</div>
+  </div>
+  <div class="bar" id="bar"><i id="barFill"></i></div>
+  <p class="err" id="err"></p>
+  <div class="row" id="take">
+    <label class="shutter" for="file" aria-label="Take photo"></label>
+    <input id="file" type="file" accept="image/*" capture="environment">
+  </div>
+  <div class="row" id="send" hidden>
+    <button class="primary" id="sendBtn">Send to kitchen screen</button>
+    <button class="secondary" id="retake">Retake</button>
+  </div>
+  <div class="row" id="again" hidden>
+    <button class="primary" id="anotherBtn">Take another</button>
+  </div>
+</main>
+<script>
+(() => {
+  const pair = new URLSearchParams(location.search).get('pair');
+  const $ = id => document.getElementById(id);
+  let file = null;
+  if (!pair) { $('sub').textContent = 'Scan the QR code on the kitchen screen first.'; $('take').hidden = true; }
+
+  function show(step) {
+    $('take').hidden = step !== 'take';
+    $('send').hidden = step !== 'send';
+    $('again').hidden = step !== 'again';
+    $('done').style.display = step === 'again' ? 'grid' : 'none';
+  }
+  function error(msg) { $('err').textContent = msg; $('err').style.display = msg ? 'block' : 'none'; }
+
+  $('file').addEventListener('change', e => {
+    file = e.target.files && e.target.files[0];
+    if (!file) return;
+    error('');
+    $('preview').src = URL.createObjectURL(file);
+    $('preview').hidden = false; $('hint').hidden = true;
+    show('send');
+  });
+  $('retake').onclick = () => { $('file').value = ''; $('file').click(); };
+  $('anotherBtn').onclick = () => {
+    $('preview').hidden = true; $('hint').hidden = false; $('file').value = ''; show('take'); $('file').click();
+  };
+  $('sendBtn').onclick = () => {
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file, file.name || 'photo.jpg');
+    fd.append('pair_id', pair);
+    fd.append('source', 'phone');
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/uploads');
+    $('bar').style.display = 'block'; $('barFill').style.width = '0';
+    $('sendBtn').disabled = true; $('sendBtn').textContent = 'Sending…';
+    xhr.upload.onprogress = ev => { if (ev.lengthComputable) $('barFill').style.width = (100 * ev.loaded / ev.total) + '%'; };
+    xhr.onload = () => {
+      $('sendBtn').disabled = false; $('sendBtn').textContent = 'Send to kitchen screen';
+      $('bar').style.display = 'none';
+      if (xhr.status >= 200 && xhr.status < 300) { show('again'); $('sub').textContent = 'Sent. Look at the kitchen screen.'; }
+      else {
+        let msg = 'Could not send the photo.';
+        try { msg = JSON.parse(xhr.responseText).detail || msg; } catch (_) {}
+        error(msg);
+      }
+    };
+    xhr.onerror = () => { $('sendBtn').disabled = false; $('sendBtn').textContent = 'Send to kitchen screen';
+      $('bar').style.display = 'none'; error('No connection to the kitchen screen. Same Wi-Fi?'); };
+    xhr.send(fd);
+  };
+  show(pair ? 'take' : '');
+})();
+</script>
+</body>
+</html>

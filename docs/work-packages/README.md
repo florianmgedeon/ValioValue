@@ -114,9 +114,9 @@ Suggestion `kind` and `payload`:
 |---|---|---|
 | `about` | `{"text": "..."}` or `{"fact": "420 lunches / day"}` | appended to `about` |
 | `usual` | `{"word", "aliases"?, "product_id"?, "product_query", "typical_qty"?, "unit"?, "per"?}` | added to `usual` (product resolved first, see 1b) |
-| `must` | a mandate must rule: `{"attr", "op", "value", "if_unknown"?, "applies_to"?, "label"?}` | new mandate version (signed) |
+| `must` | a mandate must rule: `{"attr", "op", "value", "if_unknown"?, "applies_to"?, "label"?}`. A list `value` (e.g. several allergens) becomes one rule per value | new mandate version (signed) |
 | `prefer` | a mandate preference: `{"attr", "op", "value", "weight"}` | new mandate version (signed) |
-| `autonomy` | a mandate grant: `{"scope"?, "limits", "accepts"?}` | new mandate version (signed) |
+| `autonomy` | a mandate grant: `{"scope"?, "limits", "accepts"?}`. `"scope": "usual"` means `product_id in` the current usual products | new mandate version (signed) |
 
 Source `type`: `photo`, `pdf`, `text` (typed sentence), `order`, `correction`.
 
@@ -135,7 +135,7 @@ Until 1b is merged, 1c reads the JSON file directly and falls back to `contracts
 | Endpoint | Package |
 |---|---|
 | `POST /uploads` (multipart) → upload meta | 1a |
-| `GET /uploads/{upload_id}` → the file | 1a |
+| `GET /uploads/{upload_id}` → the file, `GET /uploads/{upload_id}/meta` → its metadata | 1a |
 | `POST /pairings` → `{pair_id, phone_url}` | 1a |
 | `GET /pairings/{pair_id}/stream` (SSE `photo_received`) | 1a |
 | `GET /phone` → phone camera page | 1a |
@@ -143,8 +143,10 @@ Until 1b is merged, 1c reads the JSON file directly and falls back to `contracts
 | `GET /kitchen`, `PATCH /kitchen`, `GET /kitchen/history` | 1b |
 | `POST /kitchen/ingest` | 1b |
 | `POST /kitchen/suggestions/accept`, `POST /kitchen/suggestions/{id}/reject` | 1b |
-| `GET /orders`, `GET /autonomy`, `POST /autonomy/level` | 2b |
+| `GET /orders`, `GET /autonomy`, `POST /autonomy/level`, `POST /autonomy/sync-usual` (level 1 only: rescope the grant to the current usual products) | 2b |
 | `POST /mandate/draft`, `POST /mandate/coverage` | 3 |
+
+Signed changes (`/kitchen/suggestions/accept`, `/autonomy/level`, `/autonomy/sync-usual`) answer 409 `needs_signature` with a preview first; send the preview's `mandate_hash` back to sign. Level 1 keeps only grants scoped by `product_id` and drops category-scoped grants.
 
 All take `buyer_id` (query or body), default `config.DEFAULT_BUYER_ID`. For the demo set `DEFAULT_BUYER_ID=school-kitchen-espoo` in `.env`.
 

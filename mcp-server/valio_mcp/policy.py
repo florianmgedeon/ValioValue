@@ -117,7 +117,8 @@ def catalog_info() -> dict:
             "accept_checks": [{"check": "quantity", "params": {"max_over_pct": "number"}},
                               {"check": "delivery_date", "params": {"max_days_late": "integer"}},
                               {"check": "preference", "params": {"id": "preference id, empty = all"}},
-                              {"check": "product", "params": {}}, {"check": "budget", "params": {}},
+                              {"check": "product", "params": {}}, {"check": "usual", "params": {}},
+                              {"check": "budget", "params": {}},
                               {"check": "availability", "params": {}}],
             "limits": list(M.LIMIT_KEYS), "optimise": list(M.OPTIMISE), "if_unknown": ["exclude", "ask"],
             "products": len(prods)}

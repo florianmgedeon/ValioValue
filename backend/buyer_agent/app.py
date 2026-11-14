@@ -14,18 +14,29 @@ from pathlib import Path
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 
-from . import agent, config, signing
+from . import agent, config, signing, valio
 from .llm import make_provider, simplify_schema
+from .routes_kitchen import router as kitchen_router
+from .routes_orders import router as orders_router
+from .routes_uploads import router as uploads_router
 
 app = FastAPI(title="ValioValue buyer agent")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.include_router(uploads_router)   # 1a photos and phone pairing
+app.include_router(kitchen_router)   # 1b kitchen profile and ingest
+app.include_router(orders_router)    # 2b order list and autonomy level
 _tasks: set[asyncio.Task] = set()
 
 
+class Attachment(BaseModel):
+    upload_id: str
+
+
 class ChatRequest(BaseModel):
-    message: str
+    message: str = ""  # may be empty when a photo is attached
     session_id: str | None = None
     buyer_id: str | None = None
+    attachments: list[Attachment] = []
 
 
 class ApprovalDecision(BaseModel):
@@ -43,15 +54,10 @@ class IntentConfirm(BaseModel):
 
 async def _valio(method: str, path: str, **kw) -> httpx.Response:
     """Human-side calls to Valio Aimo's approval endpoints. The token never reaches the LLM."""
-    async with httpx.AsyncClient(timeout=20) as c:
-        return await c.request(method, f"{config.MCP_BASE_URL}{path}",
-                               headers={"Authorization": f"Bearer {config.APPROVER_TOKEN}"}, **kw)
+    return await valio.call(method, path, **kw)
 
 
-def _passthrough(r: httpx.Response):
-    if r.status_code >= 400:
-        raise HTTPException(r.status_code, r.json() if r.headers.get("content-type", "").startswith("application/json") else r.text)
-    return r.json()
+_passthrough = valio.passthrough
 
 
 @app.get("/", include_in_schema=False)
@@ -78,8 +84,17 @@ async def health():
 
 @app.post("/chat")
 async def chat(req: ChatRequest):
+    from . import uploads
+    ids = [a.upload_id for a in req.attachments]
+    for u in ids:
+        try:
+            uploads.meta(u)
+        except (FileNotFoundError, ValueError):
+            raise HTTPException(404, f"unknown upload {u}") from None
+    if not req.message.strip() and not ids:
+        raise HTTPException(422, "message or attachments required")
     session = agent.get_or_create_session(req.session_id, req.buyer_id)
-    task = asyncio.create_task(agent.run_turn(session, req.message))
+    task = asyncio.create_task(agent.run_turn(session, req.message, images=ids or None))
     _tasks.add(task)
     task.add_done_callback(_tasks.discard)
     return {"session_id": session.id}

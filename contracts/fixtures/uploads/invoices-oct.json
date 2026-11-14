@@ -1,0 +1,63 @@
+{
+  "fixture": "invoices-oct",
+  "document_type": "invoice",
+  "text": "Valio Aimo invoices Sep–Oct, 8 deliveries. Valio Eila® kevytmaitojuoma 10 l novobox ×48, Valio voi suolaton 500 g ×80, Vaasan Ruispalat 660g 12 pcs ×200, Start Naturell granola 750g ×160, PP pre-washed potato 35-50mm 15kg/bx ×40. avg. € 540 per delivery",
+  "extraction": {
+    "document_type": "invoice",
+    "title": "Invoices Sep–Oct",
+    "suggestions": [
+      {
+        "kind": "usual",
+        "title": "\"milk\" means Valio Eila® semi-skimmed, 10 L Novobox",
+        "quote": "Valio Eila® kevytmaitojuoma 10 l novobox",
+        "payload": {
+          "word": "milk",
+          "aliases": [
+            "maito"
+          ],
+          "product_id": "463038",
+          "product_name": "Valio Eila® semi skimmed milk drink 10 l novobox lactose free",
+          "product_query": "Valio Eila® kevytmaitojuoma 10 l novobox",
+          "typical_qty": 120,
+          "unit": "L",
+          "per": "week"
+        }
+      },
+      {
+        "kind": "usual",
+        "title": "\"butter\" means Valio unsalted butter 500 g",
+        "quote": "Valio voi suolaton 500 g",
+        "payload": {
+          "word": "butter",
+          "aliases": [
+            "voi"
+          ],
+          "product_id": "464411",
+          "product_name": "Valio butter 500 g unsalted",
+          "product_query": "Valio voi suolaton 500 g",
+          "typical_qty": 10,
+          "unit": "KG",
+          "per": "week"
+        }
+      },
+      {
+        "kind": "autonomy",
+        "title": "Order your usual products alone, up to €600 an order",
+        "quote": "avg. € 540 per delivery",
+        "payload": {
+          "scope": "usual",
+          "limits": {
+            "max_order_total": 600
+          },
+          "accepts": [
+            {
+              "check": "quantity",
+              "max_over_pct": 5
+            }
+          ],
+          "label": "Usual products"
+        }
+      }
+    ]
+  }
+}

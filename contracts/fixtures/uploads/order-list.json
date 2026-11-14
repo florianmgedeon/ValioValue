@@ -1,0 +1,10 @@
+{
+  "fixture": "order-list",
+  "document_type": "order_list",
+  "text": "milk 120 L\nbutter 10 kg\nrye rolls 300\napples 40 kg\ngranola 15 kg\nby Monday morning",
+  "extraction": {
+    "document_type": "order_list",
+    "title": "Order list, next week",
+    "suggestions": []
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "type": "user_message",
+  "session_id": "sess_01",
+  "timestamp": "2026-11-14T09:12:03+02:00",
+  "text": "Order this for Monday",
+  "attachments": [
+    {
+      "upload_id": "up_3f9a1c2d",
+      "url": "/uploads/up_3f9a1c2d",
+      "media_type": "image/jpeg",
+      "filename": "order-list.jpg"
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "source": {
+    "id": "s5",
+    "type": "photo",
+    "title": "Lunch menu, week 47",
+    "upload_id": "up_3f9a1c2d",
+    "document_type": "menu",
+    "created_at": "2026-11-14T09:12:03+02:00"
+  },
+  "document_type": "menu",
+  "suggestions": [
+    {
+      "id": "sg2",
+      "kind": "about",
+      "status": "proposed",
+      "title": "Primary school, about 420 lunches a day, Mon–Fri",
+      "quote": "420 lunches / day",
+      "source_id": "s5",
+      "payload": {
+        "fact": "420 lunches / day, Monday to Friday"
+      },
+      "created_at": "2026-11-14T09:12:03+02:00"
+    },
+    {
+      "id": "sg3",
+      "kind": "about",
+      "status": "proposed",
+      "title": "Closed for summer, 1 Jun – 9 Aug",
+      "quote": "Summer break 1 Jun – 9 Aug",
+      "source_id": "s5",
+      "payload": {
+        "fact": "Closed for summer, 1 Jun – 9 Aug"
+      },
+      "created_at": "2026-11-14T09:12:03+02:00"
+    },
+    {
+      "id": "sg4",
+      "kind": "prefer",
+      "status": "proposed",
+      "title": "Finnish ingredients first",
+      "quote": "Finnish ingredients first",
+      "source_id": "s5",
+      "payload": {
+        "attr": "labels",
+        "op": "contains",
+        "value": "HYVAA_SUOMESTA",
+        "weight": 3,
+        "label": "Finnish ingredients first"
+      },
+      "created_at": "2026-11-14T09:12:03+02:00"
+    }
+  ]
+}

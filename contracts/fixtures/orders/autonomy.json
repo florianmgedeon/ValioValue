@@ -1,0 +1,48 @@
+{
+  "buyer_id": "school-kitchen-espoo",
+  "level": 1,
+  "name": "Usual products",
+  "clean_orders": 6,
+  "needed": 10,
+  "offer_next": false,
+  "since": "2026-10-20T10:00:00+03:00",
+  "mandate_version": 3,
+  "grants": [
+    {
+      "id": "g1",
+      "label": "Usual products",
+      "summary": "6 usual products · up to €600 an order · accepts +5 % from pack rounding",
+      "scope": "usual products"
+    }
+  ],
+  "levels": [
+    {
+      "level": 0,
+      "name": "Suggest",
+      "locked": false
+    },
+    {
+      "level": 1,
+      "name": "Usual products",
+      "locked": false
+    },
+    {
+      "level": 2,
+      "name": "Within mandate",
+      "locked": false
+    },
+    {
+      "level": 3,
+      "name": "Standing orders",
+      "locked": true
+    }
+  ],
+  "usual_scope": {
+    "in_sync": false,
+    "missing": [
+      "463038"
+    ],
+    "extra": [],
+    "grant_id": "g1"
+  }
+}

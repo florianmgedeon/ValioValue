@@ -1,6 +1,6 @@
 # 1a · Photos in the chat, phone as camera
 
-Status: open · Wave 1 · Runs in parallel with 1b, 1c, 2b. Shared contract: [`README.md`](README.md).
+Status: done 14 Nov 2026 (branch claude/work-packages-welle-1-4-43c31f) · Wave 1 · Runs in parallel with 1b, 1c, 2b. Shared contract: [`README.md`](README.md).
 
 ## Why
 

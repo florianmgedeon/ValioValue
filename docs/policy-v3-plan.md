@@ -96,7 +96,7 @@ A list of **grants**: inside this **scope**, up to these **limits**, the agent m
 |---|---|---|
 | `scope` | Lines the grant covers, all conditions must hold. Empty = every line | any condition |
 | `limits` | `max_order_total` (summed over the lines assigned to this grant), `max_line_total`, `max_unit_price` | |
-| `accepts` | Deviations it may accept | `quantity` (`max_over_pct`), `delivery_date` (`max_days_late`), `preference` (`id`, empty = all), `product`, `budget`, `availability` |
+| `accepts` | Deviations it may accept | `quantity` (`max_over_pct`), `delivery_date` (`max_days_late`), `preference` (`id`, empty = all), `product`, `budget`, `availability`, `usual` (the line is not the kitchen's usual product) |
 
 Decision for an order:
 

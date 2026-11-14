@@ -1,0 +1,20 @@
+{
+  "detail": {
+    "needs_signature": true,
+    "preview": {
+      "mandate": {
+        "…": "the full new mandate"
+      },
+      "mandate_hash": "sha256:5d1c…",
+      "version": 4,
+      "fingerprint": "5D1C-…",
+      "summary": "Mandate v4 of …",
+      "cedar": "// …",
+      "diff": [
+        "Add prefer: Finnish ingredients first (from Lunch menu, week 47)",
+        "Add must: No peanuts or tree nuts, including \"may contain\" (from Allergy note)",
+        "Add autonomy: Usual products (from Invoices Sep–Oct)"
+      ]
+    }
+  }
+}

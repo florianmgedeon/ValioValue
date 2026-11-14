@@ -218,24 +218,46 @@ async def search_products(
                                    exclude_allergens=None if it else f.exclude_allergens,
                                    category=f.category, country_of_origin=f.country_of_origin,
                                    limit=200 if it else limit)
-    hits, excluded = pool, []
+    hits, excluded, funnel, usual = pool, [], [], None
+    preferred = (item or {}).get("product", {}).get("preferred_product_id") if item else None
     if it:
+        pp = catalog().get(preferred) if preferred else None
+        if pp:  # the buyer's usual product is always evaluated, even if the text search misses it
+            pool = [pp] + [p for p in pool if p.id != pp.id]
         hits = []
+        dropped_at: dict[str, int] = {}
         for p in pool:
             evs = constraints.evaluate_all(p, rules)
             bad = [e for e in evs if constraints.violates(e)]
+            is_usual = bool(pp) and p.id == pp.id
             if bad:
+                dropped_at[bad[0].get("id") or bad[0]["rule"]] = dropped_at.get(bad[0].get("id") or bad[0]["rule"], 0) + 1
                 excluded.append({"product_id": p.id, "name": p.name, "reason": constraints.one_line(bad[0]),
-                                 "verdict": bad[0]["verdict"]})
+                                 "verdict": bad[0]["verdict"], "rule_id": bad[0].get("id")}
+                                | ({"usual": True} if is_usual else {}))
             elif len(hits) < limit:
                 hits.append(p)
+            if is_usual:
+                usual = {"product_id": p.id, "name": p.name, "allowed": not bad,
+                         "reason": constraints.one_line(bad[0]) if bad else None}
+        # Funnel: the pool after each rule, in mandate order. A product is dropped at the first rule it breaks.
+        left = len(pool)
+        funnel = [{"step": "catalog", "label": f"Matches for '{query}'", "count": left}]
+        for r in rules:
+            left -= dropped_at.get(r.get("id") or r["label"], 0)
+            funnel.append({"step": "must" if r.get("source") == "mandate" else "rule", "rule_id": r.get("id"),
+                           "label": r["label"], "count": left})
+    usual_ids = {usual["product_id"]} if usual else set()
     result = {"query": query, "intent_id": intent_id, "item_id": item["item_id"] if item else None,
               "filters": f.model_dump(exclude_none=True),
               "total_matches": total, "returned": len(hits),
               "products": [p.summary() | ({"evidence": constraints.evaluate_all(p, rules)} if it else {})
-                           for p in hits],
+                           | ({"usual": True} if p.id in usual_ids else {}) for p in hits],
               "excluded": excluded[:12], "excluded_count": len(excluded),
               "catalog_source": catalog().source}
+    if it:
+        result["funnel"] = funnel
+        result["usual_product"] = usual
     store().audit("buyer_agent", "search_products",
                   f"Searched catalog for '{query}': {total} matches, returned {len(hits)}"
                   + (f", {len(excluded)} excluded by hard rules" if it else ""),
@@ -273,6 +295,9 @@ async def check_offer(
     if not quantity or not requested_date:
         return {"error": "quantity and requested_date are required without intent_id"}
     ids = list(dict.fromkeys(str(p) for p in product_ids))
+    preferred = item["product"].get("preferred_product_id") if item else None
+    if preferred and preferred not in ids and catalog().get(preferred):
+        ids.insert(0, preferred)  # the usual product is always quoted; its musts decide if it can win
     prices = await valio_api.price(ids, requested_date)
     avail = await valio_api.availability(ids, requested_date)
     cat = catalog()
@@ -370,6 +395,8 @@ async def check_offer(
             offer["preferences"] = [{"id": p["id"], "label": p["label"], "weight": p.get("weight", 1),
                                      "met": ev["verdict"] == "safe"} for p, ev in met if ev]
             offer["preference_score"] = sum(x["weight"] for x in offer["preferences"] if x["met"])
+        if preferred and pid == preferred:
+            offer["usual"] = True
         offers.append(offer)
 
     # Best first: can deliver in full on time, then the preferences (sum of weights met), then optimise.
@@ -377,13 +404,15 @@ async def check_offer(
     pref = {"price": lambda o: (o["total_price"], -(o["delivery_reliability"] or 0)),
             "reliability": lambda o: (-(o["delivery_reliability"] or 0), o["total_price"]),
             "co2": lambda o: (o["co2_kg_per_kg"] if o["co2_kg_per_kg"] is not None else 1e9, o["total_price"])}[opt]
-    offers.sort(key=lambda o: (not o["can_fulfil"], -o.get("preference_score", 0), *pref(o)))
+    # The buyer's usual product wins when it can deliver in full and breaks no rule.
+    offers.sort(key=lambda o: (not o["can_fulfil"], not o.get("usual"), -o.get("preference_score", 0), *pref(o)))
     for o, rank in zip([o for o in offers if o["can_fulfil"]], ["best", "better", "good"]):
         o["rank"] = rank
     for o in offers:
         store().save_quote(o["quote_id"], session, buyer_id, o, o["quote_expires_at"])
     recommended = next((o["product_id"] for o in offers if o["can_fulfil"]), None)
     n_full = sum(o["can_fulfil"] for o in offers)
+    funnel_tail = _funnel_tail(offers, prefs)
 
     store().audit("valio_mcp", "check_offer",  # noqa: E501
                   f"Priced and checked availability for {len(ids)} products for {requested_date}: "
@@ -395,9 +424,29 @@ async def check_offer(
             "product_query": item["product"]["query"] if item else None,
             "requested_date": requested_date, "requested_quantity": quantity, "requested_unit": quantity_unit,
             "offers": offers, "recommended_product_id": recommended, "skipped": skipped,
-                "note": "unit_price and total_price are net of VAT. available_amount 999999 or more means stock is "
+            "funnel_tail": funnel_tail,
+            "note": "unit_price and total_price are net of VAT. available_amount 999999 or more means stock is "
                     "not limited or unknown (terminal = supplier warehouse). fulfil_issues explains why an offer "
                     "cannot deliver in full on time."}
+
+
+def _funnel_tail(offers: list[dict], prefs: list[dict]) -> list[dict]:
+    """After the musts: what can deliver in full, then the usual product or the preferences (strongest first,
+    a step only narrows when some offer meets it), then the pick. Each count is at most the previous one."""
+    pool = [o for o in offers if o["can_fulfil"]]
+    tail = [{"step": "available", "label": "Can deliver in full on time", "count": len(pool)}]
+    usual = [o for o in pool if o.get("usual")]
+    if usual:
+        pool = usual
+        tail.append({"step": "usual", "label": "Your usual product", "count": len(pool)})
+    else:
+        for p in sorted(prefs, key=lambda p: -p.get("weight", 1)):
+            met = [o for o in pool if any(x["id"] == p["id"] and x["met"] for x in o.get("preferences") or [])]
+            if met:
+                pool = met
+            tail.append({"step": "prefer", "rule_id": p["id"], "label": p["label"], "count": len(pool)})
+    tail.append({"step": "pick", "label": "Best offer", "count": min(1, len(pool))})
+    return tail
 
 
 class OrderLine(BaseModel):
@@ -891,6 +940,53 @@ def verify(order_id: str) -> dict:
             "keys": {"valio_aimo": trust.valio_public(),
                      "buyer": {"key_id": trust.key_id(trust.buyer_public(order["buyer_id"])),
                                "public_key": trust.public_b64(trust.buyer_public(order["buyer_id"]))}}}
+
+
+def order_summary(order: dict) -> dict:
+    """One row of the order list: outcome, money, who decided, which rules blocked, whether it was clean."""
+    it = store().get_intent(order.get("intent_id") or "") or order.get("intent") or {}
+    items = {i["item_id"]: i for i in it.get("items") or []}
+    names = [items[i]["product"]["query"] for i in order.get("item_ids") or [] if i in items] or [
+        l.get("name", "") for l in order.get("lines") or []]
+    title = ", ".join(names)
+    if len(title) > 60:
+        title = title[:59].rstrip(" ,") + "…"
+    checks = (order.get("diff") or {}).get("checks") or []
+    decision = order.get("decision") or {}
+    dlines = decision.get("lines") or []
+    blocked = sorted({r for l in dlines if l.get("tier") == "block"
+                      for r in l.get("blocked_by") or [] if r not in ("technical", "evaluation_error")})
+    must_labels = {r["id"]: r["label"] for r in decision.get("musts") or [] if r.get("id")}
+    decided_by = order.get("approved_by")
+    if not decided_by and order.get("approval_id"):
+        decided_by = (store().get_approval(order["approval_id"]) or {}).get("decided_by")
+    m = order.get("mandate") or {}
+    return {"order_id": order["order_id"], "created_at": order.get("created_at") or order.get("_created_at"),
+            "status": order["status"], "tier": order.get("tier"), "total": order.get("total_price"),
+            "currency": order.get("currency", "EUR"), "lines": len(order.get("lines") or []), "title": title,
+            "decided_by": decided_by, "blocked_rules": blocked,
+            "blocked_labels": [must_labels.get(r, r) for r in blocked],
+            "blocked_lines": sum(1 for l in dlines if l.get("tier") == "block"),
+            "asked_lines": sum(1 for l in dlines if l.get("tier") == "ask"),
+            "mandate_version": m.get("version"),
+            "grants_used": m.get("grants_used") or [], "intent_id": order.get("intent_id"),
+            "intent_revised": bool(it.get("revises")),
+            "product_changed": any(not c["ok"] and c["field"] in ("product", "usual") for c in checks),
+            "delivery_date": order.get("delivery_date"), "session": order.get("_session")}
+
+
+@mcp.custom_route("/internal/orders", methods=["GET"])
+async def list_orders(request: Request) -> JSONResponse:
+    """Recent orders of a buyer, newest first, as summaries."""
+    if not _authorised(request):
+        return _deny()
+    q = request.query_params
+    try:
+        limit = max(1, min(int(q.get("limit") or 20), 200))
+    except ValueError:
+        return JSONResponse({"error": "limit must be a number"}, status_code=422)
+    rows = store().list_orders(q.get("buyer_id"), limit=limit, before=q.get("before"))
+    return JSONResponse([order_summary(o) for o in rows])
 
 
 @mcp.custom_route("/internal/orders/{order_id}", methods=["GET"])

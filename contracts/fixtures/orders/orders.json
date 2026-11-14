@@ -1,0 +1,78 @@
+[
+  {
+    "order_id": "ord_41",
+    "created_at": "2026-11-13T07:02:11+02:00",
+    "status": "confirmed",
+    "tier": "auto",
+    "total": 512.0,
+    "currency": "EUR",
+    "lines": 5,
+    "title": "milk, butter, rye rolls, apples, oat muesli",
+    "decided_by": null,
+    "blocked_rules": [],
+    "blocked_labels": [],
+    "blocked_lines": 0,
+    "asked_lines": 0,
+    "mandate_version": 3,
+    "grants_used": [
+      "g1",
+      "g2"
+    ],
+    "intent_id": "int_51aa",
+    "intent_revised": false,
+    "product_changed": false,
+    "label": "Ordered alone",
+    "clean": true,
+    "clean_reason": "Clean order"
+  },
+  {
+    "order_id": "ord_40",
+    "created_at": "2026-11-06T07:05:40+02:00",
+    "status": "confirmed",
+    "tier": "ask",
+    "total": 498.3,
+    "currency": "EUR",
+    "lines": 5,
+    "title": "milk, butter, rye rolls, apples, granola",
+    "decided_by": "Anna Virtanen",
+    "blocked_rules": [],
+    "blocked_labels": [],
+    "blocked_lines": 0,
+    "asked_lines": 1,
+    "mandate_version": 3,
+    "grants_used": [],
+    "intent_id": "int_4f02",
+    "intent_revised": false,
+    "product_changed": true,
+    "label": "You decided 1",
+    "clean": false,
+    "clean_reason": "a different product was chosen"
+  },
+  {
+    "order_id": "ord_39",
+    "created_at": "2026-11-06T07:04:02+02:00",
+    "status": "rejected",
+    "tier": "block",
+    "total": 63.0,
+    "currency": "EUR",
+    "lines": 1,
+    "title": "granola",
+    "decided_by": null,
+    "blocked_rules": [
+      "m2"
+    ],
+    "blocked_labels": [
+      "no tree nuts incl. 'may contain'"
+    ],
+    "blocked_lines": 1,
+    "asked_lines": 0,
+    "mandate_version": 3,
+    "grants_used": [],
+    "intent_id": "int_4f02",
+    "intent_revised": false,
+    "product_changed": false,
+    "label": "1 line blocked (no tree nuts incl. 'may contain')",
+    "clean": false,
+    "clean_reason": "blocked or rejected"
+  }
+]
