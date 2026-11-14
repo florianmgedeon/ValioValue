@@ -47,7 +47,7 @@
     <input id="file" type="file" accept="image/*" capture="environment">
   </div>
   <div class="row" id="send" hidden>
-    <button class="primary" id="sendBtn">Send to kitchen screen</button>
+    <button class="primary" id="sendBtn">Upload</button>
     <button class="secondary" id="retake">Retake</button>
   </div>
   <div class="row" id="again" hidden>
@@ -90,10 +90,10 @@
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/uploads');
     $('bar').style.display = 'block'; $('barFill').style.width = '0';
-    $('sendBtn').disabled = true; $('sendBtn').textContent = 'Sending…';
+    $('sendBtn').disabled = true; $('sendBtn').textContent = 'Uploading…';
     xhr.upload.onprogress = ev => { if (ev.lengthComputable) $('barFill').style.width = (100 * ev.loaded / ev.total) + '%'; };
     xhr.onload = () => {
-      $('sendBtn').disabled = false; $('sendBtn').textContent = 'Send to kitchen screen';
+      $('sendBtn').disabled = false; $('sendBtn').textContent = 'Upload';
       $('bar').style.display = 'none';
       if (xhr.status >= 200 && xhr.status < 300) { show('again'); $('sub').textContent = 'Sent. Look at the kitchen screen.'; }
       else {
@@ -102,7 +102,7 @@
         error(msg);
       }
     };
-    xhr.onerror = () => { $('sendBtn').disabled = false; $('sendBtn').textContent = 'Send to kitchen screen';
+    xhr.onerror = () => { $('sendBtn').disabled = false; $('sendBtn').textContent = 'Upload';
       $('bar').style.display = 'none'; error('No connection to the kitchen screen. Same Wi-Fi?'); };
     xhr.send(fd);
   };
