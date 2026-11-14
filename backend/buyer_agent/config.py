@@ -28,3 +28,12 @@ LLM_MAX_STEPS = int(os.getenv("LLM_MAX_STEPS", "40"))  # recipes need 2 steps pe
 LLM_THINKING = os.getenv("LLM_THINKING", "on").lower() not in ("0", "off", "false", "no")
 LLM_EFFORT = os.getenv("LLM_EFFORT", "medium")
 TIMEZONE = os.getenv("BUYER_TIMEZONE", "Europe/Helsinki")
+
+# Phone pairing: the phone opens {PUBLIC_BASE_URL}/phone?pair=... For the demo set BACKEND_HOST=0.0.0.0 and
+# PUBLIC_BASE_URL to the laptop's LAN address, e.g. http://192.168.1.20:8000
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", f"http://localhost:{BACKEND_PORT}").rstrip("/")
+UPLOADS_DIR = Path(os.getenv("UPLOADS_DIR", DATA_DIR / "uploads"))
+KITCHEN_DIR = Path(os.getenv("KITCHEN_DIR", DATA_DIR / "kitchen"))
+FIXTURES_DIR = REPO_ROOT / "contracts" / "fixtures"
+# Clean orders needed before the next autonomy level is offered
+AUTONOMY_CLEAN_ORDERS = int(os.getenv("AUTONOMY_CLEAN_ORDERS", "10"))

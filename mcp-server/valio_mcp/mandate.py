@@ -15,7 +15,7 @@ from typing import Any
 
 from . import rules as R
 
-ACCEPT_CHECKS = ("quantity", "delivery_date", "preference", "product", "budget", "availability")
+ACCEPT_CHECKS = ("quantity", "delivery_date", "preference", "product", "usual", "budget", "availability")
 LIMIT_KEYS = ("max_order_total", "max_line_total", "max_unit_price")
 OPTIMISE = ("price", "reliability", "co2")
 

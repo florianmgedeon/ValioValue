@@ -1,0 +1,55 @@
+{
+  "type": "intent_proposed",
+  "session_id": "sess_01",
+  "timestamp": "2026-11-14T09:12:03+02:00",
+  "intent": {
+    "intent_id": "int_9f2c1a7b",
+    "status": "proposed",
+    "buyer_id": "school-kitchen-espoo",
+    "original_request": "120 L milk by Monday",
+    "items": [
+      {
+        "item_id": "i1",
+        "product": {
+          "query": "milk",
+          "preferred_product_id": "463038"
+        },
+        "usual": {
+          "product_id": "463038",
+          "name": "Valio Eila® semi skimmed milk drink 10 l novobox lactose free"
+        },
+        "quantity": {
+          "amount": 120,
+          "unit": "L",
+          "max_over_pct": 2,
+          "allow_under": false
+        },
+        "hard_rules": [],
+        "note": null,
+        "status": "open",
+        "order_id": null
+      }
+    ],
+    "deliver_by": "2026-11-16",
+    "notes": [],
+    "questions": [],
+    "readback": "120 L milk → your usual: Valio Eila® semi skimmed milk drink 10 l novobox lactose free · delivered by Mon 16 Nov 2026 · all items: no peanuts incl. 'may contain'; no tree nuts incl. 'may contain' · cheapest that delivers in full · rounding up to whole packs, max +2 %",
+    "chips": [
+      {
+        "field": "items.i1",
+        "label": "120 L milk → your usual: Valio Eila® semi skimmed milk drink 10 l novobox lactose free",
+        "locked": false,
+        "usual": {
+          "product_id": "463038",
+          "name": "Valio Eila® semi skimmed milk drink 10 l novobox lactose free"
+        }
+      },
+      {
+        "field": "deliver_by",
+        "label": "by Mon 16 Nov 2026",
+        "locked": false
+      }
+    ],
+    "intent_hash": "sha256:…"
+  }
+}

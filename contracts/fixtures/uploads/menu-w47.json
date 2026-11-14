@@ -1,0 +1,39 @@
+{
+  "fixture": "menu-w47",
+  "document_type": "menu",
+  "text": "Lunch menu, week 47. Kirkkojärvi primary school, Espoo. Monday: Meatball sauce, potatoes, lingonberry jam. Tuesday: Salmon soup, rye bread. Wednesday: Chicken curry, rice, cucumber salad. Thursday: Pea soup, pancakes with berry jam. Friday: Vegetable lasagne, green salad. 420 lunches / day · Nut-free school · Finnish ingredients first · Summer break 1 Jun – 9 Aug",
+  "extraction": {
+    "document_type": "menu",
+    "title": "Lunch menu, week 47",
+    "suggestions": [
+      {
+        "kind": "about",
+        "title": "Primary school, about 420 lunches a day, Mon–Fri",
+        "quote": "420 lunches / day",
+        "payload": {
+          "fact": "420 lunches / day, Monday to Friday"
+        }
+      },
+      {
+        "kind": "about",
+        "title": "Closed for summer, 1 Jun – 9 Aug",
+        "quote": "Summer break 1 Jun – 9 Aug",
+        "payload": {
+          "fact": "Closed for summer, 1 Jun – 9 Aug"
+        }
+      },
+      {
+        "kind": "prefer",
+        "title": "Finnish ingredients first",
+        "quote": "Finnish ingredients first",
+        "payload": {
+          "attr": "labels",
+          "op": "contains",
+          "value": "HYVAA_SUOMESTA",
+          "weight": 3,
+          "label": "Finnish ingredients first"
+        }
+      }
+    ]
+  }
+}

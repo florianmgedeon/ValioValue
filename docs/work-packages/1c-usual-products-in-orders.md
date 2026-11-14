@@ -1,6 +1,6 @@
 # 1c · Usual products and kitchen context in orders
 
-Status: open · Wave 1 · Runs in parallel with 1a, 1b, 2b. Shared contract: [`README.md`](README.md).
+Status: done 14 Nov 2026 (branch claude/work-packages-welle-1-4-43c31f) · Wave 1 · Runs in parallel with 1a, 1b, 2b. Shared contract: [`README.md`](README.md).
 
 ## Why
 

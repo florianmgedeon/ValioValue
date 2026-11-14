@@ -1,0 +1,87 @@
+{
+  "type": "offers",
+  "session_id": "sess_01",
+  "timestamp": "2026-11-14T09:12:03+02:00",
+  "intent_id": "int_9f2c1a7b",
+  "item_id": "i5",
+  "product_query": "granola",
+  "request_summary": "15 kg granola, delivery by 2026-11-16",
+  "recommended_product_id": "471758",
+  "offers": [
+    {
+      "product_id": "471758",
+      "name": "Puotila Manors Granola 400g",
+      "rank": "best",
+      "can_fulfil": true,
+      "usual": false,
+      "preference_score": 3,
+      "quantity": 38,
+      "sales_unit": "PAK",
+      "unit_price": 3.4,
+      "total_price": 129.2,
+      "currency": "EUR",
+      "quote_id": "q_7a1e"
+    },
+    {
+      "product_id": "460970",
+      "name": "Start Naturell granola 750g",
+      "rank": null,
+      "can_fulfil": false,
+      "usual": true,
+      "fulfil_issues": [
+        "breaks a must of the intent or mandate"
+      ],
+      "quantity": 20,
+      "sales_unit": "PAK",
+      "unit_price": 3.15,
+      "total_price": 63.0,
+      "currency": "EUR",
+      "quote_id": "q_7a1f"
+    }
+  ],
+  "excluded": [
+    {
+      "product_id": "460970",
+      "name": "Start Naturell granola 750g",
+      "reason": "no tree nuts incl. 'may contain': tree nuts (GS1 allergen.tree nuts MAY_CONTAIN)",
+      "verdict": "excluded",
+      "rule_id": "m2",
+      "usual": true
+    }
+  ],
+  "funnel": [
+    {
+      "step": "catalog",
+      "label": "Matches for 'granola'",
+      "count": 9
+    },
+    {
+      "step": "must",
+      "rule_id": "m1",
+      "label": "no peanuts incl. 'may contain'",
+      "count": 7
+    },
+    {
+      "step": "must",
+      "rule_id": "m2",
+      "label": "no tree nuts incl. 'may contain'",
+      "count": 6
+    },
+    {
+      "step": "available",
+      "label": "Can deliver in full on time",
+      "count": 4
+    },
+    {
+      "step": "prefer",
+      "rule_id": "p1",
+      "label": "Finnish ingredients first",
+      "count": 1
+    },
+    {
+      "step": "pick",
+      "label": "Best offer",
+      "count": 1
+    }
+  ]
+}

@@ -40,6 +40,9 @@ class ItemIn(BaseModel):
     quantity_unit: Literal["L", "KG", "SALES_UNIT"] = Field(description="L, KG or sales units (packs, pieces)")
     hard_rules: list[HardRuleIn] = Field(default_factory=list, description="Must-haves for this item only")
     note: str | None = Field(None, description="Optional, e.g. 'for the risotto, 40 portions'")
+    preferred_product_id: str | None = Field(None, description=(
+        "The buyer's usual product for this item, from their kitchen profile. Only if the buyer's word matches "
+        "a usual product. Valio Aimo ranks it first if it meets every rule"))
 
 
 UNIT_WORDS = {"l": "L", "litre": "L", "litres": "L", "liter": "L", "liters": "L", "litra": "L", "litraa": "L",
@@ -136,12 +139,30 @@ def intent_hash(intent: dict) -> str:
     return trust.digest(binding(intent))
 
 
+def _product(query: str, it: dict, notes: list[str]) -> tuple[dict, dict | None]:
+    """The item's product: the buyer's words, plus their usual product if the agent set one. The usual product
+    is part of the signed binding ("your usual Valio Eila"). An unknown id is dropped with a note, never fails."""
+    from .catalog import catalog
+    prod = it.get("product") if isinstance(it.get("product"), dict) else {}
+    pid = it.get("preferred_product_id") or prod.get("preferred_product_id")
+    out = {"query": query.strip()}
+    if not pid:
+        return out, None
+    p = catalog().get(str(pid))
+    if not p:
+        notes.append(f"'{query.strip()}': usual product {pid} is not in the catalog, ignored")
+        return out, None
+    out["preferred_product_id"] = p.id
+    return out, {"product_id": p.id, "name": p.name}
+
+
 def build(*, buyer_id: str, mandate: dict, session: str | None, original_request: str, items: list[dict],
           deliver_by: str, hard_rules: list[dict], optimise: str | None, origin_preference: str | None,
           budget_max_total: float | None, max_over_pct: float, allow_under: bool, agent_questions: list[str],
           intent_id: str | None = None, check_text: bool = True, clarifications: list[str] | None = None) -> dict:
     today = now().date()
     questions: list[str] = [q for q in agent_questions if q]
+    notes: list[str] = []
     clarifications = [c for c in (clarifications or []) if c and c.strip()]
     # The buyer's answers count as the buyer's own words for every cross-check below.
     text = ("\n".join([original_request or ""] + clarifications)).lower() if check_text else ""
@@ -160,13 +181,14 @@ def build(*, buyer_id: str, mandate: dict, session: str | None, original_request
         query = ((it.get("product") or {}).get("query") if isinstance(it.get("product"), dict)
                  else it.get("product_query")) or ""
         iid = it.get("item_id") or f"i{n}"
+        product, usual = _product(query, it, notes)
         rules = _clean_rules([r for r in it.get("hard_rules") or [] if r.get("source") != "mandate"],
                              prefix=f"{iid}_r", questions=questions)
         # The buyer's own words win: "lactose-free" in the text or the item name becomes a rule.
         if not any(r["rule"] == "lactose_free" for r in rules + global_rules) and (
                 LACTOSE_FREE.search(query.lower()) or (len(items) == 1 and LACTOSE_FREE.search(text))):
             rules.append(R.rule({"rule": "lactose_free"}, source="request_text", rid=f"{iid}_r{len(rules) + 1}"))
-        norm_items.append({"item_id": iid, "product": {"query": query.strip()},
+        norm_items.append({"item_id": iid, "product": product, "usual": usual,
                            "quantity": {"amount": amount, "unit": unit, "max_over_pct": pct, "allow_under": under},
                            "hard_rules": rules, "note": it.get("note"),
                            "status": "open", "order_id": None})
@@ -234,6 +256,7 @@ def build(*, buyer_id: str, mandate: dict, session: str | None, original_request
         if budget_max_total else None,
         "spent": 0.0,
         "questions": list(dict.fromkeys(questions)),
+        "notes": notes,
         "session": session,
         "created_at": iso(),
         "expires_at": iso(now() + timedelta(hours=config.INTENT_TTL_HOURS)),
@@ -253,8 +276,9 @@ def readback(intent: dict, d: date | None) -> tuple[str, list[dict]]:
     def item_text(i: dict) -> str:
         own = [rule_label(r) for r in i["hard_rules"] if r["rule"] != "lactose_free"
                or "lactose" not in i["product"]["query"].lower()]
+        usual = i.get("usual")
         return f"{fmt_qty(i['quantity']['amount'], i['quantity']['unit'])} {i['product']['query']}" + (
-            f" ({', '.join(own)})" if own else "")
+            f" → your usual: {usual['name']}" if usual else "") + (f" ({', '.join(own)})" if own else "")
 
     head = item_text(items[0]) if len(items) == 1 else f"{len(items)} items: " + "; ".join(item_text(i) for i in items)
     parts = [head, f"delivered by {when}"]
@@ -270,8 +294,10 @@ def readback(intent: dict, d: date | None) -> tuple[str, list[dict]]:
     q0 = items[0]["quantity"] if items else {"max_over_pct": 0, "allow_under": False}
     parts.append("rounding up to whole packs, max +{:g} %".format(q0["max_over_pct"]) if not q0["allow_under"]
                  else "partial delivery allowed")
+    parts += intent.get("notes") or []
 
-    chips = [{"field": f"items.{i['item_id']}", "label": item_text(i), "locked": False} for i in items]
+    chips = [{"field": f"items.{i['item_id']}", "label": item_text(i), "locked": False}
+             | ({"usual": i["usual"]} if i.get("usual") else {}) for i in items]
     chips.append({"field": "deliver_by", "label": f"by {when}", "locked": False})
     chips += [{"field": "hard_rules", "label": rule_label(r), "locked": r.get("source") == "mandate"}
               for r in intent["hard_rules"]]
@@ -310,10 +336,16 @@ def apply_edits(intent: dict, edits: dict[str, Any]) -> dict:
             continue
         base = by_id.get(iid) or {"item_id": iid or f"i{len(order) + 1}", "product": {"query": ""},
                                   "quantity": {"amount": 0, "unit": "SALES_UNIT"}, "hard_rules": []}
-        if "product" in e:
-            base["product"] = {"query": e["product"].get("query", base["product"]["query"])}
-        if "product_query" in e:
-            base["product"] = {"query": e["product_query"]}
+        if "product" in e or "product_query" in e:
+            new_q = e["product_query"] if "product_query" in e else e["product"].get("query", base["product"]["query"])
+            keep = dict(base["product"]) if new_q == base["product"]["query"] else {}
+            pref = (e.get("product") or {}).get("preferred_product_id", keep.get("preferred_product_id"))
+            if "preferred_product_id" in e:
+                pref = e["preferred_product_id"]
+            base["product"] = {"query": new_q} | ({"preferred_product_id": pref} if pref else {})
+        elif "preferred_product_id" in e:
+            base["product"] = {k: v for k, v in base["product"].items() if k != "preferred_product_id"} | (
+                {"preferred_product_id": e["preferred_product_id"]} if e["preferred_product_id"] else {})
         if "quantity" in e:
             q = e["quantity"] if isinstance(e["quantity"], dict) else {"amount": e["quantity"]}
             base["quantity"] = dict(base["quantity"], **q)

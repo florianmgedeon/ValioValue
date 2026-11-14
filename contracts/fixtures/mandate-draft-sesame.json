@@ -1,0 +1,11 @@
+{
+  "_doc": "POST /mandate/draft {\"buyer_id\": \"school-kitchen-espoo\", \"text\": \"No sesame, not even traces\"} with the full catalog (data/raw/products.json).",
+  "kind": "must",
+  "rule": {"attr": "allergens", "op": "not_contains", "value": "sesame", "label": "No sesame, incl. may contain", "if_unknown": "exclude"},
+  "label": "No sesame, incl. may contain",
+  "explanation": "Products whose label says they contain or may contain sesame are never bought. If the data is missing, the product is not bought.",
+  "product_type": null,
+  "scope": null,
+  "coverage": {"label": "No sesame, incl. may contain", "checked": 17546, "known": 9300, "safe": 8544, "excluded": 756, "unknown": 8246, "category": null, "if_unknown": "exclude", "rule_hash": "c564342325f73e43"},
+  "provider": "scripted"
+}

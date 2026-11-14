@@ -1,0 +1,13 @@
+{
+  "type": "autonomy_progress",
+  "session_id": "sess_01",
+  "timestamp": "2026-11-14T09:12:03+02:00",
+  "order_id": "ord_41",
+  "clean": true,
+  "reason": "Clean order",
+  "clean_orders": 7,
+  "needed": 10,
+  "offer_next": false,
+  "level": 1,
+  "name": "Usual products"
+}

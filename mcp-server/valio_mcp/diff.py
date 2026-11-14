@@ -65,10 +65,19 @@ def compute_line(intent: dict, item: dict, quote: dict, mandate: dict | None = N
         else "Quote was requested for a different buyer, item or quantity"))
 
     # product class: the catalog search for the item's product accepts this product
-    in_class = bool(product) and product.id in catalog().matching_ids(item["product"]["query"])
+    preferred = item["product"].get("preferred_product_id")
+    is_usual = bool(preferred) and line["product_id"] == preferred
+    in_class = bool(product) and (is_usual or product.id in catalog().matching_ids(item["product"]["query"]))
     add(_check("product", item["product"]["query"], line["name"], in_class, "ask",
-               f"Catalog search for '{item['product']['query']}' includes this product" if in_class
+               ("The usual product you signed for this item" if is_usual
+                else f"Catalog search for '{item['product']['query']}' includes this product") if in_class
                else f"'{line['name']}' is not what a search for '{item['product']['query']}' returns"))
+
+    # usual product: the buyer signed "your usual X". Anything else is a deviation a human (or a grant) accepts.
+    if preferred:
+        usual = catalog().get(preferred)
+        add(_check("usual", usual.name if usual else preferred, line["name"], is_usual, "ask",
+                   "Your usual product" if is_usual else "not your usual product"))
 
     # musts from data, never from the agent. Broken -> block. Unknown -> block, or ask if the rule says so.
     rules = effective_rules(intent, item, mandate)

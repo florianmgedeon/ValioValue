@@ -1,6 +1,6 @@
 # 2b · Order list and autonomy level
 
-Status: open · Wave 1 (it does not depend on the other packages) · Shared contract: [`README.md`](README.md).
+Status: done 14 Nov 2026 (branch claude/work-packages-welle-1-4-43c31f) · Wave 1 (it does not depend on the other packages) · Shared contract: [`README.md`](README.md).
 
 ## Why
 
