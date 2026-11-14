@@ -153,7 +153,7 @@ export function OnboardingView() {
   }, [addUpload, patchDoc]);
 
   // Photos from the phone modal (or the composer-less file picker) land here.
-  useEffect(() => camera.onPhoto("onboard", (u) => addUpload(u)), [camera, addUpload]);
+  useEffect(() => camera.onPhoto("onboard", (ups) => ups.forEach((u) => addUpload(u))), [camera, addUpload]);
 
   /** The text field: before reading it starts reading everything, afterwards it adds one more thing to read. */
   const readMyKitchen = async () => {

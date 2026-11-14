@@ -53,8 +53,11 @@ export default function OrderView({ start }: { start?: string }) {
     if (!sessionId) void send("Order the usual");
   }, [start, sessionId, send]);
 
-  // A photo for "order" starts (or continues) the chat with the upload attached (decision W2).
-  useEffect(() => onPhoto("order", (u) => { if (u.upload_id) void send("", [{ upload_id: u.upload_id }]); }), [onPhoto, send]);
+  // Photos for "order" start (or continue) the chat with the uploads attached, all in one message (decision W2).
+  useEffect(() => onPhoto("order", (ups) => {
+    const att = ups.flatMap((u) => (u.upload_id ? [{ upload_id: u.upload_id }] : []));
+    if (att.length) void send("", att);
+  }), [onPhoto, send]);
 
   // Keep the newest block in view.
   const end = useRef<HTMLDivElement>(null);

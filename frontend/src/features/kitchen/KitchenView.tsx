@@ -55,7 +55,8 @@ export default function KitchenView() {
     }
   };
 
-  useEffect(() => camera.onPhoto("kitchen", (u: UploadMeta) => void ingest({ upload_ids: [u.upload_id!] }, "Photo")));
+  useEffect(() => camera.onPhoto("kitchen", (ups: UploadMeta[]) =>
+    void ingest({ upload_ids: ups.map((u) => u.upload_id!) }, ups.length > 1 ? `${ups.length} photos` : "Photo")));
 
   useComposer({
     onSubmit: (text) => void ingest({ text }, "Got it. Your note was"),

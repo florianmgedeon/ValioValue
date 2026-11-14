@@ -75,6 +75,11 @@ export function createPairing(
   });
 }
 
+/** The desktop closed the camera dialog: the phone gets "scan the QR code again" on its next upload. */
+export function endPairing(pairId: string): Promise<unknown> {
+  return apiRequest(`/pairings/${encodeURIComponent(pairId)}`, { method: "DELETE" });
+}
+
 const pairingEventTypes = ["paired", "photo_received"] as const;
 
 interface PairingExpiredEvent {

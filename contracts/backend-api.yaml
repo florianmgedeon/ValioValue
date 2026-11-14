@@ -432,6 +432,12 @@ paths:
                 purpose: { type: string, enum: [order, kitchen], description: "Where the desktop sends the photo (W2)" }
       responses:
         "200": { description: Pairing, content: { application/json: { schema: { $ref: "#/components/schemas/Pairing" } } } }
+  /pairings/{pair_id}:
+    delete:
+      summary: End a pairing (the desktop closed the camera dialog). Later phone uploads get 404.
+      parameters: [{ in: path, name: pair_id, required: true, schema: { type: string } }]
+      responses:
+        "204": { description: Ended (also when it was unknown) }
   /pairings/{pair_id}/stream:
     get:
       summary: SSE for the desktop, events `paired`, `photo_received`, `expired`. Pairings live 30 min in memory.
