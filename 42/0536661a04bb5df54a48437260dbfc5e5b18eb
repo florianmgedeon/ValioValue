@@ -1,0 +1,20 @@
+.claude/launch.json
+  s_0bec23a6188390::t_6ad48fd4db9e3e 5-21,23-26
+  s_0bec23a6188390::t_17e735712a08b3 1-4,22,27-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "420536661a04bb5df54a48437260dbfc5e5b18eb",
+  "prompts": {},
+  "sessions": {
+    "s_0bec23a6188390": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e57d3cbb-92b3-4508-acd2-804d8898107a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
