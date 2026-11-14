@@ -1,0 +1,19 @@
+frontend/src/features/onboarding/OnboardingView.tsx
+  s_f3eb039c5cfafd::t_d44904d99267e6 158,161,163-164,169-170,200,271-287,289-291
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d4873d3c31b89e72be40f3b6f83efdc3c3ccbd25",
+  "prompts": {},
+  "sessions": {
+    "s_f3eb039c5cfafd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f234992e-42c1-4ad6-8c30-5aac59db6b46",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
