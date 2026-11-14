@@ -1,0 +1,79 @@
+contracts/fixtures/streams/usual-granola-blocked.jsonl
+  s_ecd0fe4e756410::t_55f3feb7e91151 54
+  s_ecd0fe4e756410::t_8eba847111f88e 1-53,55-57
+frontend/src/features/order/TrustDrawer.tsx
+  s_ecd0fe4e756410::t_dd8dbc61b3bbc9 1-65
+frontend/src/api/chat.ts
+  s_ecd0fe4e756410::t_800d3a9c0cf56a 8,23
+frontend/src/features/order/useOrderSession.ts
+  s_ecd0fe4e756410::t_f38de991a0f0b6 1-102
+frontend/src/features/order/orderReducer.ts
+  s_ecd0fe4e756410::t_26aff46cd87659 314
+  s_ecd0fe4e756410::t_ec8c7a140b2734 45,47-49,53,64-65,83-84,162-173,176-182,185,212-216,276,285,347
+  s_ecd0fe4e756410::t_9df39be4dad2bc 1-42,50-52,54-63,66-82,85-161,186-211,217-275,277-284,286-313,315-346,348-471
+  s_ecd0fe4e756410::t_dd7f176d79b36f 43-44,46,174-175
+  s_ecd0fe4e756410::t_85d22e65c99802 183-184
+frontend/src/features/order/orderReducer.test.ts
+  s_ecd0fe4e756410::t_cfc98bf9dcaee5 1-3,7,9-17,19-109,111-122,156-213
+  s_ecd0fe4e756410::t_26aff46cd87659 4-6,8,18,110
+  s_ecd0fe4e756410::t_dd7f176d79b36f 123-155
+contracts/fixtures/streams/over-limit.jsonl
+  s_ecd0fe4e756410::t_8eba847111f88e 1-26
+frontend/package.json
+  s_ecd0fe4e756410::t_800d3a9c0cf56a 15-16
+  s_ecd0fe4e756410::t_89bff248814f1f 36-37
+frontend/src/features/order/panels.tsx
+  s_ecd0fe4e756410::t_974e2ecba19a22 1-94
+contracts/backend-api.yaml
+  s_ecd0fe4e756410::t_01c4393c82a437 871
+frontend/src/features/order/StartView.tsx
+  s_ecd0fe4e756410::t_8c94b85115b955 1-107
+contracts/fixtures/streams/README.md
+  s_ecd0fe4e756410::t_f45a35a6639aef 1-17
+frontend/src/features/order/order.css
+  s_ecd0fe4e756410::t_5ea35c7791d550 1-3,7-65,77-98,102-145,147-153,155-168
+  s_ecd0fe4e756410::t_0bb7ddf03aad9f 146,154
+  s_ecd0fe4e756410::t_11c6adebdd45d6 4-6
+  s_ecd0fe4e756410::t_903e83d0af960e 99-101
+  s_ecd0fe4e756410::t_097f4cd66418f3 66-76
+frontend/src/api/generated.d.ts
+  s_ecd0fe4e756410::t_01c4393c82a437 1937-1941
+contracts/fixtures/streams/jailbreak-blocked.jsonl
+  s_ecd0fe4e756410::t_8eba847111f88e 1-17
+frontend/src/features/order/blocks.tsx
+  s_ecd0fe4e756410::t_182ce46884a991 13,22-25,41-54,56-83,465,476-487,489-490,492-497,499-513,594
+  s_ecd0fe4e756410::t_dd7f176d79b36f 488,498
+  s_ecd0fe4e756410::t_d329c946c8484e 1-12,14-21,26-40,55,84-220,222-464,466-475,514-593,595-604
+  s_ecd0fe4e756410::t_097f4cd66418f3 491
+  s_ecd0fe4e756410::t_6651639c6b8ede 221
+frontend/src/features/order/OrderView.tsx
+  s_ecd0fe4e756410::t_800d3a9c0cf56a 18,32
+  s_ecd0fe4e756410::t_097f4cd66418f3 2,19,48-49,54
+  s_ecd0fe4e756410::t_8bf648cb765b71 1,3-17,20-31,33-47,50-53,55-83
+contracts/fixtures/streams/milk-auto.jsonl
+  s_ecd0fe4e756410::t_8eba847111f88e 1-23
+docs/work-packages/F1-frontend-order.md
+  s_ecd0fe4e756410::t_f91c596d158c80 3,65-73
+frontend/src/features/order/data.ts
+  s_ecd0fe4e756410::t_9ffe106f3fe3eb 1-64
+frontend/src/app/App.tsx
+  s_ecd0fe4e756410::t_800d3a9c0cf56a 11,19
+frontend/package-lock.json
+  s_ecd0fe4e756410::t_e1061437acc9c1 28-29,1107-1124,1468-1505,1593-1602,1628-1637,1774-1780,1976-1985,1996-2005,2656-2669,2987-2993,3038-3057,3249-3331,3348-3360
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d21567547ba0ca35c0f9698d7c9ee5f5032577bc",
+  "prompts": {},
+  "sessions": {
+    "s_ecd0fe4e756410": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e3584ba-52db-4727-b649-440fea4cbb5b",
+        "model": "unknown"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
