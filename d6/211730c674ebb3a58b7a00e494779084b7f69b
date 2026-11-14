@@ -1,0 +1,144 @@
+docs/work-packages/1c-usual-products-in-orders.md
+  s_5263e89c42a7bd::t_8930cba5316fd6 3
+docs/work-packages/1b-kitchen-profile-and-ingest.md
+  s_5263e89c42a7bd::t_8930cba5316fd6 3
+docs/work-packages/2b-orders-and-autonomy.md
+  s_5263e89c42a7bd::t_8930cba5316fd6 3
+contracts/fixtures/events/paired.json
+  s_5263e89c42a7bd::t_3598c3d1b3c206 1-5
+mcp-server/valio_mcp/store.py
+  s_5263e89c42a7bd::t_24c477cbca06fa 136-154
+backend/buyer_agent/routes_kitchen.py
+  s_5263e89c42a7bd::t_ca75f2b88d5ade 1-237
+backend/buyer_agent/ingest.py
+  s_5263e89c42a7bd::t_037de99325d424 131,147-149
+  s_5263e89c42a7bd::t_3ac26f59ff73de 1-130,132-146,150-296
+backend/tests/test_usual_and_autonomy.py
+  s_5263e89c42a7bd::t_664174c793843b 39
+  s_5263e89c42a7bd::t_7112d2f78ebb13 57
+  s_5263e89c42a7bd::t_916007568d6b32 1-38,40-55,58-169
+  s_5263e89c42a7bd::t_09ed9907189a85 56
+contracts/fixtures/kitchen/accept-needs-signature.json
+  s_5263e89c42a7bd::t_3598c3d1b3c206 1-20
+docs/policy-v3-plan.md
+  s_5263e89c42a7bd::t_8930cba5316fd6 99
+contracts/fixtures/events/intent_proposed_usual.json
+  s_5263e89c42a7bd::t_3598c3d1b3c206 1-55
+scripts/make_fixtures.py
+  s_5263e89c42a7bd::t_726a26a7fbf97b 127-129
+  s_5263e89c42a7bd::t_6e86e15a484d68 1-87,90-126,130-151
+  s_5263e89c42a7bd::t_99733cc4f6caec 88-89
+backend/tests/test_photos.py
+  s_5263e89c42a7bd::t_c14bb0d4b70584 1-135
+contracts/fixtures/events/offers_usual_funnel.json
+  s_5263e89c42a7bd::t_3598c3d1b3c206 1-87
+mcp-server/valio_mcp/policy.py
+  s_5263e89c42a7bd::t_24c477cbca06fa 120-121
+backend/buyer_agent/autonomy.py
+  s_5263e89c42a7bd::t_2debe26208d0c3 1-209
+contracts/fixtures/events/autonomy_progress.json
+  s_5263e89c42a7bd::t_3598c3d1b3c206 1-13
+contracts/fixtures/uploads/allergy-note.json
+  s_5263e89c42a7bd::t_4f875a1b4f4427 1-42
+contracts/fixtures/orders/autonomy.json
+  s_5263e89c42a7bd::t_3598c3d1b3c206 1-48
+mcp-server/valio_mcp/mandate.py
+  s_5263e89c42a7bd::t_24c477cbca06fa 18
+backend/buyer_agent/config.py
+  s_5263e89c42a7bd::t_9617b7b1d8a5d8 31-39
+docs/work-packages/README.md
+  s_5263e89c42a7bd::t_8e6d4635f29b21 117,119,138,146,149
+  s_5263e89c42a7bd::t_1b2d2870206243 150
+contracts/backend-api.yaml
+  s_5263e89c42a7bd::t_e603a6b0684369 4,23-31,71-73,98-99,282-514,520-524,560-561,680,722-729,741-747,948-953,996-1215
+backend/buyer_agent/uploads.py
+  s_5263e89c42a7bd::t_3283991e023278 1-148
+contracts/fixtures/events/photo_received.json
+  s_5263e89c42a7bd::t_3598c3d1b3c206 1-8
+backend/buyer_agent/valio.py
+  s_5263e89c42a7bd::t_1c4d5bf69e38da 1-77
+backend/requirements-dev.txt
+  s_5263e89c42a7bd::t_6b4cd38373722a 1-3
+mcp-server/valio_mcp/server.py
+  s_5263e89c42a7bd::t_7144e1cfd2e4d7 298-300,398-399,407-408,415,427-428,433-449
+  s_5263e89c42a7bd::t_429f1250635d6d 956-957,959,967-971
+  s_5263e89c42a7bd::t_9bbfb1949b3be3 221-222,224-226,228,232,234,236-237,240-250,255,258-260
+  s_5263e89c42a7bd::t_24c477cbca06fa 945-955,958,960-966,972-991
+  s_5263e89c42a7bd::t_984a9111761b6d 450-451
+mcp-server/valio_mcp/diff.py
+  s_5263e89c42a7bd::t_24c477cbca06fa 68-70,72-73,76-80
+  s_5263e89c42a7bd::t_1e9dc3cbeb7a3c 81
+.env.example
+  s_5263e89c42a7bd::t_9617b7b1d8a5d8 25-30
+backend/buyer_agent/static/phone.html
+  s_5263e89c42a7bd::t_2de72820d3b60b 1-113
+backend/requirements.txt
+  s_5263e89c42a7bd::t_9617b7b1d8a5d8 8-10
+backend/buyer_agent/app.py
+  s_5263e89c42a7bd::t_e53f82dcc621a6 19-21,25-27,31-34,36,39,87-95,97
+  s_5263e89c42a7bd::t_a84d70f069cea7 17,57,60
+contracts/fixtures/uploads/menu-w47.json
+  s_5263e89c42a7bd::t_4f875a1b4f4427 1-39
+backend/tests/conftest.py
+  s_5263e89c42a7bd::t_3419890944df81 1-120
+  s_5263e89c42a7bd::t_6b4cd38373722a 121-125
+backend/buyer_agent/llm.py
+  s_5263e89c42a7bd::t_fbdb1196f11449 4,12,14,25-26,81-142,155-156,158-160,225-226,228-232,306-309,322-323,325-331,350-405,419-431,458-464,467
+  s_5263e89c42a7bd::t_bf8e9ce8f37815 349,465
+backend/buyer_agent/routes_uploads.py
+  s_5263e89c42a7bd::t_36f6213b76f902 1-143
+mcp-server/tests/test_orders_list.py
+  s_5263e89c42a7bd::t_132f0e985120e2 17
+  s_5263e89c42a7bd::t_a122e1263f7222 1-14,16,18,21-22,24-63
+  s_5263e89c42a7bd::t_21d1378f310ce0 15,23
+  s_5263e89c42a7bd::t_033100b3e0eb31 19-20
+backend/buyer_agent/agent.py
+  s_5263e89c42a7bd::t_edaeeb7b8abeaf 41,147-157,159,166,173-176,180,191-193,195-200,209-218,221,308-309,337,341-342,353-354,366,374-387,417
+backend/pytest.ini
+  s_5263e89c42a7bd::t_6b4cd38373722a 1-2
+contracts/fixtures/events/user_message.json
+  s_5263e89c42a7bd::t_3598c3d1b3c206 1-14
+contracts/fixtures/kitchen/ingest-menu.json
+  s_5263e89c42a7bd::t_3598c3d1b3c206 1-53
+mcp-server/valio_mcp/intent.py
+  s_5263e89c42a7bd::t_8404e58cf33162 43-45,142-158,165,184,191,259,279,281,297,299-300,339-348
+contracts/fixtures/kitchen/school-kitchen-espoo.json
+  s_5263e89c42a7bd::t_4f875a1b4f4427 1-182
+backend/buyer_agent/kitchen.py
+  s_5263e89c42a7bd::t_8ea7d96463985d 143
+  s_5263e89c42a7bd::t_6a37f720205b19 1-142,144-237
+contracts/fixtures/uploads/order-list.json
+  s_5263e89c42a7bd::t_4f875a1b4f4427 1-10
+contracts/fixtures/orders/orders.json
+  s_5263e89c42a7bd::t_3598c3d1b3c206 1-78
+contracts/fixtures/uploads/invoices-oct.json
+  s_5263e89c42a7bd::t_4f875a1b4f4427 1-63
+scripts/demo_photo.py
+  s_5263e89c42a7bd::t_72e37b5fd10342 1-58
+backend/tests/test_kitchen.py
+  s_5263e89c42a7bd::t_037de99325d424 102
+  s_5263e89c42a7bd::t_40e05c28f95364 100-101,114
+  s_5263e89c42a7bd::t_142bf2321b889d 1-99,103-113,115-217
+docs/work-packages/1a-photos-in-chat.md
+  s_5263e89c42a7bd::t_8930cba5316fd6 3
+backend/buyer_agent/routes_orders.py
+  s_5263e89c42a7bd::t_8be2a29b315b13 1-66
+mcp-server/tests/test_usual.py
+  s_5263e89c42a7bd::t_76943cb3dc90e6 1-149
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d6211730c674ebb3a58b7a00e494779084b7f69b",
+  "prompts": {},
+  "sessions": {
+    "s_5263e89c42a7bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "65a3f618-b0e1-457c-a79a-3c961a7e9e95",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
