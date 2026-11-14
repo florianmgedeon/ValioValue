@@ -1,0 +1,21 @@
+backend/buyer_agent/llm.py
+  s_ecd0fe4e756410::t_029d91c12ba90e 164-166
+backend/tests/test_photos.py
+  s_ecd0fe4e756410::t_111adb59ae897c 136-154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "eaa486ba71f9752b9a21e7b2e52bcb2dcfd8fc0f",
+  "prompts": {},
+  "sessions": {
+    "s_ecd0fe4e756410": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e3584ba-52db-4727-b649-440fea4cbb5b",
+        "model": "unknown"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
