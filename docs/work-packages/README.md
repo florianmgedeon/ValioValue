@@ -190,3 +190,32 @@ New routes go into their own `routes_*.py` with a FastAPI `APIRouter`; `app.py` 
 * Run the stack: `scripts/dev.sh` (mcp-server :8001, backend :8000). Offline Valio API: `FAKE_VALIO=1`.
 * Docs: update the package file's status line and the "Not built yet" lists in `docs/ux-concept.md` when done.
 * Write docs and code comments in plain English, short sentences.
+
+## Frontend packages (F0–F4)
+
+The React app in `frontend/` implements the mockup [`frontend/mockup/kitchen-agent.html`](../../frontend/mockup/kitchen-agent.html) (artifact Qs4e5X53hbzDDmYQkqLD17) against the buyer backend.
+
+| Package | File | What | Wave |
+|---|---|---|---|
+| F0 | [`F0-frontend-foundation.md`](F0-frontend-foundation.md) | Tokens, shell (header, tabs, autonomy pill, composer), primitives, `useSignedChange`, mock layer | A (alone, first) |
+| F1 | [`F1-frontend-order.md`](F1-frontend-order.md) | Order tab: start screen, order mode, stream reducer, live panel, trust drawer | B |
+| F2 | [`F2-frontend-kitchen.md`](F2-frontend-kitchen.md) | Kitchen tab: teach card, suggestions, about/usual/sources, must/prefer, ladder, extra permissions | B |
+| F3 | [`F3-frontend-onboarding-camera.md`](F3-frontend-onboarding-camera.md) | Onboarding with LEARN cards, phone modal with QR and pairing stream, uploads | B |
+| F4 | [`F4-frontend-activity.md`](F4-frontend-activity.md) | Activity tab: order list and story timeline | B |
+
+```
+F0 foundation ──┬> F1 order
+                ├> F2 kitchen
+                ├> F3 onboarding + camera
+                └> F4 activity
+```
+
+Rules for all frontend packages:
+
+* **Own folder.** Each package writes only `src/features/<name>/**`. Shared code lives in `src/ui/` (primitives), `src/app/` (shell, routing, signing, providers) and `src/api/` (wrappers). A missing primitive goes into `src/ui/` as its own small commit, named in the PR.
+* **Data only through `src/api/` wrappers** and TanStack Query; no `fetch` or `EventSource` in components.
+* **Not built yet → mock, don't wait.** With `VITE_MOCK=1` the wrappers for 2a, 2c and 2d endpoints return fixtures in the shapes from those package files. Never mock a built endpoint.
+* **Every mandate change goes through `useSignedChange`**: the buyer sees diff and hash before signing. Unsigned kitchen-profile changes (about, usual, prefer suggestions) never open the sign modal.
+* **Mockup wins on wording and layout**; the contract wins on data. If they disagree, change the mockup or the contract in the same PR and say which.
+* **Desktop for the beamer, phone works:** no horizontal scroll at 375 px, 16 px gutters, safe areas.
+* **Shared files** (`App.tsx`, `styles.css`, `src/ui/index.ts`): one line per package (a route, an export), no rewrites.
