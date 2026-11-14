@@ -50,27 +50,30 @@
   .say-list { margin: 0; padding-left: 20px; display: grid; gap: 4px; list-style: disc; }
   .say-list li::marker { color: var(--ink3); }
 
-  .still-open { border-top: 1px solid var(--line); padding: 14px 20px; display: grid; gap: 4px; background: color-mix(in srgb, var(--auto-soft) 55%, transparent); }
-  .still-h { display: flex; gap: 8px; align-items: center; font-size: 13px; font-weight: 700; color: var(--auto); margin-bottom: 4px; }
-  .open-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: 14px; }
-  .open-row:last-of-type { border-bottom: 0; }
-  @media (max-width: 480px) { .open-row { grid-template-columns: minmax(0, 1fr); } }
-  .open-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  /* Still open: one plain question with buttons, no status colours. */
+  .still-open { border-top: 1px solid var(--line); padding: 16px 20px; display: grid; gap: 6px; background: var(--surface); }
+  .still-h { display: flex; gap: 8px; align-items: center; font-size: 12px; font-weight: 700; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.05em; }
+  .open-row { font-size: 14px; overflow-wrap: anywhere; }
+  .still-q { font-size: 16px; font-weight: 700; margin-top: 6px; }
+  .open-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
   .open-acts:empty { display: none; }
 
   .card-f .fore { flex: 1; min-width: 220px; font-size: 13.5px; color: var(--ink2); }
   .card-f .fore b { color: var(--ink); }
-  .order-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 16px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
-  .order-item .ask { font-size: 12px; color: var(--ink3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-  .order-item .nm { font-weight: 600; font-size: 15px; }
-  .order-item .qty { font-size: 13px; color: var(--ink2); }
-  .order-item .px { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
-  .order-item .chips { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
+  /* Read-back: what the buyer asked for is the line that matters. Everything else is quiet. */
+  .order-item { display: flex; gap: 6px 16px; padding: 12px 20px; border-bottom: 1px solid var(--line); align-items: center; flex-wrap: wrap; }
+  .order-item > .min-w-0 { flex: 1; }
+  .order-item .ask { display: grid; grid-template-columns: 6.5em minmax(0, 1fr); gap: 16px; font-size: 17px; color: var(--ink); line-height: 1.35; }
+  .order-item .ask .q { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink2); }
+  .order-item .ask .n { overflow-wrap: anywhere; }
+  .order-item .ask .n::first-letter { text-transform: uppercase; }
+  .order-item .nm { font-size: 13px; color: var(--ink3); margin-top: 2px; padding-left: calc(6.5em * 17 / 13 + 16px); }
+  .order-item .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .items-hint { font-size: 13px; color: var(--ink3); padding: 10px 20px; border-bottom: 1px solid var(--line); }
   .paramchips { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 20px; border-bottom: 1px solid var(--line); font-size: 13px; align-items: center; }
   .pchip { display: inline-flex; gap: 6px; align-items: center; padding: 6px 12px; border-radius: 10px; background: var(--surface); font-weight: 500; }
   .pchip b { font-weight: 700; }
   .applied { font-size: 12.5px; color: var(--ink3); padding: 10px 20px; border-bottom: 1px solid var(--line); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-  .questions { padding: 12px 20px; border-bottom: 1px solid var(--line); display: grid; gap: 6px; font-size: 14px; background: var(--auto-soft); }
 
   .funnel { display: grid; padding: 6px 20px 16px; }
   .frow { display: grid; grid-template-columns: minmax(0, 1fr) 72px; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: 14px; }
@@ -103,13 +106,20 @@
 
   .check { width: 26px; height: 26px; border-radius: 50%; background: var(--prefer); color: #fff; display: grid; place-items: center; flex: none; }
   .check svg { width: 15px; height: 15px; stroke-width: 3; }
-  .rline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; padding: 12px 20px; border-bottom: 1px solid var(--line); font-size: 14px; }
-  .rline .why { grid-column: 1 / -1; font-size: 12.5px; color: var(--ink3); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-  .rline .px { font-weight: 700; font-variant-numeric: tabular-nums; }
+  /* Receipt: what it did (header), why (one sentence), what (the lines). One colour: the green check. */
+  .receipt-h { display: flex; gap: 14px; align-items: center; padding: 18px 20px 6px; }
+  .receipt-h .check { width: 36px; height: 36px; }
+  .receipt-h .check svg { width: 20px; height: 20px; }
+  .receipt-h h3 { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .receipt-h .sub { font-size: 14px; color: var(--ink2); font-weight: 600; }
+  .receipt-why { padding: 4px 20px 14px 70px; font-size: 14px; color: var(--ink2); border-bottom: 1px solid var(--line); }
+  @media (max-width: 480px) { .receipt-why { padding-left: 20px; } }
+  .rline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; padding: 11px 20px; border-bottom: 1px solid var(--line); align-items: baseline; }
+  .rline .nm { font-size: 15px; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+  .rline .why { grid-column: 1 / -1; font-size: 13px; color: var(--ink3); }
+  .rline .px { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .rtotal { display: flex; justify-content: space-between; padding: 14px 20px; font-weight: 800; font-size: 17px; }
-  .proof { display: flex; gap: 10px; flex-wrap: wrap; padding: 12px 20px; background: var(--surface); font-size: 12.5px; color: var(--ink2); align-items: center; }
-  .proof .ok { display: inline-flex; gap: 5px; align-items: center; color: var(--prefer); font-weight: 600; }
-  .proof .ok svg { width: 14px; height: 14px; stroke-width: 2.6; }
+  .proof { display: flex; gap: 10px; flex-wrap: wrap; padding: 10px 20px; background: var(--surface); font-size: 12.5px; color: var(--ink3); align-items: center; }
 
   .learn { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: center; padding: 16px 20px; border-radius: 20px; background: var(--usual-soft); color: var(--ink); }
   .learn .bulb { width: 40px; height: 40px; border-radius: 12px; background: var(--usual); color: #fff; display: grid; place-items: center; }
@@ -149,3 +159,21 @@
   .verify-row { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
   .verify-row small { display: block; color: var(--ink3); font-size: 12.5px; overflow-wrap: anywhere; }
 }
+.drift-note { color: var(--auto); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+
+/* 2e: drift before the usual order */
+.drift-card { border: 2px solid var(--auto); box-shadow: var(--shadow); border-radius: 20px; overflow: hidden; background: var(--bg); }
+.drift-card .h { display: grid; gap: 4px; padding: 16px 20px; background: var(--auto-soft); }
+.drift-card .h h3 { font-size: 17px; font-weight: 700; }
+.drift-card .h p { font-size: 13px; color: var(--ink2); }
+.drift-card .dr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 16px; align-items: center; padding: 14px 20px; border-top: 1px solid var(--line); }
+.drift-card .h + .dr { border-top: 0; }
+.drift-card .dr .t { font-weight: 600; font-size: 14.5px; }
+.drift-card .dr .s { font-size: 12.5px; color: var(--ink3); margin-top: 2px; }
+.drift-card .spark { color: var(--auto); }
+.drift-card .choice { grid-column: 1 / -1; }
+.drift-card .seg { font-size: 13px; padding: 3px; border-radius: 10px; }
+.drift-card .seg button { padding: 5px 12px; border-radius: 8px; }
+.drift-card .f { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 20px; background: var(--surface); font-size: 13px; color: var(--ink3); }
+.drift-done { font-size: 13px; color: var(--ink3); padding-top: 6px; }
+

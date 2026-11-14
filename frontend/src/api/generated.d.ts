@@ -97,7 +97,7 @@ export interface paths {
          * Server-sent events stream of the agent's progress
          * @description `text/event-stream`. Each SSE message has `event: <type>` and `data: <json>`.
          *     Types: user_message, reasoning, message, intent_proposed, intent_confirmed, tool_call, tool_result,
-         *     offers, approval_required, order_confirmed, order_rejected, autonomy_progress, error, done.
+         *     offers, approval_required, order_confirmed, order_rejected, autonomy_progress, context_suggestion, error, done.
          *     Ignore unknown types.
          */
         get: {
@@ -117,7 +117,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/event-stream": components["schemas"]["ReasoningEvent"] | components["schemas"]["MessageEvent"] | components["schemas"]["ToolCallEvent"] | components["schemas"]["ToolResultEvent"] | components["schemas"]["OffersEvent"] | components["schemas"]["ApprovalRequiredEvent"] | components["schemas"]["OrderConfirmedEvent"] | components["schemas"]["IntentProposedEvent"] | components["schemas"]["IntentConfirmedEvent"] | components["schemas"]["OrderRejectedEvent"] | components["schemas"]["ErrorEvent"] | components["schemas"]["DoneEvent"] | components["schemas"]["UserMessageEvent"] | components["schemas"]["AutonomyProgressEvent"];
+                        "text/event-stream": components["schemas"]["ReasoningEvent"] | components["schemas"]["MessageEvent"] | components["schemas"]["ToolCallEvent"] | components["schemas"]["ToolResultEvent"] | components["schemas"]["OffersEvent"] | components["schemas"]["ApprovalRequiredEvent"] | components["schemas"]["OrderConfirmedEvent"] | components["schemas"]["IntentProposedEvent"] | components["schemas"]["IntentConfirmedEvent"] | components["schemas"]["OrderRejectedEvent"] | components["schemas"]["ErrorEvent"] | components["schemas"]["DoneEvent"] | components["schemas"]["UserMessageEvent"] | components["schemas"]["AutonomyProgressEvent"] | components["schemas"]["ContextSuggestionEvent"];
                     };
                 };
             };
@@ -277,6 +277,74 @@ export interface paths {
                     content: {
                         "application/json": components["schemas"]["AuditEntry"][];
                     };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/{order_id}/story": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What happened to one order and why, in plain sentences (Activity tab, package 2c)
+         * @description Built from the order, its intent and its audit trail. `why` sentences come from templates, never from an LLM, and contain no hashes, rule ids or grant ids. Steps: asked, understood, searched, decided, confirmed, learned (an accepted suggestion whose source is this order, 2a). Fixture: contracts/fixtures/order-story.json. `funnel` per searched item is catalog → after your musts → can deliver → picked (only recorded counts).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    order_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The story */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            order_id: string;
+                            /** @example Ordered alone */
+                            label: string;
+                            /** @enum {string} */
+                            tier: "auto" | "ask" | "block";
+                            total?: number;
+                            mandate?: {
+                                version?: number;
+                                grants_used?: string[];
+                            };
+                            /** @description Kitchen profile version the agent read when it proposed the intent. Only while the backend knows it. */
+                            kitchen_profile_version?: number;
+                            steps: ({
+                                /** @enum {string} */
+                                kind: "asked" | "understood" | "searched" | "decided" | "confirmed" | "learned";
+                                at?: string;
+                            } & {
+                                [key: string]: unknown;
+                            })[];
+                        };
+                    };
+                };
+                /** @description Unknown order */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
             };
         };
@@ -971,6 +1039,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pairings/{pair_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** End a pairing (the desktop closed the camera dialog). Later phone uploads get 404. */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    pair_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Ended (also when it was unknown) */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pairings/{pair_id}/stream": {
         parameters: {
             query?: never;
@@ -1139,6 +1243,104 @@ export interface paths {
         };
         trace?: never;
     };
+    "/kitchen/usual-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * "Your usual order" card (2c): usual products, usual amounts, last price paid
+         * @description Active usual products with a product and a typical amount. last_unit_price = price per usual unit (L, kg, piece) from the newest confirmed order line with that product; none yet → last_unit_price and estimate null. "Order the usual" sends POST /chat {"message": "Order the usual"}: the agent uses the same profile amounts.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    buyer_id?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The usual order */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UsualOrder"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/kitchen/usual-order/drift": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 2e: the buyer decided on a drift (keep the new amount or go back); the same value is not flagged again */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        buyer_id?: string;
+                        by?: string;
+                        decisions: {
+                            /** @example quantity:milk */
+                            key: string;
+                            /** @default true */
+                            keep?: boolean;
+                            /**
+                             * @description The drift's `to`
+                             * @example 120
+                             */
+                            value: number;
+                            /**
+                             * @description The drift's `from`, used when keep=false
+                             * @example 100
+                             */
+                            back_to?: number | null;
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description The updated kitchen profile */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/kitchen/history": {
         parameters: {
             query?: never;
@@ -1164,6 +1366,52 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/kitchen/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search the Valio Aimo catalog for choosing usual products or approved substitutes */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Product name or ID query */
+                    q?: string;
+                    limit?: number;
+                    buyer_id?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Matching catalog products */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            query: string;
+                            products: {
+                                [key: string]: unknown;
+                            }[];
+                        };
+                    };
                 };
             };
         };
@@ -1294,6 +1542,95 @@ export interface paths {
                     };
                 };
                 /** @description Valio Aimo refused the new mandate */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/kitchen/usual/fallback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set ordered substitutes and the fallback mode of usual products. Signed when the grant changes.
+         * @description Approved substitutes count as usual products. At autonomy level 1 a change that adds or removes one
+         *     widens or narrows the signed usual-products grant: without mandate_hash (or with an outdated one) the
+         *     answer is 409 NeedsSignature (diff names each substitute) and nothing is applied. With the previewed hash
+         *     the backend signs and stores the mandate, then the profile. Reordering, a mode change that keeps the
+         *     same products, or any change at level 0 or 2 is applied directly (mandate null).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        buyer_id?: string;
+                        updates: {
+                            /** @description Usual product id */
+                            id: string;
+                            /** @description Replaces the list, in the order to try. Omit to keep it. */
+                            substitutes?: {
+                                product_id?: string;
+                                product_name?: string;
+                            }[];
+                            /** @enum {string} */
+                            fallback_mode?: "ask_any" | "only_listed" | "none";
+                        }[];
+                        /** @example Anna Virtanen */
+                        by?: string;
+                        mandate_hash?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Applied */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            profile?: components["schemas"]["KitchenProfile"];
+                            mandate?: components["schemas"]["MandateSummary"] | null;
+                        };
+                    };
+                };
+                /** @description Unknown usual product */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description needs_signature (show preview, resend with its mandate_hash) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NeedsSignature"];
+                    };
+                };
+                /** @description Invalid fallback_mode or Valio Aimo refused the new mandate */
                 422: {
                     headers: {
                         [name: string]: unknown;
@@ -1626,6 +1963,10 @@ export interface components {
             allergens?: string[];
             /** @description The buyer's usual product for this item (1c). Ranked first if it can deliver and breaks no rule */
             usual?: boolean;
+            /** @description One of the buyer's pre-approved ordered substitutes for this item */
+            approved_substitute?: boolean;
+            /** @description 1-based priority order among the buyer's approved substitutes */
+            substitute_rank?: number;
             preference_score?: number;
             /** @description Binds the order to this fixed price */
             quote_id?: string;
@@ -1856,6 +2197,13 @@ export interface components {
                     product_id?: string;
                     name?: string;
                 };
+                /** @description Item chips only: ordered pre-approved fallback products */
+                substitutes?: {
+                    product_id?: string;
+                    name?: string;
+                }[];
+                /** @description False when unapproved catalog substitutes are forbidden */
+                allow_other_substitutes?: boolean;
             }[];
             /** @description E.g. a usual product id that is not in the catalog was ignored */
             notes?: string[];
@@ -1874,18 +2222,30 @@ export interface components {
         IntentItem: {
             /** @example i1 */
             item_id?: string;
-            /** @description Signed. preferred_product_id is the buyer's usual product (1c), part of the intent hash */
+            /** @description Signed. preferred_product_id, substitute_product_ids, and allow_other_substitutes are part of the intent hash */
             product?: {
                 /** @example milk */
                 query?: string;
                 /** @example 463038 */
                 preferred_product_id?: string;
+                /** @description Ordered pre-approved fallback product IDs */
+                substitute_product_ids?: string[];
+                /**
+                 * @description When false, only preferred_product_id and substitute_product_ids may fulfil this item
+                 * @default true
+                 */
+                allow_other_substitutes: boolean;
             };
             /** @description Not signed, for display */
             usual?: {
                 product_id?: string;
                 name?: string;
             } | null;
+            /** @description Not signed, resolved display names for substitute_product_ids */
+            substitutes?: {
+                product_id?: string;
+                name?: string;
+            }[];
             quantity?: {
                 /** @example 1000 */
                 amount?: number;
@@ -2098,6 +2458,11 @@ export interface components {
             args?: {
                 [key: string]: unknown;
             };
+            /**
+             * @description valio = Valio Aimo MCP tool; buyer = runs in this backend and only creates suggestions (2a)
+             * @enum {string}
+             */
+            side?: "valio" | "buyer";
         };
         ToolResultEvent: components["schemas"]["EventBase"] & {
             /** @constant */
@@ -2111,6 +2476,8 @@ export interface components {
                 [key: string]: unknown;
             };
             duration_ms?: number;
+            /** @enum {string} */
+            side?: "valio" | "buyer";
         };
         OffersEvent: components["schemas"]["EventBase"] & {
             /** @constant */
@@ -2208,6 +2575,100 @@ export interface components {
             level?: number;
             name?: string;
         };
+        /** @description 2a: the agent proposes something to remember (status proposed, nothing is active). after_order: at most one per order, "Remember" = POST /kitchen/suggestions/accept, "Just this time" = POST /kitchen/suggestions/{id}/reject. from_chat: remember_about_kitchen. from_photo: learn_from_document. Must / prefer need a signature on accept. */
+        ContextSuggestionEvent: components["schemas"]["EventBase"] & {
+            /** @constant */
+            type?: "context_suggestion";
+            /** @enum {string} */
+            reason?: "after_order" | "from_chat" | "from_photo";
+            /** @description Only for after_order */
+            order_id?: string;
+            suggestions?: components["schemas"]["Suggestion"][];
+        };
+        UsualOrder: {
+            items?: {
+                /** @example milk */
+                word?: string;
+                product_id?: string;
+                product_name?: string | null;
+                /** @example 120 */
+                quantity?: number;
+                /** @example L */
+                unit?: string;
+                /** @example 1.09 */
+                last_unit_price?: number | null;
+                /** @example 130.8 */
+                estimate?: number | null;
+                /** @description 2e: the last 8 weeks, oldest first. quantity in the usual unit, 0 = not ordered. */
+                weeks?: {
+                    /**
+                     * Format: date
+                     * @description Monday of the week
+                     */
+                    week?: string;
+                    /** @example 120 */
+                    quantity?: number;
+                    products?: string[];
+                }[];
+            }[];
+            /** @description Sum of the known estimates */
+            estimate_total?: number | null;
+            /** @description Every item has an estimate */
+            estimate_complete?: boolean;
+            /**
+             * Format: date
+             * @description Next Monday
+             */
+            deliver_by?: string;
+            /** @example your usual amounts per week */
+            based_on?: string;
+            kitchen_profile_version?: number;
+            /** @description 2e: what the weeks and the drift are based on (confirmed orders + imported history) */
+            history?: {
+                /** @example 7 */
+                orders?: number;
+                /**
+                 * @description Weeks with at least one delivery
+                 * @example 7
+                 */
+                weeks?: number;
+                /** Format: date */
+                since?: string | null;
+            };
+            /** @description 2e: what drifted before "Order the usual". quantity: the last two ordered weeks both >= 15 % off the median of the earlier weeks. cost: mean of the last 4 weeks >= 5 % off the 4 before (weeks without a delivery left out). Sentences are built by code. Hidden once decided (POST /kitchen/usual-order/drift). */
+            drift?: components["schemas"]["Drift"][];
+            still_learning?: {
+                /** @example cheese */
+                word?: string;
+                /** @example 3 */
+                orders?: number;
+                /** @example 3 */
+                products?: number;
+            }[];
+        };
+        Drift: {
+            /** @example quantity:milk */
+            key?: string;
+            /** @enum {string} */
+            kind?: "quantity" | "cost";
+            word?: string | null;
+            usual_id?: string | null;
+            unit?: string | null;
+            /** @example 100 */
+            from?: number;
+            /** @example 120 */
+            to?: number;
+            /** @example 20 */
+            pct?: number;
+            /** Format: date */
+            since?: string;
+            /** @description cost: the words that changed it most */
+            words?: string[];
+            /** @example Milk crept up: 100 → 120 L a week */
+            text?: string;
+            /** @example +20 % since 26 Oct. */
+            detail?: string;
+        };
         PairedEvent: {
             /** @constant */
             type?: "paired";
@@ -2279,6 +2740,20 @@ export interface components {
             unit?: "L" | "KG" | "SALES_UNIT";
             /** @example week */
             per?: string;
+            /** @description Ordered pre-approved fallback products when product_id cannot fulfil */
+            substitutes?: {
+                /** @example DEMO-1005 */
+                product_id?: string | null;
+                product_name?: string | null;
+                /** @description Input only: resolved via catalog search */
+                product_query?: string;
+            }[];
+            /**
+             * @description only_listed = only listed substitutes allowed; none = no substitutes allowed; ask_any = listed substitutes first, other catalog products ask
+             * @default ask_any
+             * @enum {string}
+             */
+            fallback_mode: "ask_any" | "only_listed" | "none";
             source_id?: string;
             /** @enum {string} */
             status?: "active" | "replaced" | "removed";
@@ -2410,6 +2885,8 @@ export interface components {
             label?: string;
             clean?: boolean;
             clean_reason?: string;
+            /** @description 2c, only while the backend knows it */
+            kitchen_profile_version?: number;
         };
         AutonomyState: {
             /** @enum {integer} */

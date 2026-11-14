@@ -1,0 +1,405 @@
+{
+ "about": "Imported order history: one delivery a week from Valio Aimo invoices. Dates are relative (weeks_ago, Monday of that week) so the demo stays current. Used for learning and drift only: not shown in Activity, not counted for autonomy (2e, D2).",
+ "weeks": [
+  {
+   "weeks_ago": 8,
+   "lines": [
+    {
+     "word": "milk",
+     "product_id": "463038",
+     "product_name": "Valio Eila® semi skimmed milk drink 10 l novobox lactose free",
+     "quantity": 100,
+     "unit": "L",
+     "total_price": 109.0
+    },
+    {
+     "word": "butter",
+     "product_id": "464411",
+     "product_name": "Valio butter 500 g unsalted",
+     "quantity": 10,
+     "unit": "KG",
+     "total_price": 82.0
+    },
+    {
+     "word": "rye rolls",
+     "product_id": "469786",
+     "product_name": "Vaasan Ruispalat 660g 12 pcs Wholegrain Ryebread",
+     "quantity": 25,
+     "unit": "SALES_UNIT",
+     "total_price": 85.0
+    },
+    {
+     "word": "oat drink",
+     "product_id": "473609",
+     "product_name": "Oddlygood® Barista oat drink 1 l UHT gluten free",
+     "quantity": 35,
+     "unit": "L",
+     "total_price": 73.5
+    },
+    {
+     "word": "granola",
+     "product_id": "460970",
+     "product_name": "Start Naturell granola 750g",
+     "quantity": 15,
+     "unit": "KG",
+     "total_price": 97.5
+    },
+    {
+     "word": "potatoes",
+     "product_id": "470961",
+     "product_name": "PP PRE-WASHED POTATO 35-50MM 15KG/BX",
+     "quantity": 80,
+     "unit": "KG",
+     "total_price": 76.0
+    }
+   ]
+  },
+  {
+   "weeks_ago": 7,
+   "lines": [
+    {
+     "word": "milk",
+     "product_id": "463038",
+     "product_name": "Valio Eila® semi skimmed milk drink 10 l novobox lactose free",
+     "quantity": 100,
+     "unit": "L",
+     "total_price": 109.0
+    },
+    {
+     "word": "butter",
+     "product_id": "464411",
+     "product_name": "Valio butter 500 g unsalted",
+     "quantity": 10,
+     "unit": "KG",
+     "total_price": 82.0
+    },
+    {
+     "word": "rye rolls",
+     "product_id": "469786",
+     "product_name": "Vaasan Ruispalat 660g 12 pcs Wholegrain Ryebread",
+     "quantity": 25,
+     "unit": "SALES_UNIT",
+     "total_price": 85.0
+    },
+    {
+     "word": "oat drink",
+     "product_id": "473609",
+     "product_name": "Oddlygood® Barista oat drink 1 l UHT gluten free",
+     "quantity": 35,
+     "unit": "L",
+     "total_price": 73.5
+    },
+    {
+     "word": "granola",
+     "product_id": "460970",
+     "product_name": "Start Naturell granola 750g",
+     "quantity": 15,
+     "unit": "KG",
+     "total_price": 97.5
+    },
+    {
+     "word": "potatoes",
+     "product_id": "470961",
+     "product_name": "PP PRE-WASHED POTATO 35-50MM 15KG/BX",
+     "quantity": 75,
+     "unit": "KG",
+     "total_price": 71.25
+    },
+    {
+     "word": "cheese",
+     "product_id": "hist-cheese-1",
+     "product_name": "Valio Oltermanni cheese 1 kg",
+     "quantity": 4,
+     "unit": "KG",
+     "total_price": 46.0
+    }
+   ]
+  },
+  {
+   "weeks_ago": 6,
+   "lines": [
+    {
+     "word": "milk",
+     "product_id": "463038",
+     "product_name": "Valio Eila® semi skimmed milk drink 10 l novobox lactose free",
+     "quantity": 100,
+     "unit": "L",
+     "total_price": 109.0
+    },
+    {
+     "word": "butter",
+     "product_id": "464411",
+     "product_name": "Valio butter 500 g unsalted",
+     "quantity": 10,
+     "unit": "KG",
+     "total_price": 82.0
+    },
+    {
+     "word": "rye rolls",
+     "product_id": "469786",
+     "product_name": "Vaasan Ruispalat 660g 12 pcs Wholegrain Ryebread",
+     "quantity": 25,
+     "unit": "SALES_UNIT",
+     "total_price": 85.0
+    },
+    {
+     "word": "oat drink",
+     "product_id": "473609",
+     "product_name": "Oddlygood® Barista oat drink 1 l UHT gluten free",
+     "quantity": 35,
+     "unit": "L",
+     "total_price": 73.5
+    },
+    {
+     "word": "granola",
+     "product_id": "460970",
+     "product_name": "Start Naturell granola 750g",
+     "quantity": 15,
+     "unit": "KG",
+     "total_price": 97.5
+    },
+    {
+     "word": "potatoes",
+     "product_id": "470961",
+     "product_name": "PP PRE-WASHED POTATO 35-50MM 15KG/BX",
+     "quantity": 80,
+     "unit": "KG",
+     "total_price": 76.0
+    }
+   ]
+  },
+  {
+   "weeks_ago": 5,
+   "lines": [
+    {
+     "word": "milk",
+     "product_id": "463038",
+     "product_name": "Valio Eila® semi skimmed milk drink 10 l novobox lactose free",
+     "quantity": 100,
+     "unit": "L",
+     "total_price": 109.0
+    },
+    {
+     "word": "butter",
+     "product_id": "464411",
+     "product_name": "Valio butter 500 g unsalted",
+     "quantity": 10,
+     "unit": "KG",
+     "total_price": 82.0
+    },
+    {
+     "word": "rye rolls",
+     "product_id": "469786",
+     "product_name": "Vaasan Ruispalat 660g 12 pcs Wholegrain Ryebread",
+     "quantity": 25,
+     "unit": "SALES_UNIT",
+     "total_price": 85.0
+    },
+    {
+     "word": "oat drink",
+     "product_id": "473609",
+     "product_name": "Oddlygood® Barista oat drink 1 l UHT gluten free",
+     "quantity": 35,
+     "unit": "L",
+     "total_price": 73.5
+    },
+    {
+     "word": "granola",
+     "product_id": "460970",
+     "product_name": "Start Naturell granola 750g",
+     "quantity": 15,
+     "unit": "KG",
+     "total_price": 97.5
+    },
+    {
+     "word": "potatoes",
+     "product_id": "470961",
+     "product_name": "PP PRE-WASHED POTATO 35-50MM 15KG/BX",
+     "quantity": 80,
+     "unit": "KG",
+     "total_price": 76.0
+    },
+    {
+     "word": "cheese",
+     "product_id": "hist-cheese-3",
+     "product_name": "Arla Hushållsost cheese 1 kg",
+     "quantity": 4,
+     "unit": "KG",
+     "total_price": 46.0
+    }
+   ]
+  },
+  {
+   "weeks_ago": 4,
+   "note": "autumn holiday, no delivery",
+   "lines": []
+  },
+  {
+   "weeks_ago": 3,
+   "lines": [
+    {
+     "word": "milk",
+     "product_id": "463038",
+     "product_name": "Valio Eila® semi skimmed milk drink 10 l novobox lactose free",
+     "quantity": 110,
+     "unit": "L",
+     "total_price": 119.9
+    },
+    {
+     "word": "butter",
+     "product_id": "464411",
+     "product_name": "Valio butter 500 g unsalted",
+     "quantity": 10,
+     "unit": "KG",
+     "total_price": 82.0
+    },
+    {
+     "word": "rye rolls",
+     "product_id": "469786",
+     "product_name": "Vaasan Ruispalat 660g 12 pcs Wholegrain Ryebread",
+     "quantity": 25,
+     "unit": "SALES_UNIT",
+     "total_price": 85.0
+    },
+    {
+     "word": "oat drink",
+     "product_id": "473609",
+     "product_name": "Oddlygood® Barista oat drink 1 l UHT gluten free",
+     "quantity": 35,
+     "unit": "L",
+     "total_price": 73.5
+    },
+    {
+     "word": "granola",
+     "product_id": "460970",
+     "product_name": "Start Naturell granola 750g",
+     "quantity": 15,
+     "unit": "KG",
+     "total_price": 118.5
+    },
+    {
+     "word": "potatoes",
+     "product_id": "470961",
+     "product_name": "PP PRE-WASHED POTATO 35-50MM 15KG/BX",
+     "quantity": 80,
+     "unit": "KG",
+     "total_price": 76.0
+    },
+    {
+     "word": "cheese",
+     "product_id": "hist-cheese-2",
+     "product_name": "Valio Polar 15% cheese 1 kg",
+     "quantity": 4,
+     "unit": "KG",
+     "total_price": 46.0
+    }
+   ]
+  },
+  {
+   "weeks_ago": 2,
+   "lines": [
+    {
+     "word": "milk",
+     "product_id": "463038",
+     "product_name": "Valio Eila® semi skimmed milk drink 10 l novobox lactose free",
+     "quantity": 120,
+     "unit": "L",
+     "total_price": 138.0
+    },
+    {
+     "word": "butter",
+     "product_id": "464411",
+     "product_name": "Valio butter 500 g unsalted",
+     "quantity": 10,
+     "unit": "KG",
+     "total_price": 89.0
+    },
+    {
+     "word": "rye rolls",
+     "product_id": "469786",
+     "product_name": "Vaasan Ruispalat 660g 12 pcs Wholegrain Ryebread",
+     "quantity": 25,
+     "unit": "SALES_UNIT",
+     "total_price": 85.0
+    },
+    {
+     "word": "oat drink",
+     "product_id": "473609",
+     "product_name": "Oddlygood® Barista oat drink 1 l UHT gluten free",
+     "quantity": 35,
+     "unit": "L",
+     "total_price": 73.5
+    },
+    {
+     "word": "granola",
+     "product_id": "460970",
+     "product_name": "Start Naturell granola 750g",
+     "quantity": 15,
+     "unit": "KG",
+     "total_price": 118.5
+    },
+    {
+     "word": "potatoes",
+     "product_id": "470961",
+     "product_name": "PP PRE-WASHED POTATO 35-50MM 15KG/BX",
+     "quantity": 75,
+     "unit": "KG",
+     "total_price": 71.25
+    }
+   ]
+  },
+  {
+   "weeks_ago": 1,
+   "lines": [
+    {
+     "word": "milk",
+     "product_id": "463038",
+     "product_name": "Valio Eila® semi skimmed milk drink 10 l novobox lactose free",
+     "quantity": 120,
+     "unit": "L",
+     "total_price": 138.0
+    },
+    {
+     "word": "butter",
+     "product_id": "464411",
+     "product_name": "Valio butter 500 g unsalted",
+     "quantity": 10,
+     "unit": "KG",
+     "total_price": 89.0
+    },
+    {
+     "word": "rye rolls",
+     "product_id": "469786",
+     "product_name": "Vaasan Ruispalat 660g 12 pcs Wholegrain Ryebread",
+     "quantity": 25,
+     "unit": "SALES_UNIT",
+     "total_price": 85.0
+    },
+    {
+     "word": "oat drink",
+     "product_id": "473609",
+     "product_name": "Oddlygood® Barista oat drink 1 l UHT gluten free",
+     "quantity": 35,
+     "unit": "L",
+     "total_price": 73.5
+    },
+    {
+     "word": "granola",
+     "product_id": "460970",
+     "product_name": "Start Naturell granola 750g",
+     "quantity": 15,
+     "unit": "KG",
+     "total_price": 118.5
+    },
+    {
+     "word": "potatoes",
+     "product_id": "470961",
+     "product_name": "PP PRE-WASHED POTATO 35-50MM 15KG/BX",
+     "quantity": 80,
+     "unit": "KG",
+     "total_price": 76.0
+    }
+   ]
+  }
+ ]
+}

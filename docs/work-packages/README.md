@@ -21,6 +21,7 @@ Read first, in this order:
 | 2a | [`2a-learning-in-chat.md`](2a-learning-in-chat.md) | Learning from orders and chat, buyer-side agent tools | 2 (after 1a, 1b, 1c) |
 | 2c | [`2c-activity-and-usual-order.md`](2c-activity-and-usual-order.md) | Activity tab: what the agent did and why, per order; "Your usual order" card | 2 (after 1b, 1c, 2b) |
 | 2d | [`2d-permissions-and-levels.md`](2d-permissions-and-levels.md) | Extra permissions (own grants, e.g. organic up to €200) from a sentence; levels by deviations, rework of 2b's built level logic | 3 (after 2b, 3.1) |
+| 2e | [`2e-drift-and-learned-section.md`](2e-drift-and-learned-section.md) | Drift before "Order the usual" (challenge: standing order drift), "What I learned from your orders" on the Kitchen tab | after 2a, 2c |
 | 3 | [`3-polish.md`](3-polish.md) | Rule from a sentence, rule coverage, forecast before signing | 2 |
 
 Wave 1 packages run in parallel, each in its own session and branch. Wave 2 starts when wave 1 is merged.

@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import agent, config, signing, valio
@@ -64,7 +65,15 @@ _passthrough = valio.passthrough
 
 @app.get("/", include_in_schema=False)
 async def root():
+    """The React buyer UI when it is built (frontend/dist), else the static buyer UI."""
+    index = config.FRONTEND_DIST / "index.html"
+    if index.exists():
+        return FileResponse(index, headers={"Cache-Control": "no-cache"})
     return RedirectResponse("/app")
+
+
+if (config.FRONTEND_DIST / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=config.FRONTEND_DIST / "assets"), name="assets")
 
 
 @app.get("/app", include_in_schema=False)
@@ -255,9 +264,24 @@ async def audit(order_id: str):
     return _passthrough(await _valio("GET", f"/internal/orders/{order_id}/audit"))
 
 
+def strip_api_prefix(inner):
+    """The built React UI calls /api/... (same origin, like the Vite dev proxy). Route those to the plain paths."""
+    async def asgi(scope, receive, send):
+        if scope["type"] == "http" and (scope["path"] == "/api" or scope["path"].startswith("/api/")):
+            path = scope["path"][4:] or "/"
+            scope = {**scope, "path": path, "raw_path": path.encode()}
+        await inner(scope, receive, send)
+    return asgi
+
+
+asgi_app = strip_api_prefix(app)
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
-    uvicorn.run(app, host=config.BACKEND_HOST, port=config.BACKEND_PORT)
+    # proxy_headers: behind Render / Cloudflare the original scheme is https
+    uvicorn.run(asgi_app, host=config.BACKEND_HOST, port=config.BACKEND_PORT,
+                proxy_headers=True, forwarded_allow_ips="*")
 
 
 if __name__ == "__main__":

@@ -192,7 +192,11 @@ export function orderReducer(state: OrderState, evt: OrderEvent): OrderState {
 
   switch (evt.type) {
     case "user_message": {
-      const text = evt.text ?? "";
+      // An answer to the read-back's questions is sent wrapped for the agent: show only what the buyer wrote.
+      const raw = evt.text ?? "";
+      const text = /^Answers to your questions about intent /.test(raw)
+        ? [...new Set(raw.split("\n").slice(1).map((l) => l.split(" → ").slice(1).join(" → ").trim()).filter(Boolean))].join("\n") || raw
+        : raw;
       const atts = (evt.attachments ?? []) as Attachment[];
       const key = `me:${evt.timestamp}:${text}`;
       blocks = upsert(blocks, atts.length ? { kind: "photo", key, attachments: atts, text: text || undefined } : { kind: "me", key, text });
@@ -445,7 +449,7 @@ export function mergeFunnel(items: Record<string, FunnelStep[]>): FunnelRow[] {
   for (const steps of Object.values(items)) {
     for (const s of steps) {
       const step = s.step ?? "rule";
-      const key = step === "must" || step === "rule" || step === "prefer" ? `${step}:${s.rule_id ?? s.label}` : step;
+      const key = step === "must" || step === "rule" || step === "prefer" || step === "usual" ? `${step}:${s.rule_id ?? s.label}` : step;
       const row = rows.get(key);
       if (row) {
         row.count += s.count ?? 0;
@@ -455,10 +459,11 @@ export function mergeFunnel(items: Record<string, FunnelStep[]>): FunnelRow[] {
       const label =
         step === "catalog" ? "Looked at in the catalog"
         : step === "must" || step === "rule" ? `Your must: ${s.label ?? s.rule_id}`
-        : step === "usual" ? "Your usual product first"
+        : step === "usual" ? (s.label ?? "Your usual product first")
         : step === "pick" ? "Picked"
         : s.label ?? step;
-      rows.set(key, { key, label, why: step === "catalog" ? `${n} line${n === 1 ? "" : "s"}` : undefined, count: s.count ?? 0, kind, order: STEP_ORDER[step] ?? 2, seen: seen++ });
+      const order = step === "usual" && /^Only your usual/i.test(s.label ?? "") ? 0.5 : (STEP_ORDER[step] ?? 2);
+      rows.set(key, { key, label, why: step === "catalog" ? `${n} line${n === 1 ? "" : "s"}` : undefined, count: s.count ?? 0, kind, order, seen: seen++ });
     }
   }
   return [...rows.values()].sort((a, b) => a.order - b.order || a.seen - b.seen).map(({ order: _o, seen: _s, ...r }) => r);

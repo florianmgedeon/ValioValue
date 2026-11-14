@@ -34,30 +34,62 @@
 .kt .sec-h p { font-size: 12.5px; color: var(--ink3); width: 100%; }
 .kt .rule { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; padding: 12px 20px; border-top: 1px solid var(--line); align-items: center; }
 .kt .rule .t { font-weight: 600; font-size: 14.5px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.kt .rule .s { font-size: 12.5px; color: var(--ink3); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.kt .rule .s, .kt .usual .s { font-size: 12.5px; color: var(--ink3); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .kt .rule .q { font-family: var(--hand); font-size: 18px; line-height: 1.2; color: var(--ink2); }
 .kt .rule.off .t { color: var(--ink3); text-decoration: line-through; }
 .kt .rule.new, .kt .grant.fresh { background: var(--accent-soft); }
 .kt .rule.changed, .kt .grant.changed { background: var(--auto-soft); }
 .kt .about-text { padding: 4px 20px 18px; font-size: 15px; line-height: 1.55; }
 .kt .about-facts { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 20px 18px; }
-.kt .usual { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 4px 14px; padding: 11px 20px; border-top: 1px solid var(--line); align-items: center; font-size: 14px; }
-.kt .usual .w { font-family: var(--hand); font-size: 21px; line-height: 1; color: var(--usual); overflow-wrap: anywhere; }
+.kt .usual-wrap { border-top: 1px solid var(--line); }
+.kt .usual { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 4px 14px; padding: 12px 20px; align-items: start; font-size: 14px; }
+.kt .usual .w { font-family: var(--hand); font-size: 21px; line-height: 1.1; color: var(--usual); overflow-wrap: anywhere; padding-top: 1px; }
 .kt .usual .p { font-weight: 600; }
 .kt .usual .m { font-size: 12px; color: var(--ink3); }
+.kt .usual-right { display: grid; justify-items: end; gap: 3px; }
 .kt .usual .qty { font-size: 13px; color: var(--ink2); text-align: right; font-variant-numeric: tabular-nums; }
 @media (max-width: 560px) { .kt .usual { grid-template-columns: 80px minmax(0, 1fr); } .kt .usual .qty { grid-column: 2; text-align: left; } }
-.kt .sources { display: flex; gap: 10px; padding: 4px 20px 18px; overflow-x: auto; }
-.kt .src { flex: none; width: 120px; display: grid; gap: 6px; font-size: 12px; align-content: start; }
-.kt .src .th { height: 90px; border-radius: 10px; background: var(--surface); padding: 8px; overflow: hidden; display: grid; place-items: center; }
-.kt .src .th img { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; }
-.kt .src .th.n { font-size: 22px; font-weight: 800; }
+
+/* usual product: fallback substitutes. Editor in "What I may do", read-only card in the drawer (portalled outside .kt) */
+.kt .l-row .fb { display: flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--ink2); margin-top: 2px; }
+.kt .l-row .fb .icon { color: var(--ink3); flex: none; }
+.kt .fbrow { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 4px 16px; align-items: center; padding: 12px 20px; border-top: 1px solid var(--line); }
+.kt .fbrow .w { font-family: var(--hand); font-size: 21px; line-height: 1; color: var(--usual); overflow-wrap: anywhere; }
+.kt .fbrow .p { font-weight: 600; font-size: 14px; }
+.kt .fbrow .r { font-size: 12.5px; color: var(--ink3); }
+.kt .fbrow .r b { color: var(--ink2); font-weight: 600; }
+.kt .fbrow .chg { color: var(--auto); font-weight: 600; }
+.kt .fbrow.changed { background: var(--auto-soft); }
+.kt .fbrow .usual-edit { grid-column: 1 / -1; margin-top: 10px; padding: 16px; border-radius: 16px; background: var(--surface); }
+@media (max-width: 560px) { .kt .fbrow { grid-template-columns: 76px minmax(0, 1fr); } .kt .fbrow > button { grid-column: 2; justify-self: start; } }
+.usual-edit { display: grid; gap: 14px; }
+.usual-edit .sub-item, .usual-edit .field { background: var(--bg); }
+.widen { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; color: var(--auto); background: var(--auto-soft); padding: 8px 12px; border-radius: 10px; }
+.widen .icon { margin-top: 1px; flex: none; }
+.fbcard { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: grid; gap: 8px; }
+.fbcard .chain { display: grid; gap: 6px; font-size: 14px; }
+.fbcard .chain > div { display: flex; gap: 8px; align-items: center; }
+.fbcard .foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink3); border-top: 1px solid var(--line); padding-top: 8px; }
+.fbcard .link { color: var(--accent); font-weight: 600; font-size: 13px; }
+.sub-rank.now { background: var(--surface2); color: var(--ink2); }
+.usual-edit-row { display: grid; gap: 6px; }
+.sub-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 11px; background: var(--bg); border: 1px solid var(--line); font-size: 13.5px; }
+.sub-rank { font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 7px; border-radius: 6px; background: var(--usual-soft); color: var(--usual); white-space: nowrap; }
+.sub-acts { display: flex; gap: 4px; }
+.sub-btn { width: 26px; height: 26px; border-radius: 7px; background: var(--surface); color: var(--ink2); font-size: 13px; font-weight: 700; display: grid; place-items: center; }
+.sub-btn:hover:not(:disabled) { background: var(--surface2); color: var(--ink); }
+.sub-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.sub-btn.del:hover { background: var(--must-soft); color: var(--must); }
+.sub-search { display: grid; gap: 8px; margin-top: 2px; }
+.sub-hits { display: grid; gap: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 6px; }
+.sub-hit { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 8px; border-radius: 8px; }
+.sub-hit:hover { background: var(--surface); }
 
 /* add rule / permission forms */
 .kt .addrule { padding: 14px 20px; border-top: 1px solid var(--line); display: grid; gap: 10px; background: var(--surface); }
-.kt .frow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.kt .field { height: 36px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 0 10px; font: inherit; font-size: 14px; min-width: 0; }
-.kt .field.wide { flex: 1; min-width: min(200px, 100%); }
+.kt .frow, .usual-edit .frow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.kt .field, .usual-edit .field { height: 36px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 0 10px; font: inherit; font-size: 14px; min-width: 0; }
+.kt .field.wide, .usual-edit .field.wide { flex: 1; min-width: min(200px, 100%); }
 .kt textarea.field { height: auto; min-height: 96px; padding: 10px 12px; width: 100%; line-height: 1.5; resize: vertical; }
 .kt .addrule .btn-ghost, .kt .permform .btn-ghost { background: var(--surface2); }
 .kt .k-head p .icon { display: inline-block; }
@@ -85,13 +117,13 @@
 .kt .usual-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 20px; border-top: 1px solid var(--line); background: var(--usual-soft); }
 .kt .usual-foot .est { flex: 1; min-width: 180px; font-size: 13px; color: var(--ink2); }
 .kt .usual-foot .est b { font-size: 16px; color: var(--ink); }
-.kt .rule .link { font-size: 12.5px; }
+.kt .rule .link, .kt .usual .link { font-size: 12.5px; }
 .kt .permform { margin: 6px 20px 16px; padding: 16px; border-radius: 16px; background: var(--surface); display: grid; gap: 14px; }
 .kt .pf { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; align-items: start; font-size: 14px; }
 .kt .pf > span:first-child { color: var(--ink3); font-size: 13px; padding-top: 6px; }
 @media (max-width: 560px) { .kt .pf { grid-template-columns: minmax(0, 1fr); } }
-.kt .tog { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 1.5px solid var(--line); font-size: 13px; font-weight: 600; background: var(--bg); }
-.kt .tog[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+.kt .tog, .usual-edit .tog { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 1.5px solid var(--line); font-size: 13px; font-weight: 600; background: var(--bg); }
+.kt .tog[aria-pressed="true"], .usual-edit .tog[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--bg); }
 
 /* change bar (fixed above the composer) */
 .k-changebar { position: fixed; left: 50%; bottom: calc(140px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 26; display: flex; align-items: center; gap: 14px; padding: 10px 10px 10px 20px; border-radius: 28px; background: var(--auto); color: #fff; box-shadow: var(--shadow-lg); width: max-content; max-width: calc(100% - 32px); font-size: 14px; flex-wrap: wrap; }
@@ -102,3 +134,64 @@
 .k-hist { display: grid; gap: 2px; }
 .k-hist > div { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; }
 .k-hist .when { font-size: 12px; color: var(--ink3); }
+
+/* 2e: what I learned from your orders */
+.kt .l-ask { margin: 0 20px 14px; padding: 14px 16px; border-radius: 16px; background: var(--accent-soft); display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; }
+.kt .l-ask .ic { width: 34px; height: 34px; border-radius: 10px; background: var(--bg); color: var(--accent); display: grid; place-items: center; }
+.kt .l-ask .t { font-weight: 600; }
+.kt .l-ask .s { font-size: 12.5px; color: var(--ink3); margin-top: 2px; }
+.kt .l-ask .acts { grid-column: 2; display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.kt .l-ask .btn-ghost { background: var(--bg); }
+.kt .l-row { width: 100%; text-align: left; display: grid; grid-template-columns: 110px minmax(0, 1fr) auto 16px; gap: 4px 16px; align-items: center; padding: 12px 20px; border-top: 1px solid var(--line); transition: background 0.15s; }
+.kt .l-row:hover { background: var(--surface); }
+.kt .l-row .w { font-family: var(--hand); font-size: 22px; line-height: 1; color: var(--usual); overflow-wrap: anywhere; }
+.kt .l-row .p { font-weight: 600; font-size: 14.5px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.kt .l-row .m { display: block; font-size: 12.5px; color: var(--ink3); }
+.kt .l-row .r { display: grid; justify-items: end; gap: 6px; }
+.kt .l-row .qty { font-size: 13px; color: var(--ink2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.kt .l-row .chev { color: var(--ink3); width: 16px; height: 16px; }
+.kt .l-row .bars { display: block; color: var(--usual); }
+.kt .l-row .bars .gap { fill: var(--surface2); }
+.kt .l-row.drift .bars, .kt .up { color: var(--auto); }
+.kt .up { font-weight: 600; }
+@media (max-width: 600px) {
+  .kt .l-row { grid-template-columns: 76px minmax(0, 1fr) 16px; }
+  .kt .l-row .r { grid-column: 2; grid-row: 2; justify-items: start; grid-auto-flow: column; align-items: center; gap: 10px; }
+}
+.kt .l-still, .kt .l-empty { padding: 12px 20px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink3); }
+.kt .l-still b { color: var(--ink2); }
+.l-dw { font-family: var(--hand); font-size: 26px; line-height: 1; color: var(--usual); }
+.l-ev { display: grid; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.l-ev > div { display: flex; gap: 12px; padding: 9px 14px; font-size: 14px; border-top: 1px solid var(--line); }
+.l-ev > div:first-child { border-top: 0; }
+.l-ev .d { width: 56px; flex: none; color: var(--ink3); }
+.l-ev .o { color: var(--ink3); font-size: 12.5px; min-width: 0; }
+.l-ev .q { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink2); white-space: nowrap; }
+.l-ev .none .q { color: var(--ink3); }
+
+/* To check: everything waiting for a yes (documents and orders), above both views */
+.kt .to-check { border: 2px solid var(--accent); }
+.kt .to-check .n { color: var(--accent); }
+
+/* the two views: what I know (learned) / what I may do (signed) */
+.kt .views { display: inline-flex; justify-self: start; gap: 2px; padding: 4px; border-radius: 14px; background: var(--surface); }
+.kt .views button { height: 38px; padding: 0 18px; border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 600; color: var(--ink2); }
+.kt .views button[aria-selected="true"] { background: var(--bg); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+.kt .views .sub { font-size: 12.5px; font-weight: 500; color: var(--ink3); }
+@media (max-width: 560px) { .kt .views { display: flex; justify-self: stretch; } .kt .views button { flex: 1; justify-content: center; padding: 0 8px; white-space: nowrap; } .kt .views .sub { display: none; } }
+.kt .signnote { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink3); }
+
+/* sources: one line at the end of About, documents in a drawer */
+.kt .srcline { width: 100%; display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--ink2); text-align: left; }
+.kt .srcline:hover { background: var(--surface); }
+.kt .srcline .thumbs { display: flex; }
+.kt .srcline .thumbs span { width: 24px; height: 30px; margin-left: -8px; border-radius: 4px; background: var(--paper); border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+.kt .srcline .thumbs span:first-child { margin-left: 0; transform: rotate(-5deg); }
+.kt .srcline .thumbs span:nth-child(3) { transform: rotate(4deg); }
+.src-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.src-grid .src { display: grid; gap: 6px; font-size: 13px; align-content: start; }
+.src-grid .th { height: 120px; border-radius: 12px; background: var(--surface); padding: 8px; overflow: hidden; display: grid; place-items: center; }
+.src-grid .th img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+.src-nums { display: flex; gap: 12px; }
+.src-nums > div { flex: 1; padding: 12px; border-radius: 12px; background: var(--surface); font-size: 13px; color: var(--ink3); }
+.src-nums b { display: block; font-size: 22px; color: var(--ink); }

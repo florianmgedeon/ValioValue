@@ -23,7 +23,7 @@ function Screen({ route }: { route: Route }): ReactNode {
     case "activity":
       return <ActivityView orderId={route.param} />;
     case "kitchen":
-      return <KitchenView />;
+      return <KitchenView view={route.param} />;
     case "onboard":
       return <OnboardingView />;
     case "ui":

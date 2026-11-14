@@ -348,17 +348,24 @@ def parse_items(text: str) -> tuple[list[dict], float]:
     return items, factor
 
 
-USUAL_LINE = re.compile(r'^- "([^"]+)"(?: \(also: ([^)]*)\))? → (.+?) \(product ([\w-]+)\)(?:, usually ([\d.]+) (L|kg|units) a (\w+))?',
-                        re.M)
+USUAL_LINE = re.compile(
+    r'^- "([^"]+)"(?: \(also: ([^)]*)\))? → (.+?) \(product ([\w-]+)\)'
+    r'(?:, usually ([\d.]+) (L|kg|units) a (\w+))?(?:; (.+))?$',
+    re.M,
+)
+SUB_PROD_RE = re.compile(r"\(product ([\w-]+)\)")
 
 
 def usual_from_prompt(system: str) -> list[dict]:
     """The usual products from the kitchen block of the system prompt (written by kitchen.prompt_block)."""
     out = []
-    for word, aliases, name, pid, qty, unit, per in USUAL_LINE.findall(system or ""):
+    for word, aliases, name, pid, qty, unit, per, tail in USUAL_LINE.findall(system or ""):
+        sub_ids = SUB_PROD_RE.findall(tail or "")
+        allow_other = "allow_other_substitutes=false" not in (tail or "")
         out.append({"word": word, "aliases": [a.strip() for a in aliases.split(",") if a.strip()], "name": name,
                     "product_id": pid, "typical_qty": float(qty) if qty else None,
-                    "unit": {"L": "L", "kg": "KG", "units": "SALES_UNIT"}.get(unit), "per": per or None})
+                    "unit": {"L": "L", "kg": "KG", "units": "SALES_UNIT"}.get(unit), "per": per or None,
+                    "substitute_product_ids": sub_ids, "allow_other_substitutes": allow_other})
     return out
 
 
@@ -373,8 +380,8 @@ def match_usual(query: str, usual: list[dict]) -> dict | None:
 
 
 def apply_usual(items: list[dict], text: str, system: str) -> list[dict]:
-    """Scripted stand-in for the 1c prompt rule: usual word -> preferred_product_id, 'the usual' -> all usual
-    items with usual amounts, 'double the X' doubles X."""
+    """Scripted stand-in for the 1c prompt rule: usual word -> preferred_product_id (+ substitutes/lock),
+    'the usual' -> all usual items with usual amounts, 'double the X' doubles X."""
     usual = usual_from_prompt(system)
     if not usual:
         return items
@@ -392,6 +399,10 @@ def apply_usual(items: list[dict], text: str, system: str) -> list[dict]:
         u = match_usual(it["product_query"], usual)
         if u:
             it["preferred_product_id"] = u["product_id"]
+            if u.get("substitute_product_ids"):
+                it["substitute_product_ids"] = list(u["substitute_product_ids"])
+            if u.get("allow_other_substitutes") is False:
+                it["allow_other_substitutes"] = False
     return items
 
 
@@ -428,7 +439,9 @@ class ScriptedProvider:
         users = [m for m in history if m["role"] == "user"]
         text = users[-1]["text"] if users else ""
         last_user = max(i for i, m in enumerate(history) if m["role"] == "user")
-        tool_msgs = [(m["name"], json.loads(m["content"])) for m in history[last_user:] if m["role"] == "tool"]
+        # "content" is cut at 15,000 chars for the LLM; with the full catalog a check_offer result is longer.
+        tool_msgs = [(m["name"], m["result"] if "result" in m else json.loads(m["content"]))
+                     for m in history[last_user:] if m["role"] == "tool"]
         cid = f"call_{uuid.uuid4().hex[:8]}"
         photo_text = None
         metas = _attachment_metas(history)

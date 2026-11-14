@@ -70,6 +70,25 @@ async def test_pairing_stream_gets_paired_and_photo_received(client):
     assert bad.status_code == 404
 
 
+async def test_one_pairing_takes_many_photos_until_the_desktop_ends_it(client):
+    p = (await client.post("/pairings", json={"purpose": "order"})).json()
+    stream = await routes_uploads.pairing_stream(p["pair_id"])
+    frames = stream.body_iterator
+    ids = []
+    for _ in range(3):
+        up = await client.post("/uploads", data={"pair_id": p["pair_id"]},
+                               files={"file": ("p.jpg", jpeg(400, 300), "image/jpeg")})
+        assert up.status_code == 200
+        ids.append(up.json()["upload_id"])
+    got = [json.loads((await frames.__anext__()).split("data: ", 1)[1])["upload_id"] for _ in ids]
+    assert got == ids
+    assert (await client.delete(f"/pairings/{p['pair_id']}")).status_code == 204
+    assert (await frames.__anext__()).startswith("event: expired")
+    await frames.aclose()
+    late = await client.post("/uploads", data={"pair_id": p["pair_id"]}, files={"file": ("p.jpg", jpeg(10, 10), "image/jpeg")})
+    assert late.status_code == 404
+
+
 def _history_with_photo():
     img = uploads.save(jpeg(64, 64), filename="a.jpg")
     pdf = uploads.save((FIX / "invoices-oct.pdf").read_bytes(), filename="inv.pdf")

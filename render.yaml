@@ -1,0 +1,23 @@
+# Render Blueprint: dashboard -> New -> Blueprint -> this repo.
+# Free plan: sleeps after 15 min without traffic (about 1 min to wake), data resets on every restart.
+services:
+  - type: web
+    name: valiovalue
+    runtime: docker
+    plan: free
+    region: frankfurt
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: APPROVER_TOKEN
+        generateValue: true
+      - key: LLM_PROVIDER        # anthropic | openai | gemini | openai_compatible | scripted
+        value: anthropic
+      - key: LLM_MODEL
+        value: claude-haiku-5-5
+      - key: LLM_API_KEY         # secret, set in the dashboard. Empty = scripted agent (no LLM, no cost)
+        sync: false
+      - key: DEFAULT_BUYER_ID    # juvenes: empty kitchen, the UI starts with onboarding.
+        value: juvenes           # school-kitchen-espoo: pre-filled demo kitchen, starts on the order page
+      - key: VALIO_API_KEY       # secret, set in the dashboard. Empty = offline fake Valio API
+        sync: false

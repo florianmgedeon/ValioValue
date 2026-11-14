@@ -1,10 +1,12 @@
 """Package 1b: the kitchen profile over REST. Photos sent here learn, they never order (decision W2)."""
 from __future__ import annotations
 
+import copy
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from . import config, ingest, kitchen, learning, uploads, valio
+from . import autonomy, config, ingest, kitchen, learning, uploads, valio
 
 router = APIRouter()
 
@@ -47,10 +49,65 @@ async def usual_order(buyer_id: str | None = None):
     return await learning.usual_order(_bid(buyer_id))
 
 
+class DriftDecision(BaseModel):
+    key: str                   # from GET /kitchen/usual-order drift[].key: "quantity:<word>" or "cost"
+    keep: bool = True          # quantity: True = the new amount becomes the usual amount, False = back to the old one
+    value: float               # the drift's `to` (what the buyer saw); `from` for keep=False is taken from `back_to`
+    back_to: float | None = None
+
+
+class DriftIn(BaseModel):
+    buyer_id: str | None = None
+    decisions: list[DriftDecision]
+    by: str | None = None
+
+
+@router.post("/kitchen/usual-order/drift")
+async def decide_drift(body: DriftIn):
+    """2e: the buyer looked at a drift. Quantity: set the usual amount (keep the new one or go back). Both kinds are
+    remembered in `drift_seen`, so the same value is not flagged again. No signature: usual amounts are profile data."""
+    bid = _bid(body.buyer_id)
+    if not body.decisions:
+        raise HTTPException(422, "no decisions")
+
+    def fn(p: dict):
+        seen = p.setdefault("drift_seen", {})
+        parts = []
+        for d in body.decisions:
+            if d.key.startswith("quantity:"):
+                word = d.key.split(":", 1)[1]
+                u = next((x for x in p.get("usual") or [] if x["word"] == word and x.get("status", "active") == "active"), None)
+                if not u:
+                    raise HTTPException(404, f"no usual product {word!r}")
+                qty = d.value if d.keep or d.back_to is None else d.back_to
+                u["typical_qty"] = qty
+                seen[d.key] = d.value
+                parts.append(f'Usual "{word}": {qty:g} {kitchen._unit(u.get("unit")) or ""} a {u.get("per") or "week"} (drift checked)')
+            elif d.key == "cost":
+                seen["cost"] = round(d.value)
+                parts.append(f"Cost drift checked (€{round(d.value)} a week)")
+            else:
+                raise HTTPException(422, f"unknown drift key {d.key!r}")
+        return "; ".join(parts)
+
+    return kitchen.update(bid, fn, body.by or "buyer.human", "drift checked")
+
+
 @router.get("/kitchen/history")
 async def kitchen_history(buyer_id: str | None = None):
     p = kitchen.load(_bid(buyer_id))
     return {"buyer_id": p["buyer_id"], "version": p["version"], "history": list(reversed(p.get("history") or []))}
+
+
+@router.get("/kitchen/products")
+async def kitchen_products(q: str = "", limit: int = 8, buyer_id: str | None = None):
+    """Search the Valio Aimo catalog for choosing usual products or fixed substitutes in the Kitchen tab."""
+    bid = _bid(buyer_id)
+    query = q.strip()
+    if not query:
+        return {"query": "", "products": []}
+    lim = max(1, min(limit, 25))
+    return {"query": query, "products": await ingest.search_products(bid, query, lim)}
 
 
 class UsualPatch(BaseModel):
@@ -71,13 +128,19 @@ async def patch_kitchen(body: KitchenPatch):
     """Edit About and the usual products directly (no suggestion needed: the human is typing it)."""
     bid = _bid(body.buyer_id)
     by = body.by or "buyer.human"
+    for entry in (body.usual.add if body.usual else []) + (body.usual.update if body.usual else []):
+        if entry.get("fallback_mode") is not None and entry["fallback_mode"] not in kitchen.FALLBACK_MODES:
+            raise HTTPException(422, f"fallback_mode must be one of {', '.join(kitchen.FALLBACK_MODES)}")
     resolved_add = [await ingest.resolve_usual(bid, u) for u in (body.usual.add if body.usual else [])]
     resolved_upd = []
     for u in body.usual.update if body.usual else []:
         if not u.get("id"):
             raise HTTPException(422, "usual.update entries need an id")
+        u = dict(u)
         if ("product_query" in u or "word" in u) and not u.get("product_id"):
             u = await ingest.resolve_usual(bid, u)
+        elif "substitutes" in u:
+            u["substitutes"] = await ingest.resolve_substitutes(bid, u.get("substitutes"))
         resolved_upd.append(u)
     parts: list[str] = []
 
@@ -95,6 +158,8 @@ async def patch_kitchen(body: KitchenPatch):
                 raise HTTPException(404, f"unknown usual product {u['id']}")
             cur.update({k: v for k, v in u.items() if k in ("word", "aliases", "product_id", "product_name",
                                                             "typical_qty", "unit", "per", "status")})
+            if "substitutes" in u or "fallback_mode" in u:
+                kitchen.set_fallback(cur, u.get("substitutes") if "substitutes" in u else None, u.get("fallback_mode"))
             parts.append(f'Usual "{cur["word"]}" edited')
         for uid in body.usual.remove if body.usual else []:
             cur = next((x for x in p["usual"] if x["id"] == uid), None)
@@ -107,6 +172,87 @@ async def patch_kitchen(body: KitchenPatch):
         return "; ".join(parts)
 
     return kitchen.update(bid, fn, by, "edited")
+
+
+# --------------------------------------------------------------------------- substitutes (signed)
+
+class FallbackUpdate(BaseModel):
+    id: str
+    substitutes: list[dict] | None = None
+    fallback_mode: str | None = None
+
+
+class FallbackIn(BaseModel):
+    buyer_id: str | None = None
+    updates: list[FallbackUpdate]
+    by: str | None = None
+    mandate_hash: str | None = None
+
+
+def _scope_change(before: dict, after: dict) -> tuple[list[str], list[str], list[str]]:
+    """Substitute ids that the change adds to / removes from what the agent may order alone, with one diff
+    sentence per usual product."""
+    add = [x for x in kitchen.usual_ids(after) if x not in kitchen.usual_ids(before)]
+    rem = [x for x in kitchen.usual_ids(before) if x not in kitchen.usual_ids(after)]
+    names = {s["product_id"]: s.get("product_name") or s["product_id"]
+             for p in (before, after) for u in p.get("usual") or [] for s in u.get("substitutes") or []
+             if s.get("product_id")}
+    diff = []
+    for u in after.get("usual") or []:
+        if u.get("status", "active") != "active":
+            continue
+        ids = [s["product_id"] for s in u.get("substitutes") or [] if s.get("product_id")]
+        old = next((x for x in before.get("usual") or [] if x.get("id") == u.get("id")), {})
+        old_ids = [s["product_id"] for s in old.get("substitutes") or [] if s.get("product_id")]
+        plus = [names[x] for x in ids if x in add]
+        minus = [names[x] for x in old_ids if x in rem]
+        if plus:
+            diff.append(f"{u['word']}: I may also order {', '.join(plus)} alone, as a substitute")
+        if minus:
+            diff.append(f"{u['word']}: I no longer order {', '.join(minus)} alone")
+    return add, rem, diff
+
+
+@router.post("/kitchen/usual/fallback")
+async def set_usual_fallback(body: FallbackIn):
+    """Ordered substitutes and fallback mode for usual products. Substitutes count as usual products, so at
+    autonomy level 1 a change that widens or narrows the usual-products grant is signed: without mandate_hash the
+    answer is 409 with the preview, with the previewed hash the grant is signed and stored, then the profile."""
+    bid = _bid(body.buyer_id)
+    by = body.by or "buyer.human"
+    for u in body.updates:
+        if u.fallback_mode is not None and u.fallback_mode not in kitchen.FALLBACK_MODES:
+            raise HTTPException(422, f"fallback_mode must be one of {', '.join(kitchen.FALLBACK_MODES)}")
+    resolved = {u.id: (await ingest.resolve_substitutes(bid, u.substitutes) if u.substitutes is not None else None,
+                       u.fallback_mode) for u in body.updates}
+
+    def apply(p: dict) -> list[str]:
+        parts = []
+        for uid, (subs, mode) in resolved.items():
+            cur = next((x for x in p["usual"] if x.get("id") == uid and x.get("status", "active") == "active"), None)
+            if not cur:
+                raise HTTPException(404, f"unknown usual product {uid}")
+            kitchen.set_fallback(cur, subs, mode)
+            parts.append(f'Substitutes for "{cur["word"]}" set')
+        return parts
+
+    before = kitchen.load(bid)
+    after = copy.deepcopy(before)
+    apply(after)
+    add, rem, diff = _scope_change(before, after)
+    saved_mandate = None
+    new = autonomy.with_usual_scope(await valio.mandate(bid), add, rem) if (add or rem) else None
+    if new is not None:
+        saved_mandate = await valio.change(bid, new, diff, body.mandate_hash, by)
+
+    def fn(p: dict):
+        return "; ".join(apply(p))
+
+    try:
+        new_profile = kitchen.update(bid, fn, by, "edited")
+    except kitchen.ConflictError as e:
+        raise HTTPException(409, {"error": str(e)}) from None
+    return {"profile": new_profile, "mandate": mandate_summary(saved_mandate) if saved_mandate else None}
 
 
 # --------------------------------------------------------------------------- ingest
@@ -186,13 +332,28 @@ async def accept(body: AcceptIn):
         raise HTTPException(409, {"error": f"already decided: {', '.join(done)}"})
 
     # resolve usual products first: nothing is applied if this or the mandate fails
-    usual_payloads = {s["id"]: await ingest.resolve_usual(bid, s["payload"]) for s in chosen if s["kind"] == "usual"}
+    usual_payloads = {s["id"]: await ingest.resolve_usual(bid, kitchen.merge_with_existing(profile, s["payload"]))
+                      for s in chosen if s["kind"] == "usual"}
     signed = [s for s in chosen if s["kind"] in kitchen.SIGNED_KINDS]
+    # Substitutes from a usual suggestion count as usual products: at level 1 they widen the grant, so they are
+    # signed too (a new usual product itself still joins the grant with the next signature, as before).
+    after = copy.deepcopy(profile)
+    for sid, p in usual_payloads.items():
+        kitchen.apply_usual(after, p, None)
+    new_subs = [x for x in kitchen.substitute_ids(after) if x not in kitchen.usual_ids(profile)]
     saved_mandate = None
+    current = await valio.mandate(bid) if signed or new_subs else None
+    new, diff = (None, [])
     if signed:
-        current = await valio.mandate(bid)
-        usual = kitchen.usual_ids(profile) + [p["product_id"] for p in usual_payloads.values() if p.get("product_id")]
+        extra_ids = [p["product_id"] for p in usual_payloads.values() if p.get("product_id")] + new_subs
+        usual = kitchen.usual_ids(profile) + extra_ids
         new, diff = ingest.mandate_with(current, signed, profile, usual=list(dict.fromkeys(usual)))
+    if new_subs:
+        widened = autonomy.with_usual_scope(new or current, new_subs, [])
+        if widened is not None:
+            new = widened
+            diff = diff + _scope_change(profile, after)[2]
+    if new is not None:
         saved_mandate = await valio.change(bid, new, diff, body.mandate_hash, by)
 
     def fn(p: dict):

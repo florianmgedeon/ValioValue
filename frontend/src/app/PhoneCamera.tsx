@@ -7,7 +7,8 @@ import { useToast } from "../ui";
 
 /** Where a photo goes (decision W2): an order photo starts a chat, kitchen/onboard photos are only learned from. */
 export type CameraTarget = "order" | "kitchen" | "onboard";
-export type PhotoHandler = (upload: UploadMeta) => void;
+/** Photos arrive together: all photos taken in one phone session, or the one uploaded file. */
+export type PhotoHandler = (uploads: UploadMeta[]) => void;
 
 interface PhoneCameraApi {
   /** Open the phone camera flow: QR pairing on a desktop, the device camera on a phone. */
@@ -16,8 +17,8 @@ interface PhoneCameraApi {
   upload: (where: CameraTarget) => void;
   /** A feature says what happens with a photo for `where`. Returns unregister. */
   onPhoto: (where: CameraTarget, handler: PhotoHandler) => () => void;
-  /** Called by the camera modal / upload when a photo arrived. */
-  deliver: (where: CameraTarget, upload: UploadMeta) => void;
+  /** Called by the camera modal / upload when photos arrived. */
+  deliver: (where: CameraTarget, uploads: UploadMeta[]) => void;
   /** Replace how `open` works (tests, demos). `null` restores the phone modal. */
   setOpener: (opener: ((where: CameraTarget) => void) | null) => void;
 }
@@ -37,15 +38,18 @@ export function PhoneCameraProvider({ children }: { children: ReactNode }) {
   const opener = useRef<((where: CameraTarget) => void) | null>(null);
   const [modal, setModal] = useState<CameraTarget | null>(null);
 
-  const deliver = useCallback((where: CameraTarget, upload: UploadMeta) => {
+  const deliver = useCallback((where: CameraTarget, ups: UploadMeta[]) => {
+    if (!ups.length) return;
     const h = handlers.current.get(where);
-    if (h) return h(upload);
+    if (h) return h(ups);
     if (where === "order") return toast("Photo received, but the Order tab is not open.");
     // Kitchen and onboarding photos are learned from (W2), also when no screen handles them itself.
-    toast("Reading your document…");
-    ingestUpload(upload)
-      .then((out) => toast(ingestSummary(out)))
-      .catch((e: Error) => toast(`Could not read it: ${e.message}`));
+    toast(ups.length > 1 ? `Reading your ${ups.length} documents…` : "Reading your document…");
+    for (const u of ups) {
+      ingestUpload(u)
+        .then((out) => toast(ingestSummary(out)))
+        .catch((e: Error) => toast(`Could not read it: ${e.message}`));
+    }
   }, [toast]);
 
   const upload = useCallback((where: CameraTarget) => {
@@ -89,7 +93,7 @@ export function PhoneCameraProvider({ children }: { children: ReactNode }) {
           e.target.value = "";
           if (!f) return;
           try {
-            deliver(pending.current, await uploadFile(f, { source: "upload" }));
+            deliver(pending.current, [await uploadFile(f, { source: "upload" })]);
           } catch (err) {
             toast(`Upload failed: ${(err as Error).message}`);
           }

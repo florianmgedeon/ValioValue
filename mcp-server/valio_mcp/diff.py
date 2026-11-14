@@ -65,19 +65,47 @@ def compute_line(intent: dict, item: dict, quote: dict, mandate: dict | None = N
         else "Quote was requested for a different buyer, item or quantity"))
 
     # product class: the catalog search for the item's product accepts this product
+    cat = catalog()
     preferred = item["product"].get("preferred_product_id")
+    sub_ids = list(item["product"].get("substitute_product_ids") or [])
+    allow_other = item["product"].get("allow_other_substitutes", True)
     is_usual = bool(preferred) and line["product_id"] == preferred
-    in_class = bool(product) and (is_usual or product.id in catalog().matching_ids(item["product"]["query"]))
+    is_approved_sub = line["product_id"] in sub_ids
+    in_class = bool(product) and (is_usual or is_approved_sub or product.id in cat.matching_ids(item["product"]["query"]))
     add(_check("product", item["product"]["query"], line["name"], in_class, "ask",
                ("The usual product you signed for this item" if is_usual
+                else "An approved substitute you signed for this item" if is_approved_sub
                 else f"Catalog search for '{item['product']['query']}' includes this product") if in_class
                else f"'{line['name']}' is not what a search for '{item['product']['query']}' returns"))
 
-    # usual product: the buyer signed "your usual X". Anything else is a deviation a human (or a grant) accepts.
-    if preferred:
-        usual = catalog().get(preferred)
-        add(_check("usual", usual.name if usual else preferred, line["name"], is_usual, "ask",
-                   "Your usual product" if is_usual else "not your usual product"))
+    # usual product + substitute policy:
+    # - primary usual or pre-approved substitute -> ok (0 deviations)
+    # - other product when allow_other_substitutes is False -> block (never overridden by grants)
+    # - other product when allow_other_substitutes is True -> ask (a human or grant may accept)
+    if preferred or sub_ids or not allow_other:
+        usual = cat.get(preferred) if preferred else None
+        sub_names = [(cat.get(sid).name if cat.get(sid) else sid) for sid in sub_ids]
+        base_intended = usual.name if usual else (preferred or item["product"]["query"])
+        if sub_names and not allow_other:
+            intended_lbl = f"{base_intended} (fallback only: {', '.join(sub_names)})"
+        elif sub_names:
+            intended_lbl = f"{base_intended} (or {', '.join(sub_names)})"
+        elif not allow_other:
+            intended_lbl = f"{base_intended} (no substitutes allowed)"
+        else:
+            intended_lbl = base_intended
+
+        if is_usual:
+            add(_check("usual", intended_lbl, line["name"], True, "ask", "Your usual product"))
+        elif is_approved_sub:
+            rank = sub_ids.index(line["product_id"]) + 1
+            add(_check("usual", intended_lbl, line["name"], True, "ask", f"Your approved substitute #{rank}"))
+        elif not allow_other:
+            detail = ("Not your usual product or an allowed substitute" if sub_ids
+                      else "Substitutes are not allowed for this item")
+            add(_check("usual", intended_lbl, line["name"], False, "block", detail))
+        else:
+            add(_check("usual", intended_lbl, line["name"], False, "ask", "not your usual product"))
 
     # musts from data, never from the agent. Broken -> block. Unknown -> block, or ask if the rule says so.
     rules = effective_rules(intent, item, mandate)

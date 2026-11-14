@@ -167,3 +167,69 @@ async def test_level_round_trip_and_usual_sync(client):
         assert st["level"] == level
     assert (await client.post("/autonomy/level", json={"buyer_id": buyer, "level": 3})).status_code == 422
     assert (await client.post("/autonomy/level", json={"buyer_id": "no-usual-test", "level": 1})).status_code == 422
+
+
+async def test_usual_substitute_orders_autonomously_and_blocks_other_oat_drinks(client, monkeypatch):
+    from datetime import date, datetime, timedelta
+    from valio_mcp import valio_api
+
+    buyer = "subs-e2e-buyer"
+    await client.patch("/kitchen", json={
+        "buyer_id": buyer,
+        "by": "Anna",
+        "usual": {"add": [{
+            "word": "oat milk",
+            "aliases": ["hafermilch", "oat drink"],
+            "product_id": "DEMO-2007",
+            "product_name": "Oat drink barista 1 l (DEV SAMPLE)",
+            "typical_qty": 24,
+            "unit": "L",
+            "substitutes": [{"product_id": "DEMO-1005", "product_name": "Kaurajuoma 1 l (DEV SAMPLE)"}],
+            "fallback_mode": "only_listed",
+        }]},
+    })
+    # Enable Level 1 ("Usual products"): grant scope must include both DEMO-2007 and approved substitute DEMO-1005
+    pre = (await client.post("/autonomy/level", json={"buyer_id": buyer, "level": 1, "by": "Anna"})).json()["detail"]["preview"]
+    st = (await client.post("/autonomy/level", json={"buyer_id": buyer, "level": 1, "by": "Anna",
+                                                     "mandate_hash": pre["mandate_hash"]})).json()
+    assert st["level"] == 1 and st["usual_scope"]["in_sync"]
+    cedar = (await client.get("/mandate/cedar", params={"buyer_id": buyer})).json()
+    assert '"DEMO-2007"' in cedar["cedar"] and '"DEMO-1005"' in cedar["cedar"]
+
+    # Case 1: Primary DEMO-2007 is out of stock (0 available), Fallback #1 DEMO-1005 is in stock -> orders DEMO-1005 alone!
+    out_of_stock: set[str] = {"DEMO-2007"}
+
+    async def custom_availability(ids, requested_date):
+        d = date.fromisoformat(requested_date)
+        closing = (datetime.now() + timedelta(days=2)).replace(microsecond=0).isoformat()
+        return {pid: {"productId": pid, "closingTime": closing, "salesBlock": False, "logisticModel": "Stock",
+                      "scheduleLines": [{"salesBlock": False, "availableAmount": 0 if pid in out_of_stock else 5000,
+                                         "availableDate": d.isoformat() + "T00:00:00"}]} for pid in ids}
+
+    monkeypatch.setattr(valio_api, "availability", custom_availability)
+
+    s1 = agent.get_or_create_session(None, buyer)
+    it1 = await confirm_and_order(client, s1, "24 L oat milk by Monday")
+    assert it1["items"][0]["product"] == {
+        "query": "oat milk",
+        "preferred_product_id": "DEMO-2007",
+        "substitute_product_ids": ["DEMO-1005"],
+        "allow_other_substitutes": False,
+    }
+    done1 = next((e for e in s1.events if e["type"] == "order_confirmed"), None)
+    assert done1 is not None
+    assert done1["tier"] == "auto" and done1["lines"][0]["product_id"] == "DEMO-1005"
+
+    # Case 2: Both Primary DEMO-2007 and Fallback #1 DEMO-1005 are out of stock, while DEMO-2009 is in stock ->
+    # agent must NOT order DEMO-2009!
+    out_of_stock = {"DEMO-2007", "DEMO-1005"}
+    s2 = agent.get_or_create_session(None, buyer)
+    await agent.run_turn(s2, "24 L oat milk by Monday")
+    it2 = next(e for e in reversed(s2.events) if e["type"] == "intent_proposed")["intent"]
+    r2 = await client.post(f"/intents/{it2['intent_id']}/confirm",
+                           json={"intent_hash": it2["intent_hash"], "confirmed_by": "Anna"})
+    assert r2.status_code == 200
+    await wait_done(s2, 2)
+    assert not any(e["type"] in ("order_confirmed", "approval_needed") for e in s2.events)
+    final_msgs = [e.get("text") or "" for e in s2.events if e["type"] == "message"]
+    assert any("Nothing that meets every rule can deliver" in m for m in final_msgs), final_msgs

@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<title>Kitchen Agent</title>
+<title>Aimo Agent</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Caveat:wght@500;700&display=swap">
@@ -250,6 +250,44 @@ mark.focus{outline:3px solid var(--paper-ink);outline-offset:2px}
 .card-f{display:flex;align-items:center;gap:14px;padding:14px 20px;background:var(--surface);flex-wrap:wrap}
 .card-f .fore{flex:1;min-width:220px;font-size:13.5px;color:var(--ink2)}
 .card-f .fore b{color:var(--ink)}
+.order-item{display:flex;gap:6px 16px;padding:12px 20px;border-bottom:1px solid var(--line);align-items:center;flex-wrap:wrap}
+.order-item>.min-w-0{flex:1}
+.order-item .ask{display:grid;grid-template-columns:6.5em minmax(0,1fr);gap:16px;font-size:17px;color:var(--ink);line-height:1.35}
+.order-item .ask .q{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink2)}
+.order-item .ask .n{overflow-wrap:anywhere}
+.order-item .ask .n::first-letter{text-transform:uppercase}
+.order-item .nm{font-size:13px;color:var(--ink3);margin-top:2px;padding-left:calc(6.5em * 17 / 13 + 16px)}
+.order-item .chips{display:flex;gap:6px;flex-wrap:wrap}
+.items-hint{font-size:13px;color:var(--ink3);padding:10px 20px;border-bottom:1px solid var(--line)}
+.receipt-h{display:flex;gap:14px;align-items:center;padding:18px 20px 6px}
+.receipt-h .check{width:36px;height:36px}
+.receipt-h .check svg{width:20px;height:20px}
+.receipt-h h3{font-size:22px;font-weight:800;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.receipt-h .sub{font-size:14px;color:var(--ink2);font-weight:600}
+.receipt-why{padding:4px 20px 14px 70px;font-size:14px;color:var(--ink2);border-bottom:1px solid var(--line)}
+.still-open{border-top:1px solid var(--line);padding:16px 20px;display:grid;gap:6px;background:var(--surface)}
+.still-h{display:flex;gap:8px;align-items:center;font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em}
+.open-row{font-size:14px;overflow-wrap:anywhere}
+.still-q{font-size:16px;font-weight:700;margin-top:6px}
+.open-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.auto-now{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;margin:0 20px 16px;padding:14px 16px;border-radius:16px;background:var(--auto-soft)}
+.auto-now .ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--bg);color:var(--auto)}
+.auto-now b{font-size:16px}
+.auto-opts{display:grid;gap:12px;padding:0 20px 16px}
+.lvl{display:grid;grid-template-columns:22px minmax(0,1fr);gap:12px;align-items:start;text-align:left;padding:12px 14px;border-radius:14px;border:1.5px solid var(--line);background:var(--bg)}
+.lvl[aria-checked="true"]{border-color:var(--auto);box-shadow:0 0 0 1px var(--auto)}
+.lvl .radio{width:20px;height:20px;border-radius:50%;border:2px solid var(--ink3);margin-top:1px}
+.lvl[aria-checked="true"] .radio{border:6px solid var(--auto)}
+.auto-hint{padding:0 20px 14px;font-size:13px;color:var(--ink3)}
+.auto-more{border-top:1px solid var(--line)}
+.auto-more>summary{cursor:pointer;padding:12px 20px;font-size:14px;font-weight:600;color:var(--ink2)}
+.auto-more>p{padding:0 20px 8px}
+.usual-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--line);background:var(--usual-soft)}
+.usual-foot .est{flex:1;min-width:180px;font-size:13px;color:var(--ink2)}
+.usual-foot .est b{font-size:16px;color:var(--ink)}
+.usual .s{font-size:12.5px;color:var(--ink3);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.field{height:36px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:0 10px;font:inherit;font-size:14px;min-width:0}
+.field.wide{flex:1;min-width:min(200px,100%)}
 .item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px;padding:14px 20px;border-bottom:1px solid var(--line)}
 .item .ask{font-size:12px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
 .item .nm{font-weight:600;font-size:15px}
@@ -423,12 +461,35 @@ pre.cedar .c{color:#7f8796}pre.cedar .k{color:#ff8f7a}pre.cedar .s{color:#9fd59a
 .seg button[aria-pressed="true"]{background:var(--bg);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
 .about-text{padding:4px 20px 18px;font-size:15px;line-height:1.55;color:var(--ink)}
 .about-facts{display:flex;gap:8px;flex-wrap:wrap;padding:0 20px 18px}
-.usual{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:4px 14px;padding:11px 20px;border-top:1px solid var(--line);align-items:center;font-size:14px}
-.usual .w{font-family:var(--hand);font-size:21px;line-height:1;color:var(--usual)}
+.usual-wrap{border-top:1px solid var(--line)}
+.usual{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:4px 14px;padding:12px 20px;align-items:start;font-size:14px}
+.usual .w{font-family:var(--hand);font-size:21px;line-height:1.1;color:var(--usual);padding-top:1px}
 .usual .p{font-weight:600}
-.usual .m{font-size:12px;color:var(--ink3)}
+.usual .m{font-size:12px;color:var(--ink3);display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:3px}
 .usual .q{font-size:13px;color:var(--ink2);text-align:right;font-variant-numeric:tabular-nums}
-@media (max-width:560px){.usual{grid-template-columns:80px minmax(0,1fr)}.usual .q{grid-column:2;text-align:left}}
+.usual-right{display:grid;justify-items:end;gap:4px}
+.usual-subs{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.sub-pill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;background:var(--usual-soft);color:var(--ink);font-size:12px}
+.sub-pill b{color:var(--usual);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.usual-edit{margin:0 20px 16px;padding:16px;border-radius:16px;background:var(--surface);border:1px solid var(--line);display:grid;gap:14px}
+.usual-edit-row{display:grid;gap:6px}
+.sub-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:11px;background:var(--bg);border:1px solid var(--line);font-size:13.5px}
+.sub-item.primary{border-color:color-mix(in srgb,var(--usual) 35%,var(--line));background:color-mix(in srgb,var(--usual-soft) 45%,var(--bg))}
+.sub-rank{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:6px;background:var(--usual-soft);color:var(--usual);white-space:nowrap}
+.sub-acts{display:flex;gap:4px}
+.sub-btn{width:26px;height:26px;border-radius:7px;background:var(--surface);color:var(--ink2);font-size:13px;font-weight:700;display:grid;place-items:center}
+.sub-btn:hover:not(:disabled){background:var(--surface2);color:var(--ink)}
+.sub-btn:disabled{opacity:.35;cursor:not-allowed}
+.sub-btn.del:hover{background:var(--must-soft);color:var(--must)}
+.sub-hits{display:grid;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:6px;margin-top:4px}
+.sub-hit{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 8px;border-radius:8px}
+.sub-hit:hover{background:var(--surface)}
+.scenebar{background:color-mix(in srgb,var(--usual-soft) 70%,var(--bg));border-bottom:1px solid color-mix(in srgb,var(--usual) 22%,var(--line));padding:8px max(16px,env(safe-area-inset-left,0px))}
+.scenebar-in{max-width:1280px;margin:0 auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px}
+.scenebar .lbl{font-weight:700;color:var(--usual);display:inline-flex;align-items:center;gap:5px;margin-right:4px}
+.scenebar button{padding:5px 11px;border-radius:999px;font-weight:600;background:var(--bg);color:var(--ink2);border:1px solid var(--line);font-size:12.5px}
+.scenebar button[aria-pressed="true"]{background:var(--usual);color:#fff;border-color:var(--usual)}
+@media (max-width:560px){.usual{grid-template-columns:80px minmax(0,1fr)}.usual-right{grid-column:2;justify-items:start}}
 .ladder{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:6px 20px 16px}
 @media (max-width:560px){.ladder{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .rung{border-radius:14px;padding:12px;background:var(--surface);display:grid;gap:4px;align-content:start;text-align:left;border:2px solid transparent}
@@ -641,13 +702,32 @@ const SEED_ORDERS = [
 ];
 
 /* ============ state ============ */
+const OAT_CATALOG = [
+  {id:'473609', name:'Kaurajuoma 1 L (lactose-free, milk-free)', origin:'FI'},
+  {id:'219804', name:'Valio Oddlygood® Organic Oat Drink 1 L', origin:'FI'},
+  {id:'884120', name:'Oat cooking drink 1 L plant-based', origin:'FI'},
+  {id:'309112', name:'Valio Oddlygood® Vanilla Oat Drink 1 L', origin:'FI'},
+];
+const FALLBACK_META = {
+  only_listed:{short:'Only take these substitutes', kind:'usual', desc:'If #1 is out of stock, I try your substitutes in order and never fall back to any other product.'},
+  ask_any:{short:'Ask me before other products', kind:'about', desc:'I try your substitutes first; if none are in stock, I ask you before picking another product.'},
+  none:{short:'Never substitute', kind:'must', desc:'Only your primary product may be ordered. If it\'s out of stock, I leave it open.'},
+};
 const S = {
-  view:'onboard', tab:'order',
+  view:'app', tab:'kitchen', scene:'kitchen',
   ob:{stage:'drop', docs:['menu','note','inv'], reading:null, read:[], shown:[], decided:{}},
   hl:new Set(), focus:null,
   run:[], rid:0, live:null,
-  orders:[...SEED_ORDERS], sel:'A-4470',
-  profileV:7, mandateV:3, level:1, clean:6, need:10, nextNo:4471,
+  orders:[
+    {no:'A-4472', date:'Today', time:'08:14', title:'Oat drink 35 L (Fallback #1 used)', tier:'auto', label:'Ordered alone · Fallback #1', total:62.65,
+     asked:{type:'text', text:'35 L oat drink by Monday'}, intent:'1 item · signed by Anna Virtanen · fallback only: #473609', hash:'7d20b9',
+     lines:[
+      {name:'Kaurajuoma 1 L (#473609) × 35', price:62.65, outcome:'alone', grant:'g1', funnel:'22 → 2 → 2 → 1 → 1', why:'Fallback #1: Oat drink 1 L (#520114) unavailable (0 cartons in stock). Approved substitute #1 in g1, 0 deviations.'}
+     ],
+     learned:null},
+    ...SEED_ORDERS
+  ], sel:'A-4472',
+  profileV:8, mandateV:3, level:1, clean:7, need:10, nextNo:4473,
   modal:null, drawer:null, toast:null, rec:false, compText:'',
   pending:[], addOpen:false, pendingLevel:null, limit:600,
   grants:[{id:'g2', t:'Fruit and vegetables', c:'category in fruit, vegetables', lim:'up to €150 an order', acc:'accepts +5 % pack rounding', src:'You, 2 Nov', on:true}],
@@ -667,13 +747,14 @@ const S = {
     ],
   },
   about:'Primary school kitchen in Espoo. About 420 lunches a day, Monday to Friday. Nut-free site. Finnish ingredients first. 18 milk-free and 9 gluten-free diets. Closed for summer, 1 Jun – 9 Aug.',
+  editUsual:'oat', subQuery:'oat',
   usual:[
-    {k:'milk', q:'120 L', src:'Invoices'},
-    {k:'butter', q:'10 kg', src:'Invoices'},
-    {k:'rye', q:'300 pcs', src:'Invoices'},
-    {k:'oat', q:'35 L', src:'Allergy note'},
-    {k:'granola', q:'15 kg', src:'Invoices'},
-    {k:'potatoes', q:'80 kg', src:'Invoices'},
+    {k:'milk', pid:'463038', q:'120 L', src:'Invoices', subs:[{id:'463042', name:'Valio Eila® lactose-free milk drink 1 L'}], mode:'only_listed'},
+    {k:'butter', pid:'400310', q:'10 kg', src:'Invoices', subs:[], mode:'none'},
+    {k:'rye', pid:'611202', q:'300 pcs', src:'Invoices', subs:[], mode:'ask_any'},
+    {k:'oat', pid:'520114', q:'35 L', src:'Allergy note', subs:[{id:'473609', name:'Kaurajuoma 1 L (lactose-free, milk-free)'}], mode:'only_listed'},
+    {k:'granola', pid:'702551', q:'15 kg', src:'Invoices', subs:[], mode:'ask_any'},
+    {k:'potatoes', pid:'130905', q:'80 kg', src:'Invoices', subs:[], mode:'ask_any'},
   ],
 };
 
@@ -704,15 +785,24 @@ const LEVELS=[[0,'Suggest','I prepare, you sign every order'],[1,'Within your ru
 
 /* ============ header ============ */
 function header(){
-  const bars = Array.from({length:S.need},(_,i)=>`<i class="${i<S.clean?'on':''}"></i>`).join('');
   const tab=(v,l)=>`<button role="tab" aria-selected="${S.tab===v}" data-act="tab" data-v="${v}">${l}</button>`;
+  const sc=(v,l)=>`<button type="button" aria-pressed="${S.scene===v}" data-act="scene" data-v="${v}">${l}</button>`;
+  const autoText = S.level===0 ? 'I ask before every order' : S.level===1 ? `Usual products alone · up to €${S.limit}` : `Orders alone · up to €${S.limit}`;
   return `<header class="top"><div class="top-in">
-    <div class="brand">Kitchen agent <small>orders from Valio Aimo</small></div>
+    <div class="brand">Aimo Agent</div>
     ${S.view==='app'?`<div class="tabs" role="tablist">${tab('order','Order')}${tab('activity','Activity')}${tab('kitchen','Kitchen')}</div>`:''}
     <div class="spacer"></div>
-    ${S.view==='app'?`<button class="autopill" data-act="goauto" title="How autonomous your agent is">${ic('hand')}<span class="txt">Level ${S.level} · ${LEVELS[S.level][1]}</span>${S.level<2?`<span class="bar">${bars}</span><span class="num">${S.clean}/${S.need}</span>`:''}</button>`:''}
+    ${S.view==='app'?`<button class="autopill" data-act="goauto" title="What I may order without you">${ic('hand')}<span class="txt">${autoText}</span></button>`:''}
     <div class="who"><span class="nm">${KITCHEN.name}</span><span class="avatar">${KITCHEN.initials}</span></div>
-  </div></header>`;
+  </div>
+  ${S.view==='app'?`<div class="scenebar"><div class="scenebar-in">
+    <span class="lbl">${ic('usual','width:14px;height:14px')}Vorschau-Szenarien (aktuelles main-Frontend):</span>
+    ${sc('kitchen','1. Kitchen · Fallback-Regeln bearbeiten')}
+    ${sc('fallback_auto','2. Order · #1 ausverkauft → Fallback #1 übernimmt')}
+    ${sc('fallback_block','3. Order · #1 & #2 ausverkauft → Andere Hafermilch blockiert')}
+    ${sc('activity','4. Activity · Audit-Trail')}
+  </div></div>`:''}
+  </header>`;
 }
 
 /* ============ onboarding ============ */
@@ -855,22 +945,25 @@ function blockHtml(b){
   return '';
 }
 function readback(b){
-  const its=b.items, total=its.reduce((s,i)=>s+i.price,0);
-  const bl=its.filter(i=>i.p.blocked), over=total>LIMIT;
-  const fore = bl.length||over
-    ? `<b>${its.length-bl.length} line${its.length-bl.length>1?'s':''} pass your rules.</b> ${bl.map(i=>`${i.p.word[0].toUpperCase()+i.p.word.slice(1)} needs you: its label changed to "may contain tree nuts".`).join(' ')} ${over?`The total is above your €600 limit, so you sign the cart.`:''}`
-    : `<b>Everything passes your rules and stays under €600.</b> I'll order it alone.`;
+  const its=b.items;
   return `<div class="card">
-    <div class="card-h"><h3>Here's what I understood</h3><span class="muted">${b.src}</span><span class="spacer"></span><button class="link" style="font-size:13px" data-act="trust" data-v="intent">intent ${b.hash}</button></div>
-    ${its.map(i=>`<div class="item">
-      <div><div class="ask">${esc(i.ask)}</div><div class="nm">${esc(i.p.name)}</div><div class="qty">${esc(i.qty)}</div></div>
-      <div class="px">${eur(i.price)}</div>
-      <div class="chips">${i.p.usual?chip('usual',`Your usual · ${i.p.src}`,'usual'):chip('about','New for you')}${i.p.blocked?chip('must','Label changed 9 Nov: may contain nuts','flag'):chip('must','Nut-free','check')}${i.p.fin?chip('prefer','Finnish','check'):''}</div></div>`).join('')}
-    <div class="sum"><span>Estimate</span><span class="num">${eur(total)}</span></div>
-    <div class="paramchips"><span class="pchip">Deliver <b>${b.when}</b></span><span class="pchip">To <b>kitchen door</b></span><button class="pchip" style="color:var(--accent)" data-act="noop">${ic('plus')}Change</button></div>
-    <div class="applied">Applied from your kitchen: ${chip('must','No nuts incl. may contain','lock')}${chip('prefer','Finnish first')}${chip('usual','Your usual products')}</div>
-    <div class="card-f"><div class="fore">${fore}</div>
-      ${b.signed?`<span class="chip k-prefer">${ic('check')}Signed</span>`:`<button class="btn ghost small" data-act="noop">Edit</button><button class="btn primary" data-act="sign" data-id="${b.id}">${ic('lock')}Sign & send to Valio Aimo</button>`}</div>
+    <div class="card-h"><h3>Here's what I understood</h3><span class="muted">${b.src}</span></div>
+    ${its.map(i=>{
+      const m = /^([\d.,]+\s+\S+)\s+(.+)$/.exec(i.ask) || ['', '', i.ask];
+      return `<div class="order-item">
+        <div class="min-w-0">
+          <div class="ask"><span class="q">${esc(m[1])}</span><span class="n">${esc(m[2])}</span></div>
+          ${i.p.usual?`<div class="nm">Your usual: ${esc(i.p.name)}</div>`:''}
+          ${i.subNote?`<div class="nm">${esc(i.subNote)}</div>`:''}
+        </div>
+        ${i.subChip?`<div class="chips">${i.subChip}</div>`:''}
+      </div>`;
+    }).join('')}
+    <div class="items-hint">Rounding up to whole packs, at most +5 %.</div>
+    <div class="paramchips"><span class="pchip">Deliver by <b>${b.when}</b></span></div>
+    <div class="applied">Applied from your kitchen: ${chip('must','No peanuts or tree nuts, including "may contain"','lock')}${chip('prefer','Finnish ingredients first')}${chip('usual','Your usual products')}</div>
+    <div class="card-f"><div class="fore">${b.fore || 'Valio Aimo checks every line against your rules. Anything outside them comes back to you.'}</div>
+      ${b.signed?`<span class="chip k-prefer">${ic('check')}Sent</span>`:`<button class="btn primary" data-act="sign" data-id="${b.id}">${ic('lock')}Confirm &amp; send to Valio Aimo</button>`}</div>
   </div>`;
 }
 function funnel(b){
@@ -906,6 +999,23 @@ function approveCard(b){
   </div>`;
 }
 function blocked(b){
+  if(b.subBlock){
+    return `<div class="card blockcard">
+      <div class="card-h">${ic('ban')}<h3>Blocked · No approved oat drink in stock</h3><span class="spacer"></span><span class="mono">allow_other_substitutes: false</span></div>
+      <div class="evidence">
+        <p style="font-size:15px">Both your usual oat drink (<b>#520114</b>) and your approved Fallback #1 (<b>#473609 Kaurajuoma 1 L</b>) have <b>0 cartons in stock</b> for Monday. Because your fallback mode is set to <b>Only listed substitutes</b>, Valio Aimo blocked the 20 other oat drinks in the catalog (such as #884120 Oat cooking drink 1 L, 420 cartons in stock).</p>
+        <dl>
+          <dt>Primary (#1)</dt><dd>Oat drink 1 L, lactose-free, milk-free (#520114) — <span class="cond">0 cartons in stock</span></dd>
+          <dt>Fallback #1</dt><dd>Kaurajuoma 1 L (#473609) — <span class="cond">0 cartons in stock</span></dd>
+          <dt>Rule</dt><dd>${chip('usual','Only approved substitutes (#520114, #473609)','lock')} ${chip('must','Unlisted catalog products forbidden','ban')}</dd>
+          <dt>Blocked catalog options</dt><dd>20 other oat products in stock (e.g. #884120 Oat cooking drink 1 L) excluded by <code>allow_other_substitutes = false</code></dd>
+          <dt>To allow another substitute</dt><dd>Add a Fallback #2 in your Kitchen profile under "oat drink" or switch fallback mode to "Ask before other products".</dd>
+        </dl>
+      </div>
+      <div class="card-f"><div class="fore">The agent cannot silently fall back to an unapproved oat milk when your usual product and listed substitutes are out of stock.</div>
+        <button class="btn primary small" data-act="scene" data-v="kitchen">Edit fallback rules in Kitchen</button></div>
+    </div>`;
+  }
   return `<div class="card blockcard">
     <div class="card-h">${ic('ban')}<h3>Blocked by Valio Aimo</h3><span class="spacer"></span><span class="mono">forbid · m1</span></div>
     <div class="evidence">
@@ -930,11 +1040,14 @@ function blocked(b){
   </div>`;
 }
 function receipt(b){
+  const n = b.lines.length;
+  const why = b.whyText || `I ordered this on my own: every line passed your rules and the total is inside your €${S.limit} limit.`;
   return `<div class="card receipt">
-    <div class="card-h"><span class="check">${ic('check')}</span><h3>Valio Aimo confirmed</h3><span class="muted">order #${b.no} · prices locked · ${b.when}</span></div>
-    ${b.lines.map(l=>`<div class="rline"><span>${esc(l.t)}</span><span class="px">${eur(l.p)}</span><span class="why">${l.why}</span></div>`).join('')}
+    <div class="receipt-h"><span class="check">${ic('check')}</span><div><h3>Ordered · ${eur(b.total)}</h3><div class="sub">${n} item${n===1?'':'s'} · delivery ${b.when}</div></div></div>
+    <p class="receipt-why">${esc(why)}</p>
+    ${b.lines.map(l=>`<div class="rline"><span class="nm" style="font-weight:600;font-size:15px">${esc(l.t)}</span><span class="px">${eur(l.p)}</span>${l.why?`<span class="why">${l.why}</span>`:''}</div>`).join('')}
     <div class="rtotal"><span>Total</span><span class="num">${eur(b.total)}</span></div>
-    <div class="proof"><span class="ok">${ic('shield')}Signed by Valio Aimo</span><span>mandate v${S.mandateV}</span><span>kitchen profile v${S.profileV}</span><span class="spacer"></span><button class="link" data-act="openorder" data-id="${b.no}">Why, line by line</button><button class="link" data-act="trust" data-v="receipt">Verify</button></div>
+    <div class="proof"><span>Order ${b.no} · prices locked by Valio Aimo</span><span class="spacer"></span><button class="link" data-act="openorder" data-id="${b.no}">Why, line by line</button></div>
   </div>`;
 }
 function learnBlock(b){
@@ -1055,6 +1168,65 @@ function route(text){
   return milkOrder(text);
 }
 
+function loadScene(v){
+  S.rid++; S.view='app'; S.scene=v;
+  const oatU = S.usual.find(u=>u.k==='oat') || {subs:[{id:'473609', name:'Kaurajuoma 1 L (lactose-free, milk-free)'}], mode:'only_listed'};
+  const subList = (oatU.subs||[]).map((s,i)=>`#${i+1} ${s.name}`).join(' → ') || '#1 Kaurajuoma 1 L (lactose-free, milk-free)';
+  if(v==='kitchen'){
+    S.tab='kitchen'; S.editUsual='oat'; location.hash='kitchen'; render();
+    setTimeout(()=>document.getElementById('usualsec')?.scrollIntoView({behavior:'smooth', block:'center'}), 60);
+    return;
+  }
+  if(v==='activity'){
+    S.tab='activity'; S.sel='A-4472'; location.hash='activity'; window.scrollTo(0,0); render();
+    return;
+  }
+  const oatItem = {
+    ...line('oat', 35),
+    subNote: `If out of stock, only: ${subList}`,
+    subChip: chip('usual', `Only approved substitutes (${(oatU.subs||[]).length||1})`, 'lock'),
+  };
+  if(v==='fallback_auto'){
+    S.tab='order'; location.hash='order';
+    S.live={step:'done', now:'done', started:'08:14', title:'35 L oat drink by Monday', total:62.65, lines:1, note:'ordered alone · Fallback #1', when:'Mon 16 Nov'};
+    S.run=[
+      {id:++BID, seen:true, t:'me', text:'35 L oat drink by Monday'},
+      {id:++BID, seen:true, t:'say', typing:false, html:'"Oat drink" is your usual <b>Oat drink 1 L, lactose-free, milk-free</b>, with approved substitute <b>#1 Kaurajuoma 1 L</b> if it is out of stock.'},
+      {id:++BID, seen:true, t:'readback', items:[oatItem], when:'Mon 16 Nov', src:'from your message', hash:'7d20b9', signed:true},
+      {id:++BID, seen:true, t:'funnel', grow:true, checking:false, rows:[
+        {l:'Looked at in the catalog', why:'oat drink · 1 line', n:22, pct:100},
+        {l:'Only your usual product + allowed substitute(s)', why:'20 other oat drinks excluded', n:2, pct:14, k:'usual'},
+        {l:'Your must: no nuts incl. may contain', n:2, pct:14, k:'must'},
+        {l:'In stock for Mon 16 Nov', why:'Primary #520114 has 0 cartons · Fallback #1 has 180 cartons', n:1, pct:8},
+        {l:'Your approved substitute #1', why:'Kaurajuoma 1 L (lactose-free, milk-free)', n:1, pct:8, k:'usual'},
+      ]},
+      {id:++BID, seen:true, t:'receipt', no:'A-4472', when:'Mon 16 Nov', total:62.65, lines:[
+        {t:'Kaurajuoma 1 L (lactose-free, milk-free) × 35 l', p:62.65, why:`${chip('usual','Fallback #1')} Your usual Oat drink 1 L (#520114) was out of stock (0 cartons available) — ordered your approved substitute #1.`}
+      ]},
+    ];
+    window.scrollTo(0,0); render();
+    return;
+  }
+  if(v==='fallback_block'){
+    S.tab='order'; location.hash='order';
+    S.live={step:'checking', now:'block', started:'08:19', title:'35 L oat drink by Monday (both out of stock)', total:0, lines:1, note:'blocked · no approved substitute in stock', when:'Mon 16 Nov'};
+    S.run=[
+      {id:++BID, seen:true, t:'me', text:'35 L oat drink by Monday'},
+      {id:++BID, seen:true, t:'say', typing:false, html:'Checking your usual <b>Oat drink 1 L</b> and approved substitute <b>#1 Kaurajuoma 1 L</b> against live stock for Monday.'},
+      {id:++BID, seen:true, t:'readback', items:[oatItem], when:'Mon 16 Nov', src:'from your message', hash:'9f31c4', signed:true},
+      {id:++BID, seen:true, t:'funnel', grow:true, checking:false, rows:[
+        {l:'Looked at in the catalog', why:'20 other oat drinks in stock (e.g. Oat cooking drink 1 L)', n:22, pct:100},
+        {l:'Only your usual product + allowed substitute(s)', why:'only_listed', n:2, pct:14, k:'usual'},
+        {l:'Your must: no nuts incl. may contain', n:2, pct:14, k:'must'},
+        {l:'In stock for Mon 16 Nov', why:'both primary and Fallback #1 have 0 cartons in stock', n:0, pct:0, k:'must'},
+      ]},
+      {id:++BID, seen:true, t:'block', subBlock:true},
+    ];
+    window.scrollTo(0,0); render();
+    return;
+  }
+}
+
 /* ============ activity ============ */
 function activityView(){
   const o=S.orders.find(x=>x.no===S.sel)||S.orders[0];
@@ -1086,76 +1258,138 @@ function story(o){
 /* ============ kitchen ============ */
 function kitchenView(){
   const R=S.rules;
+  const nowText = S.level===0 ? 'Nothing. I ask you before every order.' : S.level===1 ? `Your usual products, up to €${S.limit} an order.` : `Anything that passes your rules, up to €${S.limit} an order.`;
   return `<main class="wrap kitchen">
-    <div class="k-head"><div><h1>${KITCHEN.name}</h1><p>Kitchen profile v${S.profileV} · mandate v${S.mandateV} signed by Anna Virtanen, 13 Nov · Valio Aimo enforces every ${ic('lock','width:13px;height:13px;vertical-align:-2px')} rule</p></div>
+    <div class="k-head"><div><h1>${KITCHEN.name}</h1><p>What I know about your kitchen. Teach me more with a photo or a sentence below.</p></div>
       <span class="spacer"></span><button class="btn ghost small" data-act="history">History</button></div>
 
-    <button class="photo-card wide" data-act="phone" data-v="kitchen">
-      <span class="ic">${ic('cam')}</span>
-      <span style="display:grid;gap:6px;position:relative;z-index:1"><h2>Teach me with a photo</h2><p>Menus, allergy notes, invoices, delivery notes. I read them and suggest what to remember about your kitchen. These photos never place an order, and nothing changes until you accept it.</p></span>
-      <span class="teach-steps"><span><b>1</b>Take a photo</span><span><b>2</b>I suggest rules and usual products</span><span><b>3</b>You accept or reject each one</span></span>
-      <span class="acts"><span class="btn primary small">${ic('phone')}Use your phone</span><span class="btn ghost small" data-act="noop">${ic('clip')}Upload</span></span>
-      <span class="stack">${docMenu()}${docNote()}</span>
-    </button>
-
     ${R.suggest.length?`<section class="sec" style="border-color:var(--accent)"><div class="sec-h">${ic('bulb')}<h2>New from your documents</h2><span class="spacer"></span><span class="muted" style="font-size:13px">I never turn these on without you</span></div>
-      ${R.suggest.map(s=>`<div class="rule new"><div><div class="t">${kindTag(s.kind)} ${esc(s.t)}</div><div class="s"><span class="cond">${esc(s.c)}</span>from ${esc(s.src)}</div></div>
+      ${R.suggest.map(s=>`<div class="rule new"><div><div class="t">${kindTag(s.kind)} ${esc(s.t)}</div><div class="s"><span>from ${esc(s.src)}</span><span>· needs your OK</span></div></div>
         <div class="yn"><button class="y" aria-pressed="false" aria-label="Accept" data-act="sugyes" data-id="${s.id}">${ic('check')}</button><button class="n" aria-pressed="false" aria-label="Reject" data-act="sugno" data-id="${s.id}">${ic('x')}</button></div></div>`).join('')}
     </section>`:''}
 
-    <section class="sec" id="autosec"><div class="sec-h">${kindTag('auto')}<h2>How autonomous I am</h2>${signedTag()}<span class="spacer"></span><button class="link" style="font-size:13px" data-act="tab" data-v="activity">See what I decided</button><p>I only ever order what passes every must. The level decides how many small deviations I may accept without you. You decide every step up.</p></div>
-      <div class="ladder" role="radiogroup" aria-label="Autonomy level">${LEVELS.map(([n,t,d])=>{
-        const cur=n===S.level, pend=n===S.pendingLevel, lock=n===3;
-        const tag=cur?'CURRENT':pend?'TO SIGN':lock?'NOT YET':'';
-        const rec=n===2&&S.level<2&&S.clean<S.need?`<span class="rec">Recommended after ${S.need} clean orders</span>`:'';
-        return `<button class="rung ${cur?'cur':''} ${pend?'pend':''} ${lock?'locked':''}" role="radio" aria-checked="${cur}" data-act="level" data-v="${n}"><span class="lv">LEVEL ${n}${tag?' · '+tag:''}${lock?' '+ic('lock','width:11px;height:11px;vertical-align:-1px'):''}</span><b>${t}</b><span>${d}</span>${rec}</button>`;}).join('')}</div>
-      <div class="progress">${S.level<2
-        ?`<div>${S.clean} of ${S.need} orders without a correction. At ${S.need} I'll suggest level 2. You can switch earlier yourself.</div><div class="track"><i style="width:${S.clean/S.need*100}%"></i></div>`
-        :`<div>Level 2 since mandate v${S.mandateV}. Every deviation I accept alone is marked in Activity, so you can see what I decided.</div>`}</div>
-      ${S.level>0?`<div class="grant"><span class="gid">g1</span><div><b style="font-size:14.5px">${S.level>=2?'Within your rules + small deviations':'Within your rules'}</b><div class="muted" style="font-size:12.5px">any product that passes every must · up to €${S.limit} an order · ${S.level>=2?'accepts +5 % pack rounding, 1 day late, a missed preference':'no deviations'}</div></div><button class="link" style="font-size:13px" data-act="limit">Change limit</button></div>`
-        :`<div class="grant"><span class="gid">—</span><div><b style="font-size:14.5px">No grants</b><div class="muted" style="font-size:12.5px">I prepare every order, you sign every order</div></div></div>`}
-      <div class="perm-h"><b>Extra permissions</b><span class="spacer" style="flex:1"></span><button class="link" style="font-size:13px" data-act="permopen">${S.perm.open?'Close':'+ Add permission'}</button>
-        <p>On top of your level: products I may order alone with their own limit. Musts still block, whatever a permission says.</p></div>
-      ${S.grants.map(g=>`<div class="grant ${g.on?'':'off'} ${g.fresh?'fresh rise':''}"><span class="gid g2">${g.id}</span><div><b style="font-size:14.5px">${esc(g.t)}</b>
-          <div class="s" style="font-size:12.5px;color:var(--ink3);display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:2px"><span class="cond">${esc(g.c)}</span>${esc(g.lim)} · ${esc(g.acc)} · ${esc(g.src)}</div></div>
-          <button class="toggle" role="switch" aria-checked="${g.on}" aria-label="Permission on" data-act="gtog" data-id="${g.id}"></button></div>`).join('')}
-      ${S.perm.open?permForm():''}
+    <section class="sec" id="autosec">
+      <div class="sec-h"><h2>What may I order without you?</h2><span class="spacer"></span><button class="link" style="font-size:13px" data-act="tab" data-v="activity">See what I decided</button></div>
+      <div class="auto-now">
+        <span class="ic">${ic('hand')}</span>
+        <div style="display:grid;gap:2px">
+          <b>${nowText}</b>
+          <span class="muted" style="font-size:13px">Your musts always apply. Small differences I accept: +5 % rounding.</span>
+        </div>
+        <button class="btn ghost small" data-act="limit">Change</button>
+      </div>
+      <p class="auto-hint">${S.clean} of ${S.need} orders went through without a correction. After ${S.need} I'll suggest letting me do more.</p>
+      <details class="auto-more">
+        <summary>Extra permissions (${S.grants.length})</summary>
+        <p class="muted" style="font-size:12.5px">On top of the above: products I may order alone with their own limit. Your musts still apply.</p>
+        ${S.grants.map(g=>`<div class="grant ${g.on?'':'off'} ${g.fresh?'fresh rise':''}" style="grid-template-columns:minmax(0,1fr) auto"><div><b style="font-size:14.5px">${esc(g.t)}</b>
+            <div class="muted" style="font-size:12.5px;margin-top:2px">${esc(g.c)} · ${esc(g.lim)} · ${esc(g.acc)} · ${esc(g.src)}</div></div>
+            <button class="toggle" role="switch" aria-checked="${g.on}" aria-label="Permission on" data-act="gtog" data-id="${g.id}"></button></div>`).join('')}
+      </details>
     </section>
 
     <div class="k-grid">
-      <div style="display:grid;gap:20px">
-        <section class="sec"><div class="sec-h">${kindTag('about')}<h2>About us</h2><span class="spacer"></span><button class="link" style="font-size:13px" data-act="noop">Edit</button><p>Shapes how I read your requests. Not enforced.</p></div>
-          <p class="about-text">${esc(S.about)}</p>
-          <div class="about-facts">${chip('about','420 lunches / day')}${chip('about','Mon–Fri')}${chip('about','18 milk-free')}${chip('about','9 gluten-free')}${chip('about','Closed 1 Jun – 9 Aug')}</div>
-        </section>
-        <section class="sec"><div class="sec-h">${kindTag('usual')}<h2>Usual products</h2><span class="spacer"></span><span class="muted" style="font-size:13px">${S.usual.length} words I know</span><p>When you say the word, I pick this product. Together with the usual amounts they make your usual order.</p></div>
-          ${S.usual.map(u=>`<div class="usual ${u.fresh?'rise':''}"><span class="w">${esc(P[u.k].word)}</span><div><div class="p">${esc(P[u.k].name)}</div><div class="m">from ${esc(u.src)}</div></div><span class="q">${esc(u.q)} / week</span></div>`).join('')}
-        </section>
-        <section class="sec"><div class="sec-h"><h2>Sources</h2><span class="spacer"></span><span class="muted" style="font-size:13px">everything I learned from</span></div>
-          <div class="sources">${[['Lunch menu',docMenu],['Allergy note',docNote],['Invoices',docInvoice]].map(([t,f])=>`<div class="src"><div class="th">${f()}</div>${t}</div>`).join('')}
-            <div class="src"><div class="th" style="display:grid;place-items:center;font-size:22px;font-weight:800">41</div>orders</div>
-            <div class="src"><div class="th" style="display:grid;place-items:center;font-size:22px;font-weight:800">3</div>your corrections</div></div>
-        </section>
+      <section class="sec"><div class="sec-h"><h2>Never order</h2><span class="spacer"></span><button class="link" style="font-size:13px" data-act="addrule">${S.addOpen?'Close':'+ Add'}</button><p>Valio Aimo blocks every product that breaks one of these, whatever I'm told.</p></div>
+        ${R.must.map(r=>`<div class="rule ${r.on?'':'off'} ${r.changed?'changed':''} ${r.fresh?'rise new':''}"><div style="display:grid;gap:4px"><div class="t">${esc(r.t)}</div>
+          <div class="s"><span>If the label doesn't say: ${r.unk==='ask'?'I ask you':'I leave it out'}</span><button type="button" class="link" style="font-size:12.5px" data-act="unk" data-id="${r.id}" data-v="${r.unk==='ask'?'exclude':'ask'}">change</button></div></div>
+          <button class="toggle" role="switch" aria-checked="${r.on}" aria-label="Rule on" data-act="tog" data-g="must" data-id="${r.id}"></button></div>`).join('')}
+        ${S.addOpen?`<div class="addrule"><div class="eyebrow">Never order</div>
+          <div class="row"><input class="wide" id="nr" value="No sesame, not even traces" aria-label="Describe the rule"><button class="btn primary small" data-act="saverule">Add to my rules</button></div></div>`:''}
+      </section>
+      <section class="sec"><div class="sec-h"><h2>Prefer</h2><span class="spacer"></span><button class="link" style="font-size:13px" data-act="noop">+ Add</button><p>I pick these first when I can. Missing one never blocks an order.</p></div>
+        ${R.prefer.map(r=>`<div class="rule ${r.on?'':'off'} ${r.fresh?'rise new':''}"><div class="t">${esc(r.t)}</div>
+          <div style="display:flex;gap:12px;align-items:center">
+            <select class="field" aria-label="Importance" onchange="this.dataset.v=this.value" data-act="w" data-id="${r.id}">
+              <option value="1" ${r.w===1?'selected':''}>Nice to have</option>
+              <option value="2" ${r.w===2?'selected':''}>Important</option>
+              <option value="3" ${r.w===3?'selected':''}>Very important</option>
+            </select>
+            <button class="toggle" role="switch" aria-checked="${r.on}" aria-label="Preference on" data-act="tog" data-g="prefer" data-id="${r.id}"></button>
+          </div></div>`).join('')}
+      </section>
+    </div>
+
+    <section class="sec" id="usualsec"><div class="sec-h"><h2>Your usual products</h2><p>When you say the word, I pick this product. With the usual amounts they make your usual order.</p></div>
+      ${S.usual.map(u=>{
+        const subs = u.subs||[];
+        const mode = u.mode || (subs.length?'only_listed':'ask_any');
+        const fm = FALLBACK_META[mode];
+        const isEd = S.editUsual===u.k;
+        const availHits = OAT_CATALOG.filter(c=>c.id!==u.pid && !subs.some(s=>s.id===c.id));
+        const fbSentence = mode==='none'
+          ? 'If out of stock: never substitute'
+          : subs.length>0
+            ? `If out of stock: ${subs.map((s,idx)=>`${idx+1}. ${s.name}`).join(' → ')}${mode==='only_listed'?' · no other products':''}`
+            : 'If out of stock: I ask you';
+        return `<div class="usual-wrap"><div class="usual ${u.fresh?'rise':''}">
+          <span class="w">${esc(P[u.k].word)}</span>
+          <div style="display:grid;gap:2px;min-width:0">
+            <div class="p">${esc(P[u.k].name)}</div>
+            <div class="s">
+              <span>${esc(fbSentence)}</span>
+              <button type="button" class="link" style="font-size:12.5px" data-act="editusual" data-id="${u.k}">${isEd?'close':'change'}</button>
+              <span>· from ${esc(u.src)}</span>
+            </div>
+          </div>
+          <span class="q">${esc(u.q)} / week</span>
+        </div>
+        ${isEd?`<div class="usual-edit rise">
+          <div class="usual-edit-row">
+            <span class="eyebrow">If ${esc(P[u.k].name)} is out of stock</span>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              ${['only_listed','ask_any','none'].map(mKey=>`<button type="button" class="tog" aria-pressed="${mode===mKey}" data-act="submode" data-id="${u.k}" data-v="${mKey}">${FALLBACK_META[mKey].short}</button>`).join('')}
+            </div>
+            <p class="muted" style="font-size:12.5px">${esc(fm.desc)}</p>
+          </div>
+          ${mode!=='none'?`<div class="usual-edit-row">
+            <span class="eyebrow">Approved substitutes in order</span>
+            ${subs.length===0?`<p class="muted" style="font-size:13px">No substitutes added yet. Pick one below so I know what to take instead.</p>`:`
+              <div style="display:grid;gap:6px">${subs.map((s,idx)=>`<div class="sub-item">
+                <span class="sub-rank">#${idx+1}</span>
+                <div style="flex:1;min-width:0"><b>${esc(s.name)}</b></div>
+                <div class="sub-acts">
+                  <button type="button" class="sub-btn" ${idx===0?'disabled':''} data-act="submove" data-id="${u.k}" data-v="${idx}:-1" aria-label="Move up">↑</button>
+                  <button type="button" class="sub-btn" ${idx===subs.length-1?'disabled':''} data-act="submove" data-id="${u.k}" data-v="${idx}:1" aria-label="Move down">↓</button>
+                  <button type="button" class="sub-btn del" data-act="subdel" data-id="${u.k}" data-v="${s.id}" aria-label="Remove">×</button>
+                </div>
+              </div>`).join('')}</div>`}
+            <div style="display:grid;gap:8px;margin-top:4px">
+              <div style="display:flex;gap:8px;align-items:center">
+                ${ic('search','width:16px;height:16px;color:var(--ink3)')}
+                <input class="field wide" value="${esc(P[u.k].word)}" placeholder="Search Valio Aimo for &quot;${esc(P[u.k].word)}&quot; substitutes…" aria-label="Search catalog">
+              </div>
+              ${availHits.length?`<div class="sub-hits">
+                ${availHits.slice(0,3).map(h=>`<div class="sub-hit">
+                  <div style="font-weight:500;font-size:13.5px">${esc(h.name)}</div>
+                  <button type="button" class="btn ghost small" data-act="subadd" data-id="${u.k}" data-v="${h.id}">+ Add as #${subs.length+1}</button>
+                </div>`).join('')}
+              </div>`:''}
+            </div>
+          </div>`:''}
+          <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:4px">
+            <button type="button" class="btn ghost small" data-act="editusual" data-id="${u.k}">Cancel</button>
+            <button type="button" class="btn primary small" ${mode==='only_listed'&&subs.length===0?'disabled':''} data-act="subsave" data-id="${u.k}">Save</button>
+          </div>
+        </div>`:''}
+        </div>`;
+      }).join('')}
+      <div class="usual-foot">
+        <span class="est">The usual order ≈ <b class="num">€551.85</b>. Inside your limit: I can order it alone.</span>
+        <button class="btn ghost small" data-act="adjust">Adjust</button>
+        <button class="btn primary small" data-act="usual">Order the usual</button>
       </div>
-      <div style="display:grid;gap:20px">
-        <section class="sec"><div class="sec-h">${kindTag('must')}<h2>Must</h2>${signedTag()}<span class="spacer"></span><button class="link" style="font-size:13px" data-act="addrule">${S.addOpen?'Close':'+ Add rule'}</button><p>Never broken. Valio Aimo blocks any line that fails one, whatever I'm told.</p></div>
-          ${R.must.map(r=>`<div class="rule ${r.on?'':'off'} ${r.changed?'changed':''} ${r.fresh?'rise new':''}"><div><div class="t">${esc(r.t)}</div>
-            <div class="s"><span class="cond">${esc(r.c)}</span>${esc(r.src)}</div>
-            <div class="s" style="margin-top:4px">${esc(r.cov||'')} · if unknown <span class="seg"><button aria-pressed="${r.unk==='exclude'}" data-act="unk" data-id="${r.id}" data-v="exclude">exclude</button><button aria-pressed="${r.unk==='ask'}" data-act="unk" data-id="${r.id}" data-v="ask">ask me</button></span></div></div>
-            <button class="toggle" role="switch" aria-checked="${r.on}" aria-label="Rule on" data-act="tog" data-g="must" data-id="${r.id}"></button></div>`).join('')}
-          ${S.addOpen?`<div class="addrule"><div class="eyebrow">New rule</div>
-            <div class="row"><input class="wide" id="nr" value="No sesame, not even traces" aria-label="Describe the rule"><button class="btn ghost small" data-act="noop">Turn into rule</button></div>
-            <div class="row"><select aria-label="Attribute"><option>allergens</option><option>country</option><option>labels</option><option>category</option><option>co2_per_kg</option><option>unit_price</option><option>delivery_reliability</option></select>
-              <select aria-label="Operator"><option>not_contains</option><option>eq</option><option>lte</option><option>gte</option></select>
-              <input value="sesame" aria-label="Value" style="width:110px"><span class="muted" style="font-size:13px">if unknown: exclude</span></div>
-            <div class="row"><span class="muted" style="font-size:13px">Checked against 1,431 products · label known for 1,398</span><span class="spacer"></span><button class="btn primary small" data-act="saverule">Add rule</button></div></div>`:''}
-        </section>
-        <section class="sec"><div class="sec-h">${kindTag('prefer')}<h2>Prefer</h2><p>Ranks products. Missing one never blocks. At level 2 I may accept a miss alone.</p></div>
-          ${R.prefer.map(r=>`<div class="rule ${r.on?'':'off'} ${r.fresh?'rise new':''}"><div><div class="t">${esc(r.t)}</div><div class="s"><span class="cond">${esc(r.c)}</span>${esc(r.src)}</div></div>
-            <div style="display:flex;gap:12px;align-items:center"><span class="weight">${[1,2,3].map(n=>`<button class="${n<=r.w?'on':''}" data-act="w" data-id="${r.id}" data-v="${n}" aria-label="Weight ${n}"></button>`).join('')}</span>
-            <button class="toggle" role="switch" aria-checked="${r.on}" aria-label="Preference on" data-act="tog" data-g="prefer" data-id="${r.id}"></button></div></div>`).join('')}
-        </section>
-      </div>
+    </section>
+
+    <div class="k-grid">
+      <section class="sec"><div class="sec-h"><h2>About your kitchen</h2><span class="spacer"></span><button class="link" style="font-size:13px" data-act="noop">Edit</button><p>Helps me read your requests and plan amounts.</p></div>
+        <p class="about-text">${esc(S.about)}</p>
+        <div class="about-facts">${chip('about','420 lunches / day')}${chip('about','Mon–Fri')}${chip('about','18 milk-free')}${chip('about','9 gluten-free')}${chip('about','Closed 1 Jun – 9 Aug')}</div>
+      </section>
+      <section class="sec"><div class="sec-h"><h2>What I learned from</h2></div>
+        <div class="sources">${[['Lunch menu',docMenu],['Allergy note',docNote],['Invoices',docInvoice]].map(([t,f])=>`<div class="src"><div class="th">${f()}</div>${t}</div>`).join('')}
+          <div class="src"><div class="th" style="display:grid;place-items:center;font-size:22px;font-weight:800">41</div>orders</div>
+          <div class="src"><div class="th" style="display:grid;place-items:center;font-size:22px;font-weight:800">3</div>your corrections</div></div>
+      </section>
     </div>
   </main>`;
 }
@@ -1187,7 +1421,7 @@ function phoneModal(){
       <div class="phone"><div class="notch"></div><div class="scr">
         ${m.paired?`<div class="viewfinder"><div class="vf-label">Hold steady · list found</div>${docList()}<div class="vf-corners"></div>
           <button class="shutter" data-act="shoot" aria-label="Take photo"></button>${m.flash?'<div class="flash"></div>':''}</div>`
-        :`<div class="phone-idle"><b>Kitchen agent</b>Opening camera…</div>`}
+        :`<div class="phone-idle"><b>Aimo Agent</b>Opening camera…</div>`}
       </div></div>
     </div></div></div>`;
 }
@@ -1292,7 +1526,7 @@ document.addEventListener('click', async e=>{
     case 'skip': S.ob.stage='review'; S.ob.shown=LEARN.map(c=>c.id); S.ob.read=[...S.ob.docs]; LEARN.forEach(c=>{S.hl.add(c.id); if(c.also) S.hl.add(c.also);}); return render();
     case 'dec': S.ob.decided[id]= v==='1'; return render();
     case 'adopt': S.view='app'; S.tab='order'; location.hash='order'; window.scrollTo(0,0); render(); return toast('Kitchen profile signed · mandate v3');
-    case 'tab': S.tab=v; location.hash=v; window.scrollTo(0,0); return render();
+    case 'tab': S.tab=v; if(v==='kitchen') S.scene='kitchen'; else if(v==='activity') S.scene='activity'; location.hash=v; window.scrollTo(0,0); return render();
     case 'goauto': S.tab='kitchen'; location.hash='kitchen'; render(); return document.getElementById('autosec')?.scrollIntoView({behavior:'smooth',block:'center'});
     case 'say': S.compText=''; return route(v);
     case 'usual': return usualOrder(false);
@@ -1349,7 +1583,33 @@ document.addEventListener('click', async e=>{
         if(s.kind==='prefer') S.rules.prefer.push({id:s.id,t:s.t,c:s.c,src:s.src,w:1,on:true,fresh:true}); else S.usual.push({k:'apples',q:'40 kg',src:s.src,fresh:true});
         S.profileV++; render(); return toast('Kitchen profile v'+S.profileV); }
     case 'sugno': S.rules.suggest=S.rules.suggest.filter(x=>x.id!==id); return render();
-    case 'history': return toast('v3 · 13 Nov: added "on time ≥ 95 %" · v2 · 2 Nov: nut rule incl. may contain · v1 · 28 Oct: onboarding');
+    case 'history': return toast('v8 · Today: oat drink fallback ONLY #473609 · v3 · 13 Nov: added "on time ≥ 95 %"');
+    case 'editusual': S.editUsual = S.editUsual===id ? null : id; return render();
+    case 'subadd': {
+      const u=S.usual.find(x=>x.k===id), hit=OAT_CATALOG.find(c=>c.id===v);
+      if(u && hit){ u.subs=[...(u.subs||[]), {id:hit.id, name:hit.name}]; if((u.mode||'ask_any')==='ask_any') u.mode='only_listed'; }
+      return render();
+    }
+    case 'subdel': {
+      const u=S.usual.find(x=>x.k===id);
+      if(u){ u.subs=(u.subs||[]).filter(s=>s.id!==v); if(!u.subs.length && u.mode==='only_listed') u.mode='ask_any'; }
+      return render();
+    }
+    case 'submove': {
+      const u=S.usual.find(x=>x.k===id);
+      if(u && u.subs){ const [idx,dir]=v.split(':').map(Number); const t=idx+dir; if(t>=0&&t<u.subs.length){ const cp=[...u.subs]; const [it]=cp.splice(idx,1); cp.splice(t,0,it); u.subs=cp; } }
+      return render();
+    }
+    case 'submode': {
+      const u=S.usual.find(x=>x.k===id);
+      if(u) u.mode=v;
+      return render();
+    }
+    case 'subsave': {
+      S.profileV++; S.editUsual=null; render();
+      return toast(`Saved fallback rules to kitchen profile v${S.profileV} · synced with Level 1 grant g1`);
+    }
+    case 'scene': return loadScene(v);
     case 'restart': Object.assign(S.ob,{stage:'drop',docs:['menu','note','inv'],reading:null,read:[],shown:[],decided:{}}); S.hl.clear(); S.view='onboard'; S.rid++; S.run=[]; S.live=null; location.hash=''; window.scrollTo(0,0); return render();
     case 'noop': e.stopPropagation(); return toast('Not in this mockup yet');
   }

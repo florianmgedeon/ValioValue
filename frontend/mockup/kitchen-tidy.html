@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kitchen Tab Tidy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+
+/* Tokens copied from frontend/src/styles.css */
+:root {
+  --bg: #ffffff; --surface: #f5f5f7; --surface2: #ececf0; --line: #e3e3e8;
+  --ink: #1d1d1f; --ink2: #515154; --ink3: #6e6e73;
+  --accent: #0a66d8; --accent-soft: #e8f0fc;
+  --must: #c4291c; --must-soft: #fdecea; --prefer: #1b7f3b; --prefer-soft: #e8f7ec;
+  --usual: #5b3fd1; --usual-soft: #efebfd; --auto: #a35c00; --auto-soft: #fdf2e2;
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 28px rgba(0,0,0,.07);
+  --shadow-lg: 0 2px 6px rgba(0,0,0,.06), 0 24px 60px rgba(0,0,0,.14);
+  --font: Inter, -apple-system, "SF Pro Text", system-ui, sans-serif;
+  --hand: Caveat, "Bradley Hand", "Segoe Print", cursive;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111113; --surface: #1c1c1f; --surface2: #26262a; --line: #2e2e33;
+    --ink: #f5f5f7; --ink2: #c7c7cc; --ink3: #98989f;
+    --accent: #4c9bff; --accent-soft: #16263d;
+    --must: #ff6a5c; --must-soft: #3a1715; --prefer: #4cc777; --prefer-soft: #12301d;
+    --usual: #a594ff; --usual-soft: #241d44; --auto: #f0a640; --auto-soft: #3a2810;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 28px rgba(0,0,0,.35);
+    --shadow-lg: 0 24px 60px rgba(0,0,0,.55);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111113; --surface: #1c1c1f; --surface2: #26262a; --line: #2e2e33;
+  --ink: #f5f5f7; --ink2: #c7c7cc; --ink3: #98989f;
+  --accent: #4c9bff; --accent-soft: #16263d;
+  --must: #ff6a5c; --must-soft: #3a1715; --prefer: #4cc777; --prefer-soft: #12301d;
+  --usual: #a594ff; --usual-soft: #241d44; --auto: #f0a640; --auto-soft: #3a2810;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 28px rgba(0,0,0,.35);
+  --shadow-lg: 0 24px 60px rgba(0,0,0,.55);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--bg); overflow-x: clip; }
+body { color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+h1, h2, h3 { letter-spacing: -0.02em; }
+.num { font-variant-numeric: tabular-nums; }
+:focus { outline: none; }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: -3px; }
+.icon { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.muted { color: var(--ink3); }
+.spacer { flex: 1; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: 999px; font-weight: 600; font-size: 15px; white-space: nowrap; transition: transform .15s, background .2s; }
+.btn:active { transform: scale(.97); }
+.btn-primary { background: var(--ink); color: var(--bg); }
+.btn-ghost { background: var(--surface); }
+.btn-ghost:hover { background: var(--surface2); }
+.btn-small { height: 34px; padding: 0 14px; font-size: 13px; }
+.link { color: var(--accent); font-weight: 600; font-size: 13px; }
+.link:hover { text-decoration: underline; }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.k-accent { background: var(--accent-soft); color: var(--accent); }
+.k-usual { background: var(--usual-soft); color: var(--usual); }
+
+/* header (as Header.tsx) */
+header { position: sticky; top: 0; z-index: 20; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: saturate(1.6) blur(16px); -webkit-backdrop-filter: saturate(1.6) blur(16px); }
+.hd { max-width: 1280px; margin: 0 auto; height: 60px; display: flex; align-items: center; gap: 16px; padding: 0 16px; }
+.brand { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; white-space: nowrap; }
+.tabs { display: flex; gap: 2px; background: var(--surface); padding: 3px; border-radius: 999px; }
+.tabs button { height: 32px; padding: 0 16px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--ink2); }
+.tabs button[aria-selected="true"] { background: var(--bg); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.pill { height: 36px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 999px; background: var(--auto-soft); color: var(--auto); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: var(--bg); display: grid; place-items: center; font-size: 11px; font-weight: 700; }
+@media (max-width: 640px) { .brand, .pill span { display: none; } .tabs button { padding: 0 10px; } }
+
+
+.k-plain { background: var(--surface); color: var(--ink2); }
+.k-prefer { background: var(--prefer-soft); color: var(--prefer); }
+.k-must { background: var(--must-soft); color: var(--must); }
+.kind { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; padding: 4px 8px; border-radius: 6px; white-space: nowrap; }
+
+main { max-width: 1000px; margin: 0 auto; padding: 28px 16px 160px; display: grid; gap: 22px; }
+.k-head { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+.k-head h1 { font-size: clamp(28px, 4vw, 40px); font-weight: 800; line-height: 1.1; }
+.k-head p { color: var(--ink3); font-size: 14px; margin-top: 4px; }
+
+/* the switch between the two views */
+.views { display: inline-flex; background: var(--surface); border-radius: 14px; padding: 4px; gap: 2px; justify-self: start; }
+.views button { height: 38px; padding: 0 18px; border-radius: 10px; font-weight: 600; font-size: 14.5px; color: var(--ink2); display: inline-flex; align-items: center; gap: 8px; }
+.views button[aria-selected="true"] { background: var(--bg); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.views .sub { font-weight: 500; font-size: 12.5px; color: var(--ink3); }
+@media (max-width: 520px) { .views { display: flex; } .views button { flex: 1; justify-content: center; padding: 0 8px; } .views .sub { display: none; } }
+.view { display: grid; gap: 22px; }
+.view[hidden], main[hidden], .notes[hidden] { display: none; }
+.grid2 { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 20px; align-items: start; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: minmax(0,1fr); } }
+
+.sec { background: var(--bg); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; }
+.sec-h { display: flex; align-items: center; gap: 10px; padding: 16px 20px 12px; flex-wrap: wrap; }
+.sec-h h2 { font-size: 17px; font-weight: 700; }
+.sec-h p { font-size: 12.5px; color: var(--ink3); width: 100%; }
+
+/* to check */
+.check { border: 2px solid var(--accent); }
+.check .sec-h h2 .n { color: var(--accent); }
+.ci { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px 14px; align-items: center; padding: 12px 20px; border-top: 1px solid var(--line); }
+.ci .t { font-weight: 600; font-size: 14.5px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ci .s { font-size: 12.5px; color: var(--ink3); }
+.ci .q { font-family: var(--hand); font-size: 18px; color: var(--ink2); line-height: 1.2; }
+.yn { display: flex; gap: 6px; }
+.yn button { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); color: var(--ink2); }
+.yn button:hover { background: var(--surface2); }
+.yn .icon { width: 16px; height: 16px; stroke-width: 2.4; }
+
+/* learned rows (as in the 2e section) */
+.row { width: 100%; text-align: left; display: grid; grid-template-columns: 104px minmax(0,1fr) auto 16px; gap: 4px 16px; align-items: center; padding: 12px 20px; border-top: 1px solid var(--line); }
+.row:hover { background: var(--surface); }
+.row .w { font-family: var(--hand); font-size: 22px; line-height: 1; color: var(--usual); }
+.row .p { font-weight: 600; font-size: 14.5px; }
+.row .m { display: block; font-size: 12.5px; color: var(--ink3); }
+.row .r { display: grid; justify-items: end; gap: 6px; }
+.row .qty { font-size: 13px; color: var(--ink2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.row .chev { color: var(--ink3); width: 16px; height: 16px; }
+.bars { display: block; color: var(--usual); }
+.bars .gap { fill: var(--surface2); }
+.row.drift .bars, .up { color: var(--auto); }
+.up { font-weight: 600; }
+@media (max-width: 600px) { .row { grid-template-columns: 76px minmax(0,1fr) 16px; } .row .r { grid-column: 2; grid-row: 2; justify-items: start; grid-auto-flow: column; align-items: center; gap: 10px; } }
+.still { padding: 12px 20px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink3); }
+.still b { color: var(--ink2); }
+.foot { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--line); background: var(--usual-soft); flex-wrap: wrap; }
+.foot .est { flex: 1; min-width: 180px; font-size: 13px; color: var(--ink2); }
+.foot .est b { font-size: 16px; color: var(--ink); }
+
+.about { padding: 0 20px 14px; font-size: 15px; line-height: 1.55; }
+.facts { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 20px 16px; }
+.facts .chip { background: var(--surface); color: var(--ink2); }
+.srcline { width: 100%; display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--ink2); text-align: left; }
+.srcline:hover { background: var(--surface); }
+.srcline .thumbs { display: flex; }
+.srcline .thumbs span { width: 26px; height: 32px; border-radius: 4px; background: #fffdf6; border: 1px solid var(--line); margin-left: -8px; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.srcline .thumbs span:first-child { margin-left: 0; transform: rotate(-5deg); }
+.srcline .thumbs span:nth-child(3) { transform: rotate(4deg); }
+
+/* what I may do */
+.auto-now { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 14px; align-items: center; margin: 0 20px 16px; padding: 14px 16px; border-radius: 16px; background: var(--auto-soft); }
+.auto-now .ic { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--bg); color: var(--auto); }
+.auto-now b { font-size: 16px; }
+.more { border-top: 1px solid var(--line); padding: 12px 20px; font-size: 14px; font-weight: 600; color: var(--ink2); }
+.rule { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px 14px; padding: 12px 20px; border-top: 1px solid var(--line); align-items: center; }
+.rule .t { font-weight: 600; font-size: 14.5px; }
+.rule .s { font-size: 12.5px; color: var(--ink3); }
+.toggle { width: 42px; height: 26px; border-radius: 999px; background: var(--prefer); position: relative; flex: none; }
+.toggle::after { content: ""; position: absolute; top: 3px; left: 19px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.empty { padding: 12px 20px 16px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--ink3); }
+.signnote { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--ink3); }
+.signnote .icon { width: 15px; height: 15px; }
+
+/* order thread */
+.thread { max-width: 760px; margin: 0 auto; width: 100%; display: grid; gap: 18px; }
+.empty-order { text-align: center; padding: 60px 0 0; display: grid; gap: 8px; }
+.empty-order h1 { font-size: clamp(28px, 4vw, 40px); font-weight: 800; }
+.empty-order p { color: var(--ink3); }
+.msg-me { justify-self: end; }
+.bubble { background: var(--ink); color: var(--bg); padding: 12px 16px; border-radius: 20px 20px 6px 20px; font-size: 15px; }
+.agent { display: grid; grid-template-columns: 32px minmax(0,1fr); gap: 12px; align-items: start; }
+.agent-dot { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--ink), var(--ink2)); color: var(--bg); display: grid; place-items: center; }
+.agent-dot .icon { width: 16px; height: 16px; }
+.card { background: var(--bg); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; box-shadow: var(--shadow); }
+.drift-card { border: 2px solid var(--auto); }
+.drift-card .h { padding: 16px 20px; background: var(--auto-soft); display: grid; gap: 4px; }
+.drift-card .h h3 { font-size: 17px; font-weight: 700; }
+.drift-card .h p { font-size: 13px; color: var(--ink2); }
+.dr { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px 16px; align-items: center; padding: 14px 20px; border-top: 1px solid var(--line); }
+.drift-card .h + .dr { border-top: 0; }
+.dr .t { font-weight: 600; font-size: 14.5px; }
+.dr .s { font-size: 12.5px; color: var(--ink3); margin-top: 2px; }
+.dr .spark { color: var(--auto); }
+.dr .choice { grid-column: 1 / -1; }
+.seg { display: inline-flex; background: var(--surface); border-radius: 10px; padding: 3px; font-size: 13px; }
+.seg button { padding: 5px 12px; border-radius: 8px; font-weight: 600; color: var(--ink3); }
+.seg button[aria-pressed="true"] { background: var(--bg); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.card-f { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 20px; background: var(--surface); font-size: 13px; color: var(--ink3); }
+.card-h { padding: 16px 20px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.card-h h3 { font-size: 17px; font-weight: 700; }
+.oi { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 2px 16px; padding: 11px 20px; border-bottom: 1px solid var(--line); align-items: center; }
+.oi .a { font-size: 12px; color: var(--ink3); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.oi .n { font-weight: 600; font-size: 14.5px; }
+.decided .h { background: var(--surface); }
+.done-line { font-size: 13px; color: var(--ink3); padding: 10px 20px 14px; }
+
+/* composer (static) */
+.composer { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); width: min(760px, calc(100% - 32px)); z-index: 30; display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 18px; border-radius: 28px; background: var(--bg); border: 1px solid var(--line); box-shadow: var(--shadow-lg); color: var(--ink3); font-size: 15px; }
+.composer .send { margin-left: auto; width: 40px; height: 40px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; }
+
+/* drawer */
+.scrim { position: fixed; inset: 0; z-index: 60; background: rgba(10,10,12,.45); backdrop-filter: blur(6px); }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 61; width: min(460px, 100%); background: var(--bg); box-shadow: var(--shadow-lg); overflow-y: auto; padding: 24px; display: grid; gap: 18px; align-content: start; }
+#drawer[hidden] { display: none; }
+.drawer .top { display: flex; gap: 12px; align-items: start; }
+.drawer h2 { font-size: 20px; font-weight: 800; flex: 1; }
+.x { width: 34px; height: 34px; border-radius: 50%; background: var(--surface); display: grid; place-items: center; flex: none; }
+.docs { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+.doc { display: grid; gap: 6px; font-size: 13px; }
+.doc .th { height: 120px; border-radius: 12px; background: var(--surface); display: grid; place-items: center; }
+.doc .th span { width: 64px; height: 84px; background: #fffdf6; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+.nums { display: flex; gap: 12px; }
+.nums div { flex: 1; border-radius: 12px; background: var(--surface); padding: 12px; font-size: 13px; color: var(--ink3); }
+.nums b { display: block; font-size: 22px; color: var(--ink); }
+
+/* proposal notes */
+.notes { max-width: 1000px; margin: 0 auto; padding: 0 16px 140px; }
+.notes > div { border: 1px dashed var(--line); border-radius: 16px; padding: 18px 20px; display: grid; gap: 8px; font-size: 13.5px; color: var(--ink2); }
+.notes b { color: var(--ink); }
+.notes ol { padding-left: 18px; display: grid; gap: 6px; }
+
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11M11 10V4.5a1.5 1.5 0 0 1 3 0V11M14 10.5V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-.5a6 6 0 0 1-4.6-2.2L3.6 15a1.5 1.5 0 0 1 2.3-1.9L8 15"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+</svg>
+
+<header>
+  <div class="hd">
+    <span class="brand">Aimo Agent</span>
+    <nav class="tabs"><button data-tab="order">Order</button><button>Activity</button><button data-tab="kitchen" aria-selected="true">Kitchen</button></nav>
+    <span class="spacer"></span>
+    <button class="pill" id="pill" title="What I may order without you"><svg class="icon"><use href="#i-hand"/></svg><span>Orders alone · up to €300</span></button>
+    <span class="avatar">SK</span>
+  </div>
+</header>
+
+<!-- ============================== KITCHEN ============================== -->
+<main id="kitchen">
+  <div class="k-head">
+    <div>
+      <h1>School kitchen, Espoo</h1>
+      <p>Teach me more with a photo or a sentence below.</p>
+    </div>
+    <span class="spacer"></span>
+    <button class="btn btn-small btn-ghost">History</button>
+  </div>
+
+  <section class="sec check" id="check">
+    <div class="sec-h">
+      <h2>To check <span class="n" id="check-n">(2)</span></h2>
+      <span class="spacer"></span>
+      <span class="muted" style="font-size:13px">Nothing changes until you say yes</span>
+    </div>
+    <div class="ci">
+      <div>
+        <div class="t"><span class="kind k-usual">USUAL</span>Use Nut-free oat muesli whenever you say “granola”?</div>
+        <div class="s">You chose it instead of Start Naturell granola on 12 Nov.</div>
+      </div>
+      <div class="yn"><button aria-label="Yes"><svg class="icon"><use href="#i-check"/></svg></button><button aria-label="No, just this time"><svg class="icon"><use href="#i-x"/></svg></button></div>
+    </div>
+    <div class="ci">
+      <div>
+        <div class="t"><span class="kind k-prefer">PREFER</span>Organic, when it costs at most 10 % more</div>
+        <div class="s">from City sustainability report · needs your signature</div>
+        <div class="q">“Organic share target 25 % by 2027”</div>
+      </div>
+      <div class="yn"><button aria-label="Yes"><svg class="icon"><use href="#i-check"/></svg></button><button aria-label="No"><svg class="icon"><use href="#i-x"/></svg></button></div>
+    </div>
+  </section>
+
+  <div class="views" role="tablist">
+    <button role="tab" data-view="know" aria-selected="true">What I know <span class="sub">learned, no signature</span></button>
+    <button role="tab" data-view="may" aria-selected="false"><svg class="icon" style="width:15px;height:15px"><use href="#i-lock"/></svg>What I may do <span class="sub">signed</span></button>
+  </div>
+
+  <!-- What I know -->
+  <div class="view" id="v-know">
+    <section class="sec">
+      <div class="sec-h">
+        <h2>What I learned from your orders</h2>
+        <span class="spacer"></span>
+        <span class="muted" style="font-size:13px">7 orders since 14 Sep</span>
+        <p>When you say the word, I pick this product. The bars are the last eight weeks.</p>
+      </div>
+      <div id="rows"></div>
+      <div class="still">Still learning: <b>cheese</b> – 3 different products in 3 orders. I’ll ask you next time.</div>
+      <div class="foot">
+        <span class="est">The usual order ≈ <b class="num">€580</b>. Above your €300: you approve the cart.</span>
+        <button class="btn btn-small btn-ghost" style="background:var(--bg)">Adjust</button>
+        <button class="btn btn-small btn-primary" data-usual>Order the usual</button>
+      </div>
+    </section>
+
+    <section class="sec">
+      <div class="sec-h">
+        <h2>About your kitchen</h2>
+        <span class="spacer"></span>
+        <button class="link">Edit</button>
+      </div>
+      <p class="about">Primary school kitchen in Espoo. About 420 lunches a day, Monday to Friday. Nut-free site. Finnish ingredients first. Closed for summer, 1 Jun – 9 Aug.</p>
+      <div class="facts"><span class="chip">420 lunches / day</span><span class="chip">18 milk-free and 9 gluten-free diets</span></div>
+      <button class="srcline" id="src">
+        <span class="thumbs"><span></span><span></span><span></span></span>
+        <span>Learned from <b>4 documents</b> and <b>7 orders</b></span>
+        <span class="spacer"></span>
+        <svg class="icon" style="width:16px;height:16px;color:var(--ink3)"><use href="#i-chev"/></svg>
+      </button>
+    </section>
+  </div>
+
+  <!-- What I may do -->
+  <div class="view" id="v-may" hidden>
+    <section class="sec" id="autonomy">
+      <div class="sec-h">
+        <h2>What may I order without you?</h2>
+        <span class="spacer"></span>
+        <button class="link">See what I decided</button>
+      </div>
+      <div class="auto-now">
+        <span class="ic"><svg class="icon"><use href="#i-hand"/></svg></span>
+        <div style="display:grid;gap:2px"><b>Anything that passes your rules, up to €300 an order</b><span class="muted" style="font-size:13px">Your musts always apply.</span></div>
+        <button class="btn btn-small btn-ghost" style="background:var(--bg)">Change</button>
+      </div>
+      <div class="more">Extra permissions (0) ›</div>
+    </section>
+    <div class="grid2">
+      <section class="sec">
+        <div class="sec-h"><h2>Never order</h2><p>Valio Aimo blocks these, whatever I find.</p></div>
+        <div class="rule"><div><div class="t">No peanuts, incl. “may contain”</div><div class="s">If the label doesn’t say: leave it out</div></div><span class="toggle"></span></div>
+        <div class="rule"><div><div class="t">No tree nuts, incl. “may contain”</div><div class="s">If the label doesn’t say: leave it out</div></div><span class="toggle"></span></div>
+      </section>
+      <section class="sec">
+        <div class="sec-h"><h2>Prefer</h2><p>I pick these first when I can. Missing one never blocks an order.</p></div>
+        <div class="empty">Nothing yet. I pick the cheapest.</div>
+      </section>
+    </div>
+    <div class="signnote"><svg class="icon"><use href="#i-lock"/></svg>Changes here are signed by you and checked by Valio Aimo on every order.</div>
+  </div>
+</main>
+
+<!-- ============================== ORDER ============================== -->
+<main id="order" hidden>
+  <div class="thread" id="thread">
+    <div class="empty-order" id="order-empty"><h1>What do you need?</h1><p>Type it, say it or send a photo.</p></div>
+  </div>
+</main>
+
+<div class="composer" id="composer"><span id="ph">Teach me something about your kitchen…</span><span class="send"><svg class="icon"><use href="#i-up"/></svg></span></div>
+
+<div class="notes" id="notes">
+  <div>
+    <b>Proposal notes (not part of the app)</b>
+    <ol>
+      <li><b>To check</b> collects everything waiting for a yes: suggestions from documents and the one question after an order. Shown only when something is open, above both views.</li>
+      <li><b>Two views</b>: “What I know” (learned, no signature) and “What I may do” (signed rules). The header pill opens “What I may do”.</li>
+      <li><b>Sources</b> are one line in About; the thumbnails are in a drawer.</li>
+      <li><b>Drift</b> moved to where you order: “Order the usual” opens the order chat, and the first thing the agent shows is what drifted. Try the button.</li>
+    </ol>
+  </div>
+</div>
+
+<div id="drawer" hidden>
+  <div class="scrim" data-close></div>
+  <aside class="drawer" role="dialog" aria-modal="true">
+    <div class="top"><h2>What I learned from</h2><button class="x" data-close aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button></div>
+    <div class="docs">
+      <div class="doc"><div class="th"><span></span></div>Lunch menu, week 47</div>
+      <div class="doc"><div class="th"><span></span></div>Allergy note</div>
+      <div class="doc"><div class="th"><span></span></div>Invoices Sep–Oct</div>
+      <div class="doc"><div class="th"><span></span></div>City sustainability report</div>
+    </div>
+    <div class="nums"><div><b>7</b>orders</div><div><b>1</b>of your corrections</div></div>
+  </aside>
+</div>
+
+<script>
+const ITEMS = [
+  ["milk", "Valio Eila® semi skimmed milk drink 10 l, lactose free", "every week", "~120 L / week", [100,100,100,100,0,110,120,120], "↑ 20 % since 26 Oct"],
+  ["butter", "Valio butter 500 g unsalted", "every week", "~10 kg / week", [10,10,10,10,0,10,10,10]],
+  ["rye rolls", "Vaasan Ruispalat 660 g, 12 pcs", "every week", "~25 packs / week", [25,25,25,25,0,25,25,25]],
+  ["oat drink", "Oddlygood® Barista oat drink 1 l", "every week", "~35 L / week", [35,35,35,35,0,35,35,35]],
+  ["granola", "Start Naturell granola 750 g", "every week", "~15 kg / week", [15,15,15,15,0,15,15,15]],
+  ["potatoes", "Pre-washed potatoes 35–50 mm, 15 kg", "every week", "~80 kg / week", [80,75,80,80,0,80,75,80]],
+];
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function bars(w) {
+  const on = w.filter(Boolean), max = Math.max(...on), base = Math.min(...on) * 0.8, H = 16, bw = 5, gap = 2;
+  const h = (v) => (max === base ? H : 5 + ((v - base) / (max - base)) * (H - 5));
+  return `<svg class="bars" width="${8 * (bw + gap) - gap}" height="${H}">${w.map((v, i) => v
+    ? `<rect x="${i * (bw + gap)}" y="${H - h(v)}" width="${bw}" height="${h(v)}" rx="1.5" fill="currentColor"/>`
+    : `<rect class="gap" x="${i * (bw + gap)}" y="${H - 2}" width="${bw}" height="2" rx="1"/>`).join("")}</svg>`;
+}
+document.getElementById("rows").innerHTML = ITEMS.map(([w, p, m, q, weeks, d]) => `
+  <button class="row${d ? " drift" : ""}">
+    <span class="w">${esc(w)}</span>
+    <span><span class="p">${esc(p)}</span><span class="m">${esc(m)}${d ? ` · <span class="up">${esc(d)}</span>` : ""}</span></span>
+    <span class="r"><span class="qty">${esc(q)}</span>${bars(weeks)}</span>
+    <svg class="icon chev"><use href="#i-chev"/></svg>
+  </button>`).join("");
+
+// views
+function view(v) {
+  document.querySelectorAll(".views button").forEach((b) => b.setAttribute("aria-selected", b.dataset.view === v));
+  document.getElementById("v-know").hidden = v !== "know";
+  document.getElementById("v-may").hidden = v !== "may";
+}
+document.querySelector(".views").addEventListener("click", (e) => { const b = e.target.closest("[data-view]"); if (b) view(b.dataset.view); });
+
+// tabs
+function tab(t) {
+  document.querySelectorAll(".tabs [data-tab]").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === t));
+  document.getElementById("kitchen").hidden = t !== "kitchen";
+  document.getElementById("order").hidden = t !== "order";
+  document.getElementById("notes").hidden = t !== "kitchen";
+  document.getElementById("ph").textContent = t === "kitchen" ? "Teach me something about your kitchen…" : "Answer me or add something…";
+  window.scrollTo(0, 0);
+}
+document.querySelector(".tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-tab]"); if (b) tab(b.dataset.tab); });
+document.getElementById("pill").addEventListener("click", () => { tab("kitchen"); view("may"); });
+
+// to check: answering removes the line
+document.getElementById("check").addEventListener("click", (e) => {
+  const b = e.target.closest(".yn button"); if (!b) return;
+  b.closest(".ci").remove();
+  const n = document.querySelectorAll("#check .ci").length;
+  if (!n) document.getElementById("check").remove(); else document.getElementById("check-n").textContent = `(${n})`;
+});
+
+// sources drawer
+const drawer = document.getElementById("drawer");
+document.getElementById("src").addEventListener("click", () => { drawer.hidden = false; });
+drawer.addEventListener("click", (e) => { if (e.target.closest("[data-close]")) drawer.hidden = true; });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") drawer.hidden = true; });
+
+// order the usual -> order thread, drift first
+const thread = document.getElementById("thread");
+const agent = (inner) => `<div class="agent"><span class="agent-dot"><svg class="icon"><use href="#i-spark"/></svg></span><div>${inner}</div></div>`;
+document.querySelector("[data-usual]").addEventListener("click", () => {
+  tab("order");
+  thread.innerHTML = `<div class="msg-me"><div class="bubble">Order the usual</div></div>` + agent(`
+    <section class="card drift-card" id="dcard">
+      <div class="h"><h3>Before I write it down: two things drifted</h3><p>Over the last weeks your orders changed. Everything else looks like always.</p></div>
+      <div class="dr">
+        <div><div class="t">Milk crept up: 100 → 120 L a week</div><div class="s">+20 % since 26 Oct.</div></div>
+        <svg class="spark" width="72" height="24" viewBox="0 0 72 24"><polyline fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="2,20 13,20 24,20 35,20 47,12 58,4 70,4"/></svg>
+        <div class="choice seg" role="group"><button aria-pressed="true" data-milk="120">Keep 120 L</button><button aria-pressed="false" data-milk="100">Back to 100 L</button></div>
+      </div>
+      <div class="dr">
+        <div><div class="t">Cost drifted: €545 → €585 a week</div><div class="s">+7 % in the last 4 weeks. Mostly milk and granola. Above your €300: you approve the cart.</div></div>
+      </div>
+      <div class="card-f"><span>Your choice becomes the usual amount.</span><span class="spacer"></span><button class="btn btn-small btn-primary" id="use">Use these amounts</button></div>
+    </section>`);
+  document.getElementById("dcard").addEventListener("click", (e) => {
+    const s = e.target.closest("[data-milk]");
+    if (s) { s.parentElement.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b === s)); return; }
+    if (!e.target.closest("#use")) return;
+    const milk = document.querySelector('[data-milk][aria-pressed="true"]').dataset.milk;
+    const card = document.getElementById("dcard");
+    card.className = "card decided";
+    card.innerHTML = `<div class="done-line">Drift checked · milk stays at <b>${milk} L</b> a week from now on.</div>`;
+    thread.insertAdjacentHTML("beforeend", agent(`
+      <section class="card">
+        <div class="card-h"><h3>Here’s what I understood</h3><span class="muted" style="font-size:13px">your usual, deliver by Mon 16 Nov</span></div>
+        ${[["milk", milk + " L"], ["butter", "10 kg"], ["rye rolls", "25 packs"], ["oat drink", "35 L"], ["granola", "15 kg"], ["potatoes", "80 kg"]]
+          .map(([w, q]) => `<div class="oi"><span><span class="a">${q} ${w}</span></span><span class="chip k-usual">Your usual</span></div>`).join("")}
+        <div class="card-f"><span style="flex:1">This is what I order. Valio Aimo checks every line against your rules.</span><button class="btn btn-small btn-primary"><svg class="icon"><use href="#i-lock"/></svg>Confirm &amp; send</button></div>
+      </section>`));
+  });
+});
+</script>
+</body>
+</html>

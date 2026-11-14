@@ -33,7 +33,7 @@ export function Header({ tab, showTabs }: { tab: Tab; showTabs: boolean }) {
     >
       <div className="mx-auto flex h-15 max-w-[1280px] items-center gap-2 sm:gap-4" style={{ paddingLeft: "max(16px, env(safe-area-inset-left))", paddingRight: "max(16px, env(safe-area-inset-right))" }}>
         <a href="#order" className="hidden items-baseline gap-1.5 text-[17px] font-extrabold tracking-tight whitespace-nowrap sm:flex">
-          Kitchen agent <small className="hidden text-[13px] font-medium tracking-normal text-ink3 lg:inline">orders from Valio Aimo</small>
+          Aimo Agent
         </a>
         {showTabs && (
           <nav className="flex gap-0.5 rounded-full bg-surface p-[3px] sm:ml-2" role="tablist">
@@ -57,10 +57,7 @@ export function Header({ tab, showTabs }: { tab: Tab; showTabs: boolean }) {
             className="flex h-9 items-center gap-2.5 rounded-full bg-auto-soft pr-3 pl-2.5 text-[13px] font-semibold whitespace-nowrap text-auto"
             title="What I may order without you"
             data-tour="autonomy"
-            onClick={() => {
-              navigate("kitchen");
-              window.setTimeout(() => document.getElementById("autonomy")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
-            }}
+            onClick={() => navigate("kitchen", "may")}
           >
             <Icon name="hand" className="hidden sm:block" />
             <span className="hidden md:inline">{long}</span>

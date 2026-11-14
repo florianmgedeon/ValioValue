@@ -13,6 +13,7 @@ the last level change; the counter starts at 0 when the level changes.
 """
 from __future__ import annotations
 
+import copy
 import logging
 from datetime import datetime
 
@@ -151,6 +152,27 @@ def usual_scope(buyer_id: str, m: dict) -> dict:
     missing = [x for x in want if x not in have]
     extra = [x for x in have if x not in want]
     return {"in_sync": not missing and not extra, "missing": missing, "extra": extra, "grant_id": grant["id"]}
+
+
+def with_usual_scope(m: dict, added: list[str], removed: list[str]) -> dict | None:
+    """Level 1 only: the mandate with the usual-products grant widened by `added` and narrowed by `removed`.
+    None when nothing changes (another level, or the grant already says so)."""
+    if level_of(m) != 1:
+        return None
+    new = copy.deepcopy(valio.editable(m))
+    grants = (new.get("autonomy") or {}).get("grants") or []
+    g = next((x for x in grants if x.get("id") == "g1" and x.get("enabled", True)), None) or next(
+        (x for x in grants if x.get("enabled", True) and product_scope(x) is not None), None)
+    if g is None:
+        return None
+    have = product_scope(g) or []
+    want = [x for x in have if x not in removed] + [x for x in added if x not in have]
+    if want == have:
+        return None
+    for c in g["scope"]:
+        if c.get("attr") == "product_id" and c.get("op") == "in":
+            c["value"] = want
+    return new
 
 
 def mandate_for_level(m: dict, level: int, usual: list[str], max_order_total: float | None) -> tuple[dict, list[str]]:

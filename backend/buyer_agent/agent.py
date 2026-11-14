@@ -171,7 +171,7 @@ A) New request: call propose_intent FIRST, nothing else. original_request = the 
    - A single product request is one item: quantity and unit exactly as the buyer said them.
    - A recipe, menu or shopping list is one item per ingredient. Scale to the portions the buyer needs and convert to buyable units (L, KG, or SALES_UNIT for pieces). Put the scaling in each item's note (e.g. "180 g x 40 portions").
    - hard_rules for what applies to everything (a guest's milk allergy), item hard_rules for one ingredient only. Only what the buyer actually required. Never guess: if "non-dairy", an allergy or anything else is ambiguous, put it in open_questions.
-   - Usual products: when an item matches a usual word or alias of the kitchen (also plurals, Finnish, obvious synonyms), set preferred_product_id on that item to its product id. Use the usual amount only if the buyer gave none. "The usual" = every usual product with its usual amount ("the usual, but double the oat drink": all usual items, oat drink doubled). Never set preferred_product_id for a word that is not in the list, and never swap a usual product for one that seems better: Valio Aimo ranks.
+   - Usual products: when an item matches a usual word or alias of the kitchen (also plurals, Finnish, obvious synonyms), set preferred_product_id on that item to its product id. If that usual entry lists fallback products ("fallback ONLY" or "fallback first"), also pass their product ids in substitute_product_ids in that exact order, and set allow_other_substitutes=false whenever the entry says "fallback ONLY" or "no substitutes allowed". Use the usual amount only if the buyer gave none. "The usual" = every usual product with its usual amount ("the usual, but double the oat drink": all usual items, oat drink doubled). Never set preferred_product_id for a word that is not in the list, and never swap a usual product for an unapproved product: Valio Aimo ranks.
    - Photos: a photo of a shopping or order list: read every line, one item per line, quantities as written, then as above. Put "from your photo" in the note of each item. If a line is unreadable, add an open question quoting what you can read. original_request = the buyer's text plus "[photo: <one-line transcription>]".
      A photo of a menu, recipe or prep sheet WITH an order request ("order for this menu, 420 portions"): one item per ingredient as for recipes.
      A photo of a menu, note, invoice or anything else WITHOUT an order request: do not order. Call learn_from_document(upload_id) for it, then say in one sentence what you found.
@@ -269,21 +269,26 @@ async def _loop(session: Session) -> None:
                         session.emit("context_suggestion", reason=local_tools.reason(call.name),
                                      suggestions=res["suggestions"])
                 else:
+                    call_args = call.args
+                    if call.name == "propose_intent":
+                        from . import kitchen
+                        call_args = kitchen.enrich_intent_items(session.buyer_id, call.args)
                     session.emit("tool_call", call_id=call.id, tool=call.name, step=step, side="valio",
-                                 label=label(call.name, call.args), args=call.args)
+                                 label=label(call.name, call_args), args=call_args)
                     t0 = time.perf_counter()
                     try:
-                        res = tool_payload(await mcp.call_tool(call.name, call.args))
+                        res = tool_payload(await mcp.call_tool(call.name, call_args))
                     except Exception as e:
                         res = {"error": f"{type(e).__name__}: {e}"}
                     ok = not res.get("error") and res.get("status") != "rejected"
                     session.emit("tool_result", call_id=call.id, tool=call.name, ok=ok, summary=summary(call.name, res),
                                  result=res, duration_ms=round((time.perf_counter() - t0) * 1000), side="valio")
-                    stop = _side_events(session, call.name, call.args, res)
+                    stop = _side_events(session, call.name, call_args, res)
                     if stop:
                         order_res = res | {"_tool": call.name}
                 session.history.append({"role": "tool", "tool_call_id": call.id, "name": call.name,
-                                        "content": json.dumps(res, ensure_ascii=False)[:15000]})
+                                        "content": json.dumps(res, ensure_ascii=False)[:15000],
+                                        "result": res})  # untruncated, for the scripted provider
             if stop:
                 if order_res.get("_tool") == "propose_intent":
                     _intent_message(session, order_res["intent"])

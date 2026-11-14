@@ -22,6 +22,7 @@ from . import config
 KINDS = ("about", "usual", "must", "prefer", "autonomy")
 SIGNED_KINDS = ("must", "prefer", "autonomy")
 SOURCE_TYPES = ("photo", "pdf", "text", "order", "correction")
+FALLBACK_MODES = ("ask_any", "only_listed", "none")
 PROMPT_MAX = 1500
 
 _locks: dict[str, threading.RLock] = {}
@@ -174,11 +175,41 @@ def apply_about(profile: dict, payload: dict, source_id: str | None) -> str:
     return f"About: {text}"
 
 
+def normalise_substitutes(subs: list | None, primary_id: str | None = None) -> list[dict]:
+    """Deduplicate substitute entries in order, excluding the primary product id."""
+    out: list[dict] = []
+    seen: set[str] = {str(primary_id)} if primary_id else set()
+    for raw in subs or []:
+        s = {"product_id": raw, "product_name": None} if isinstance(raw, str) else dict(raw or {})
+        pid = str(s["product_id"]).strip() if s.get("product_id") else None
+        if pid:
+            if pid in seen:
+                continue
+            seen.add(pid)
+        item: dict = {"product_id": pid, "product_name": s.get("product_name")}
+        if s.get("candidates"):
+            item["candidates"] = s["candidates"]
+        if pid or item.get("candidates"):
+            out.append(item)
+    return out
+
+
+def normalise_fallback_mode(mode: str | None, has_substitutes: bool) -> str:
+    if mode is None:
+        return "only_listed" if has_substitutes else "ask_any"
+    if mode not in FALLBACK_MODES:
+        raise ValueError(f"fallback_mode must be one of {', '.join(FALLBACK_MODES)}")
+    return mode
+
+
 def apply_usual(profile: dict, payload: dict, source_id: str | None) -> str:
     """Add or replace the usual product for a word. Payload must already be resolved (product_id or None)."""
     word = (payload.get("word") or "").strip().lower()
+    subs = normalise_substitutes(payload.get("substitutes"), payload.get("product_id"))
+    mode = normalise_fallback_mode(payload.get("fallback_mode"), bool(subs))
     entry = {"word": word, "aliases": [a.lower() for a in payload.get("aliases") or []],
              "product_id": payload.get("product_id"), "product_name": payload.get("product_name"),
+             "substitutes": subs, "fallback_mode": mode,
              "typical_qty": payload.get("typical_qty"), "unit": payload.get("unit"), "per": payload.get("per") or "week",
              "source_id": source_id, "status": "active"}
     old = next((u for u in profile["usual"] if u["word"] == word and u.get("status", "active") == "active"), None)
@@ -189,9 +220,103 @@ def apply_usual(profile: dict, payload: dict, source_id: str | None) -> str:
     return f'Usual: "{word}" means {entry["product_name"] or "a product still to choose"}'
 
 
+def find_usual(profile: dict, word: str | None) -> dict | None:
+    """The active usual product for a word or one of its aliases."""
+    w = (word or "").strip().lower()
+    if not w:
+        return None
+    for u in profile.get("usual") or []:
+        if u.get("status", "active") == "active" and (u["word"] == w or w in (u.get("aliases") or [])):
+            return u
+    return None
+
+
+def merge_with_existing(profile: dict, payload: dict) -> dict:
+    """A usual suggestion that only sets substitutes ("if milk is out, take ...") names no product: keep the
+    product, amounts and aliases the kitchen already has for that word instead of searching for the word."""
+    if payload.get("product_id") or payload.get("product_query"):
+        return payload
+    cur = find_usual(profile, payload.get("word"))
+    if not cur:
+        return payload
+    keep = {k: cur.get(k) for k in ("word", "aliases", "product_id", "product_name", "typical_qty", "unit", "per")}
+    return keep | {k: v for k, v in payload.items() if v is not None and k not in ("word",)}
+
+
+def set_fallback(cur: dict, substitutes: list | None, mode: str | None) -> None:
+    """Set a usual product's ordered substitutes and fallback mode (substitutes given = replace the list)."""
+    if substitutes is not None:
+        cur["substitutes"] = normalise_substitutes(substitutes, cur.get("product_id"))
+        if mode is None and cur["substitutes"] and cur.get("fallback_mode", "ask_any") == "ask_any":
+            mode = "only_listed"
+    if mode is not None:
+        cur["fallback_mode"] = normalise_fallback_mode(mode, bool(cur.get("substitutes")))
+
+
+def substitute_ids(profile: dict) -> list[str]:
+    """Approved substitute ids that are not themselves a usual product (those are what a substitute adds)."""
+    primary = {u.get("product_id") for u in profile.get("usual") or [] if u.get("status", "active") == "active"}
+    return [x for x in usual_ids(profile) if x not in primary]
+
+
 def usual_ids(profile: dict) -> list[str]:
-    return [u["product_id"] for u in profile.get("usual") or [] if u.get("status", "active") == "active"
-            and u.get("product_id")]
+    """Product ids covered by level-1 autonomy: every active usual product plus its approved substitutes."""
+    ids: list[str] = []
+    for u in profile.get("usual") or []:
+        if u.get("status", "active") != "active":
+            continue
+        if u.get("product_id"):
+            ids.append(u["product_id"])
+        if u.get("fallback_mode", "ask_any") != "none":
+            for s in u.get("substitutes") or []:
+                if s.get("product_id"):
+                    ids.append(s["product_id"])
+    return list(dict.fromkeys(ids))
+
+
+def enrich_intent_items(buyer_id: str, args: dict) -> dict:
+    """Attach configured substitute_product_ids and allow_other_substitutes from the kitchen profile onto
+    propose_intent items, so an LLM cannot forget or bypass a usual product's fallback rule."""
+    items_in = args.get("items")
+    if not isinstance(items_in, list) or not items_in:
+        return args
+    profile = load(buyer_id)
+    active = [u for u in profile.get("usual") or [] if u.get("status", "active") == "active" and u.get("product_id")]
+    if not active:
+        return args
+    by_pid = {u["product_id"]: u for u in active}
+    by_word: dict[str, dict] = {}
+    for u in active:
+        for w in [u["word"], *(u.get("aliases") or [])]:
+            wl = w.strip().lower()
+            for form in (wl, f"{wl}s", f"{wl}es"):
+                by_word.setdefault(form, u)
+
+    out_items = []
+    for raw in items_in:
+        it = dict(raw)
+        u = by_pid.get(it.get("preferred_product_id"))
+        if not u and not it.get("preferred_product_id"):
+            q = (it.get("product_query") or "").strip().lower()
+            u = by_word.get(q)
+        if u:
+            sub_ids = [s["product_id"] for s in (u.get("substitutes") or []) if s.get("product_id")]
+            mode = u.get("fallback_mode") or ("only_listed" if sub_ids else "ask_any")
+            if not it.get("preferred_product_id"):
+                it["preferred_product_id"] = u["product_id"]
+            if mode == "none":
+                it.pop("substitute_product_ids", None)
+                it["allow_other_substitutes"] = False
+            elif mode == "only_listed":
+                if sub_ids:
+                    it["substitute_product_ids"] = sub_ids
+                else:
+                    it.pop("substitute_product_ids", None)
+                it["allow_other_substitutes"] = False
+            elif sub_ids and not it.get("substitute_product_ids"):
+                it["substitute_product_ids"] = sub_ids
+        out_items.append(it)
+    return dict(args, items=out_items)
 
 
 def _unit(u: str | None) -> str | None:
@@ -201,6 +326,22 @@ def _unit(u: str | None) -> str | None:
 
 def _num(x) -> str:
     return f"{float(x):g}"
+
+
+def _fallback_prompt_suffix(u: dict) -> str:
+    subs = [s for s in (u.get("substitutes") or []) if s.get("product_id")]
+    mode = u.get("fallback_mode") or ("only_listed" if subs else "ask_any")
+    if mode == "none":
+        return "; no substitutes allowed (allow_other_substitutes=false)"
+    if mode == "only_listed":
+        if subs:
+            names = ", ".join(f"{s.get('product_name') or s['product_id']} (product {s['product_id']})" for s in subs)
+            return f"; fallback ONLY: {names} (allow_other_substitutes=false)"
+        return "; no substitutes allowed (allow_other_substitutes=false)"
+    if subs:
+        names = ", ".join(f"{s.get('product_name') or s['product_id']} (product {s['product_id']})" for s in subs)
+        return f"; fallback first: {names}"
+    return ""
 
 
 def prompt_block(buyer_id: str) -> str:
@@ -220,8 +361,9 @@ def prompt_block(buyer_id: str) -> str:
             if u.get("product_id"):
                 amount = (f", usually {_num(u['typical_qty'])} {_unit(u.get('unit'))} a {u.get('per') or 'week'}"
                           if u.get("typical_qty") and _unit(u.get("unit")) else "")
+                fb = _fallback_prompt_suffix(u)
                 lines.append(f'- "{u["word"]}"{alias} → {u.get("product_name") or u["product_id"]} '
-                             f'(product {u["product_id"]}){amount}')
+                             f'(product {u["product_id"]}){amount}{fb}')
             else:
                 lines.append(f'- "{u["word"]}"{alias} → no product chosen yet, search normally')
     text = "\n".join(lines)

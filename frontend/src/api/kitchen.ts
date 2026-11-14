@@ -1,5 +1,5 @@
 import { apiRequest, apiUrl } from "./client";
-import type { IngestResponse, KitchenProfile, Pairing, PairingStreamEvent, UploadMeta, UsualOrder } from "./types";
+import type { Drift, IngestResponse, KitchenProfile, Pairing, PairingStreamEvent, UploadMeta, UsualOrder } from "./types";
 
 export function getKitchenProfile(buyerId?: string): Promise<KitchenProfile> {
   const query = buyerId ? `?buyer_id=${encodeURIComponent(buyerId)}` : "";
@@ -10,6 +10,35 @@ export function patchKitchenProfile(
   patch: Record<string, unknown>,
 ): Promise<KitchenProfile> {
   return apiRequest<KitchenProfile>("/kitchen", { method: "PATCH", json: patch });
+}
+
+export interface KitchenCatalogProduct {
+  product_id: string;
+  name: string;
+  brand?: string | null;
+  category?: string | null;
+  sales_unit?: string | null;
+  country_of_origin?: string | null;
+}
+
+export function searchKitchenProducts(
+  q: string,
+  limit = 8,
+  buyerId?: string,
+): Promise<{ query: string; products: KitchenCatalogProduct[] }> {
+  const params = new URLSearchParams({ q, limit: String(limit) });
+  if (buyerId) params.set("buyer_id", buyerId);
+  return apiRequest<{ query: string; products: KitchenCatalogProduct[] }>(`/kitchen/products?${params.toString()}`);
+}
+
+/** Substitutes and fallback mode of usual products; 409 needs_signature when the usual-products grant changes. */
+export function setUsualFallback(request: {
+  buyer_id?: string;
+  updates: { id: string; substitutes?: { product_id: string; product_name: string }[]; fallback_mode?: "ask_any" | "only_listed" | "none" }[];
+  by?: string;
+  mandate_hash?: string;
+}): Promise<{ profile?: KitchenProfile; mandate?: unknown }> {
+  return apiRequest("/kitchen/usual/fallback", { method: "POST", json: request });
 }
 
 export function getKitchenHistory(
@@ -75,6 +104,11 @@ export function createPairing(
   });
 }
 
+/** The desktop closed the camera dialog: the phone gets "scan the QR code again" on its next upload. */
+export function endPairing(pairId: string): Promise<unknown> {
+  return apiRequest(`/pairings/${encodeURIComponent(pairId)}`, { method: "DELETE" });
+}
+
 const pairingEventTypes = ["paired", "photo_received"] as const;
 
 interface PairingExpiredEvent {
@@ -108,3 +142,13 @@ export function getUsualOrder(buyerId?: string): Promise<UsualOrder> {
   const query = buyerId ? `?buyer_id=${encodeURIComponent(buyerId)}` : "";
   return apiRequest<UsualOrder>(`/kitchen/usual-order${query}`);
 }
+
+/** POST /kitchen/usual-order/drift (2e): keep the new amount or go back; the same value is not flagged again. */
+export function decideDrift(
+  decisions: { key: string; keep?: boolean; value: number; back_to?: number | null }[],
+  by?: string,
+): Promise<KitchenProfile> {
+  return apiRequest<KitchenProfile>("/kitchen/usual-order/drift", { method: "POST", json: { decisions, by } });
+}
+
+export type { Drift };

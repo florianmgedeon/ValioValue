@@ -154,7 +154,7 @@ export function OnboardingView() {
   }, [addUpload, patchDoc]);
 
   // Photos from the phone modal (or the composer-less file picker) land here.
-  useEffect(() => camera.onPhoto("onboard", (u) => addUpload(u)), [camera, addUpload]);
+  useEffect(() => camera.onPhoto("onboard", (ups) => ups.forEach((u) => addUpload(u))), [camera, addUpload]);
 
   /** The text field: before reading it starts reading everything, afterwards it adds one more thing to read. */
   const readMyKitchen = async () => {
@@ -237,7 +237,7 @@ export function OnboardingView() {
         <Steps current={stage === "drop" ? 0 : stage === "reading" || busyReading ? 1 : 2} />
       </div>
 
-      <div className="mt-10 grid grid-cols-1 items-start gap-[18px] min-[560px]:grid-cols-2 min-[1000px]:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,0.7fr)]">
+      <div className="mt-10 grid grid-cols-1 items-start gap-[18px] min-[560px]:grid-cols-2 min-[1000px]:grid-cols-4">
         {docs.map((d) => (
           <DocCard key={d.key} doc={d} highlight={focused?.docKey === d.key ? focused : undefined} />
         ))}
