@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<title>Kitchen Agent</title>
+<title>Aimo Agent</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Caveat:wght@500;700&display=swap">
@@ -789,7 +789,7 @@ function header(){
   const sc=(v,l)=>`<button type="button" aria-pressed="${S.scene===v}" data-act="scene" data-v="${v}">${l}</button>`;
   const autoText = S.level===0 ? 'I ask before every order' : S.level===1 ? `Usual products alone · up to €${S.limit}` : `Orders alone · up to €${S.limit}`;
   return `<header class="top"><div class="top-in">
-    <div class="brand">Kitchen agent <small>orders from Valio Aimo</small></div>
+    <div class="brand">Aimo Agent</div>
     ${S.view==='app'?`<div class="tabs" role="tablist">${tab('order','Order')}${tab('activity','Activity')}${tab('kitchen','Kitchen')}</div>`:''}
     <div class="spacer"></div>
     ${S.view==='app'?`<button class="autopill" data-act="goauto" title="What I may order without you">${ic('hand')}<span class="txt">${autoText}</span></button>`:''}
@@ -1421,7 +1421,7 @@ function phoneModal(){
       <div class="phone"><div class="notch"></div><div class="scr">
         ${m.paired?`<div class="viewfinder"><div class="vf-label">Hold steady · list found</div>${docList()}<div class="vf-corners"></div>
           <button class="shutter" data-act="shoot" aria-label="Take photo"></button>${m.flash?'<div class="flash"></div>':''}</div>`
-        :`<div class="phone-idle"><b>Kitchen agent</b>Opening camera…</div>`}
+        :`<div class="phone-idle"><b>Aimo Agent</b>Opening camera…</div>`}
       </div></div>
     </div></div></div>`;
 }

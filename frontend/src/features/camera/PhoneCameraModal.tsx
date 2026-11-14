@@ -197,7 +197,7 @@ function PhoneFrame({ state, photo }: { state: State; photo: Photo | null }) {
           )
         ) : (
           <div className="grid place-content-center gap-2.5 p-6 text-center text-[13px] text-[#bbb]">
-            <b className="text-[15px] text-white">Kitchen agent</b>
+            <b className="text-[15px] text-white">Aimo Agent</b>
             {state.stage === "waiting" && state.paired ? "Camera open. Take the photo." : "Scan the QR code to open the camera."}
           </div>
         )}
