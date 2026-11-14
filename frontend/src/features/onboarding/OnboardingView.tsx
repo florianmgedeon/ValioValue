@@ -234,7 +234,7 @@ export function OnboardingView() {
         </p>
       </div>
 
-      <div className="mt-10 grid grid-cols-1 items-start gap-[18px] min-[560px]:grid-cols-2 min-[1000px]:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,0.7fr)]">
+      <div className="mt-10 grid grid-cols-1 items-start gap-[18px] min-[560px]:grid-cols-2 min-[1000px]:grid-cols-4">
         {docs.map((d) => (
           <DocCard key={d.key} doc={d} highlight={focused?.docKey === d.key ? focused : undefined} />
         ))}
