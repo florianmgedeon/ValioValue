@@ -159,7 +159,10 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
       {it.items.map((i) => (
         <div key={i.item_id} className="order-item">
           <div className="min-w-0">
-            <div className="ask">{i.quantity?.amount} {unitLabel(i.quantity?.unit)} {i.product?.query}</div>
+            <div className="ask">
+              <span className="q">{i.quantity?.amount} {unitLabel(i.quantity?.unit)}</span>
+              <span className="n">{i.product?.query}</span>
+            </div>
             {i.usual?.name && <div className="nm">Your usual: {i.usual.name}</div>}
             {sameSlack === null && i.quantity?.max_over_pct ? <div className="nm">Rounding up to whole packs, at most +{i.quantity.max_over_pct} %</div> : null}
           </div>

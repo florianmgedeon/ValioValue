@@ -63,9 +63,11 @@
   /* Read-back: what the buyer asked for is the line that matters. Everything else is quiet. */
   .order-item { display: flex; gap: 6px 16px; padding: 12px 20px; border-bottom: 1px solid var(--line); align-items: center; flex-wrap: wrap; }
   .order-item > .min-w-0 { flex: 1; }
-  .order-item .ask { font-size: 18px; font-weight: 700; color: var(--ink); line-height: 1.3; }
-  .order-item .ask::first-letter { text-transform: uppercase; }
-  .order-item .nm { font-size: 13px; color: var(--ink3); margin-top: 2px; }
+  .order-item .ask { display: grid; grid-template-columns: 6.5em minmax(0, 1fr); gap: 16px; font-size: 17px; color: var(--ink); line-height: 1.35; }
+  .order-item .ask .q { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink2); }
+  .order-item .ask .n { overflow-wrap: anywhere; }
+  .order-item .ask .n::first-letter { text-transform: uppercase; }
+  .order-item .nm { font-size: 13px; color: var(--ink3); margin-top: 2px; padding-left: calc(6.5em * 17 / 13 + 16px); }
   .order-item .chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .items-hint { font-size: 13px; color: var(--ink3); padding: 10px 20px; border-bottom: 1px solid var(--line); }
   .paramchips { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 20px; border-bottom: 1px solid var(--line); font-size: 13px; align-items: center; }
