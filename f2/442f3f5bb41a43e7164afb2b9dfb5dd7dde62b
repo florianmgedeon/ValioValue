@@ -1,0 +1,54 @@
+backend/tests/test_learning.py
+  s_d7b23ece589331::t_7001beffe1b228 137-147,152,155
+  s_d7b23ece589331::t_73a9cb31c83ce4 1-18,20-40,42-136,148-151,153-154,156-200
+  s_d7b23ece589331::t_74b5d3fffa5b95 19,41
+backend/buyer_agent/learning.py
+  s_d7b23ece589331::t_74b5d3fffa5b95 48,52-53
+  s_d7b23ece589331::t_b0dbe6551eae9e 18
+  s_d7b23ece589331::t_b74923f4f8ba58 1-17,19-47,49-51,54-208
+backend/buyer_agent/llm.py
+  s_d7b23ece589331::t_b56371f2f27bbb 406-415,431-432,441-452,458-471
+backend/buyer_agent/routes_kitchen.py
+  s_d7b23ece589331::t_e2b4dda9ac1db2 7,44-47
+  s_d7b23ece589331::t_490ad0ebe64f86 48-49
+backend/tests/test_photos.py
+  s_d7b23ece589331::t_73a9cb31c83ce4 121-126,128
+frontend/src/api/kitchen.ts
+  s_d7b23ece589331::t_e780c50f895409 106
+frontend/src/features/order/data.ts
+  s_d7b23ece589331::t_e780c50f895409 9
+frontend/src/api/orders.ts
+  s_d7b23ece589331::t_e780c50f895409 29
+backend/buyer_agent/story.py
+  s_d7b23ece589331::t_e2b4dda9ac1db2 141-142,182-183,185-191,196,207-209
+contracts/backend-api.yaml
+  s_d7b23ece589331::t_1d4d9362c28178 72,100,177-178,199,492-505,1050,1064,1165-1199,1363
+docs/work-packages/2c-activity-and-usual-order.md
+  s_d7b23ece589331::t_48b4c29a7390de 3
+backend/buyer_agent/routes_orders.py
+  s_d7b23ece589331::t_e2b4dda9ac1db2 7,20-23
+backend/buyer_agent/agent.py
+  s_d7b23ece589331::t_22e73cd0a231e5 54,177,180-184,228,231,257,259-270,272,281,330-337,341,355-359,365,411-418,420
+frontend/src/api/mock/index.ts
+  s_d7b23ece589331::t_e780c50f895409 3,5
+docs/work-packages/2a-learning-in-chat.md
+  s_d7b23ece589331::t_48b4c29a7390de 3
+backend/buyer_agent/local_tools.py
+  s_d7b23ece589331::t_c72098a6b17dac 1-110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f2442f3f5bb41a43e7164afb2b9dfb5dd7dde62b",
+  "prompts": {},
+  "sessions": {
+    "s_d7b23ece589331": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2ce80f9b-4cd9-4a3b-854f-c5940f30becb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
