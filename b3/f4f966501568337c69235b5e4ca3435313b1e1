@@ -1,0 +1,32 @@
+frontend/src/features/kitchen/KitchenView.tsx
+  s_d34ffbf12ef855::t_6f085c5e281f04 16,287
+frontend/src/app/composer.tsx
+  s_d34ffbf12ef855::t_6f085c5e281f04 12-13,45,57,60,109-110,122-126,128,137,143-147,153,161,165
+frontend/src/features/order/order.css
+  s_d34ffbf12ef855::t_6f085c5e281f04 16-18,20-21,23-29,33
+frontend/src/features/order/OrderView.tsx
+  s_d34ffbf12ef855::t_6f085c5e281f04 4,13,15-19,31,34-42,69,72,87-92
+frontend/src/features/order/StartView.tsx
+  s_d34ffbf12ef855::t_6f085c5e281f04 3-4,17,21-22,33-37,44-48
+frontend/src/features/order/UsualCard.tsx
+  s_d34ffbf12ef855::t_50ca379bfa43c5 40-41
+  s_d34ffbf12ef855::t_6f085c5e281f04 1-39,42-48
+frontend/src/app/App.tsx
+  s_d34ffbf12ef855::t_6f085c5e281f04 21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b3f4f966501568337c69235b5e4ca3435313b1e1",
+  "prompts": {},
+  "sessions": {
+    "s_d34ffbf12ef855": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ccf5fe61-b83d-4acd-bf29-4a1ee24d3ce4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
