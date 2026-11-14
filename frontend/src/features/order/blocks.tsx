@@ -152,6 +152,7 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
   };
 
   return (
+    <>
     <Card className="rise">
       <CardHeader title="Here's what I understood">
         <span className="text-[13px] text-ink3">from your {it.items.some((i) => i.note === "from your photo") ? "photo" : "message"}</span>
@@ -174,12 +175,6 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
         </div>
       ))}
       {hint && <div className="items-hint">{hint}</div>}
-      {questions.length > 0 && (
-        <div className="questions">
-          <b>I need an answer before I can search:</b>
-          {questions.map((q) => <div key={q}>{q}</div>)}
-        </div>
-      )}
       <div className="paramchips">
         <span className="pchip">Deliver by <b>{fmtDay(it.deliver_by)}</b></span>
         {it.preferences?.optimise && <span className="pchip">Then <b>{it.preferences.optimise === "price" ? "cheapest" : it.preferences.optimise === "co2" ? "lowest CO₂" : "most reliable"}</b></span>}
@@ -197,7 +192,7 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
       <CardFooter>
         <div className="fore">
           {questions.length ? (
-            <><b>Answer below and I write it down again.</b> Nothing is sent before you confirm.</>
+            <>Nothing is sent before you confirm.</>
           ) : (
             <>Valio Aimo checks every line against your rules. Anything outside them comes back to you.</>
           )}
@@ -211,6 +206,13 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
         )}
       </CardFooter>
     </Card>
+    {/* The question goes below the card, as the agent's chat message, so it reads as "answer me in the chat". */}
+    {questions.length > 0 && !b.signed && (
+      <div className="say rise">
+        {questions.map((q) => <p key={q}><b>{q}</b></p>)}
+      </div>
+    )}
+    </>
   );
 }
 
