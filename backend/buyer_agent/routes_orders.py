@@ -1,10 +1,10 @@
-"""Package 2b: the order list for the start screen and the autonomy ladder."""
+"""Package 2b: the order list for the start screen and the autonomy ladder. 2c: the story of one order."""
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from . import autonomy, config, kitchen, valio
+from . import autonomy, config, kitchen, story, valio
 
 router = APIRouter()
 
@@ -19,6 +19,12 @@ async def list_orders(buyer_id: str | None = None, limit: int = 20, before: str 
         clean, reason = autonomy.is_clean(r, rows)
         out.append(r | {"clean": clean, "clean_reason": reason})
     return out
+
+
+@router.get("/orders/{order_id}/story")
+async def order_story(order_id: str):
+    """What happened to one order and why, step by step, in plain sentences (Activity tab)."""
+    return await story.load(order_id)
 
 
 @router.get("/autonomy")

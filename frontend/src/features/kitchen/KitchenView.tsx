@@ -132,7 +132,7 @@ export default function KitchenView() {
     const list = group === "must" ? view.mandatory_rules : view.preferences;
     const id = nextId(group === "must" ? "m" : "p", list.map((x) => x.id));
     const full = { ...rule, id, label, enabled: true, ...(group === "must" ? { source: `You, ${today}` } : {}) } as HardRule | Preference;
-    setOps((o) => [...o, { key: `add:${group}:${id}`, t: "addRule", group, rule: full, text: `Add ${group === "must" ? "must" : "preference"}: ${label}`, kind: "add" }]);
+    setOps((o) => [...o, { key: `add:${group}:${id}`, t: "addRule", group, rule: full, text: `New ${group === "must" ? "must" : "preference"}: ${label}`, kind: "add" }]);
   };
 
   // ---- grants
@@ -145,14 +145,14 @@ export default function KitchenView() {
     const orig = m.autonomy?.grants?.find((x) => x.id === g.id);
     setOps((o) => upsert(o, {
       key: `grant:${g.id}:enabled`, t: "patchGrant", id: g.id!, patch: { enabled: next },
-      text: `${next ? "Turn on" : "Turn off"} permission ${g.id}: ${g.label ?? ""}`, kind: next ? "add" : "del",
+      text: `${next ? "Turn on" : "Turn off"} permission: ${g.label ?? ""}`, kind: next ? "add" : "del",
     }, !!orig && next === (orig.enabled !== false)));
   };
   const addGrant = (g: Grant) => {
     const id = nextId("g", grantIds);
     const grant = { ...g, id, enabled: true, source: `You, ${today}` } as Grant;
     const lim = g.limits?.max_order_total != null ? `up to €${g.limits.max_order_total} an order` : g.limits?.max_line_total != null ? `up to €${g.limits.max_line_total} a line` : `up to €${g.limits?.max_unit_price} per unit`;
-    setOps((o) => [...o, { key: `add:grant:${id}`, t: "addGrant", grant, text: `Add permission ${id}: ${(g.label ?? "products").toLowerCase()} alone, ${lim}`, kind: "add" }]);
+    setOps((o) => [...o, { key: `add:grant:${id}`, t: "addGrant", grant, text: `New permission: ${(g.label ?? "products").toLowerCase()} alone, ${lim}`, kind: "add" }]);
   };
 
   // ---- level and limit (signed on their own: the backend builds g1)

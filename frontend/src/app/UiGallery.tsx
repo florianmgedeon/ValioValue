@@ -138,7 +138,7 @@ export default function UiGallery() {
 
       <Section title="Trust">
         <HashRow label="Intent you signed" value="sha256:3fa9e1c07b52d84e19a6f0c3b7d2e5a8146c9f0b2e7d3a5c8b1f4e6a09d2c7e1" />
-        <DiffList lines={[{ text: "Add must: No sesame, not even traces", kind: "add" }, { text: "Turn off: Lower CO₂ per kg", kind: "del" }, { text: "Limit: up to €800 an order (was €600)", kind: "chg" }]} />
+        <DiffList lines={[{ text: "New must: No sesame, not even traces", kind: "add" }, { text: "Turn off: Lower CO₂ per kg", kind: "del" }, { text: "Limit: up to €800 an order (was €600)", kind: "chg" }]} />
         <CedarBlock text={'// MUST no peanuts or tree nuts incl. \'may contain\'\n@id("m1")\nforbid (principal == Buyer::"school-kitchen-espoo", action, resource)\nwhen { context.verdicts has m1 && context.verdicts.m1 != "safe" };'} />
       </Section>
 

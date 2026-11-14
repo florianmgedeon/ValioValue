@@ -3,7 +3,7 @@
 Level, read from the current mandate (no new mandate field):
   0 Suggest          no grants
   1 Usual products   every grant has a scope `product_id in [...]` (the kitchen's usual products)
-  2 Within mandate   at least one grant without a product_id scope
+  2 Within your rules  at least one grant without a product_id scope
   3 Standing orders  not built, shown locked
 
 An order is CLEAN if it is confirmed, its intent was not revised after it was proposed, and no line needed a human
@@ -20,7 +20,7 @@ from . import config, kitchen, valio
 
 log = logging.getLogger("buyer_agent.autonomy")
 
-LEVELS = {0: "Suggest", 1: "Usual products", 2: "Within mandate", 3: "Standing orders"}
+LEVELS = {0: "Suggest", 1: "Usual products", 2: "Within your rules", 3: "Standing orders"}
 DEFAULT_MAX_ORDER_TOTAL = 600.0
 LEVEL1_ACCEPTS = [{"check": "quantity", "max_over_pct": 5}]
 
@@ -163,7 +163,7 @@ def mandate_for_level(m: dict, level: int, usual: list[str], max_order_total: fl
     diff: list[str] = []
     if level == 0:
         new["autonomy"] = {"grants": []}
-        diff.append("Remove every grant: the agent suggests, you sign every order")
+        diff.append("Nothing alone any more: I suggest, you approve every order")
     elif level == 1:
         if not usual:
             raise ValueError("the kitchen profile has no usual products with a product yet")
@@ -172,16 +172,16 @@ def mandate_for_level(m: dict, level: int, usual: list[str], max_order_total: fl
         g1 = {"id": "g1", "label": "Usual products", "scope": [{"attr": "product_id", "op": "in", "value": usual}],
               "limits": {"max_order_total": limit}, "accepts": LEVEL1_ACCEPTS, "source": "autonomy level 1"}
         new["autonomy"] = {"grants": [g1] + keep}
-        diff.append(f"g1 Usual products: the agent orders your {len(usual)} usual products alone, up to €{limit:,.0f} "
-                    f"an order, accepts +5 % from pack rounding")
-        diff += [f"Remove {g['id']} {g.get('label')}: not limited to usual products" for g in dropped]
+        diff.append(f"Usual products: I order your {len(usual)} usual products alone, up to €{limit:,.0f} "
+                    f"an order, and accept +5 % from pack rounding")
+        diff += [f"Remove the permission “{g.get('label')}”: it is not limited to your usual products" for g in dropped]
     elif level == 2:
         others = [g for g in grants if g["id"] != "g1"]
         acc = (g1_old or {}).get("accepts") or LEVEL1_ACCEPTS
-        g1 = {"id": "g1", "label": "Within mandate", "scope": [], "limits": {"max_order_total": limit}, "accepts": acc,
+        g1 = {"id": "g1", "label": "Within your rules", "scope": [], "limits": {"max_order_total": limit}, "accepts": acc,
               "source": "autonomy level 2"}
         new["autonomy"] = {"grants": [g1] + others}
-        diff.append(f"g1 Within mandate: the agent orders anything your musts allow alone, up to €{limit:,.0f} an order")
+        diff.append(f"Within your rules: I order anything your musts allow alone, up to €{limit:,.0f} an order")
     else:
         raise ValueError("level 3 (standing orders) is not built yet")
     return new, diff

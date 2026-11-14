@@ -145,14 +145,15 @@ def mandate_with(current: dict, suggestions: list[dict], profile: dict, usual: l
                 r |= {"id": valio.fresh_id(new, "m" if s["kind"] == "must" else "p"), "source": src}
                 new[key].append(r)
                 added += 1
-            diff.append(f"Add {s['kind']}: {s['title']} (from {src})" if added
-                        else f"Already in your mandate, {s['kind']}: {s['title']}")
+            what = "Must" if s["kind"] == "must" else "Preference"
+            diff.append(f"New {what.lower()}: {s['title']} (from {src})" if added
+                        else f"{what} you already have: {s['title']}")
         elif s["kind"] == "autonomy":
             g = {"id": valio.fresh_id(new, "g"), "label": p.get("label") or s.get("title"),
                  "scope": _scope(p.get("scope"), usual), "limits": p.get("limits") or {},
                  "accepts": p.get("accepts") or [], "source": src}
             new["autonomy"]["grants"].append(g)
-            diff.append(f"Add autonomy: {g['label']} (from {src})")
+            diff.append(f"May order alone: {g['label']} (from {src})")
     return new, diff
 
 

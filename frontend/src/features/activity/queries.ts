@@ -1,8 +1,5 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { ApiError } from "../../api/client";
-import { MOCK } from "../../api/mock";
-import { getOrderAudit, getOrderStory, listOrders, verifyOrder } from "../../api/orders";
-import type { AuditEntry, OrderStory } from "../../api/types";
+import { getOrderStory, listOrders, verifyOrder } from "../../api/orders";
 import { keys } from "../../app/queries";
 
 export const PAGE = 20;
@@ -17,24 +14,12 @@ export function useOrderList() {
   });
 }
 
-export type StorySource = { story: OrderStory } | { audit: AuditEntry[] };
-
-/**
- * The story of one order. Until 2c builds `/story`, a 404 falls back to the audit trail (mocks off only).
- * TODO(2c): drop the fallback.
- */
+/** The story of one order: `GET /orders/{id}/story` (2c). */
 export function useOrderStory(orderId: string | undefined) {
   return useQuery({
     queryKey: [...keys.orders, orderId, "story"],
     enabled: !!orderId,
-    queryFn: async (): Promise<StorySource> => {
-      try {
-        return { story: await getOrderStory(orderId!) };
-      } catch (e) {
-        if (MOCK || !(e instanceof ApiError) || (e.status !== 404 && e.status !== 405)) throw e;
-        return { audit: await getOrderAudit(orderId!) };
-      }
-    },
+    queryFn: () => getOrderStory(orderId!),
   });
 }
 

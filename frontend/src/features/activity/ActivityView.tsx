@@ -1,12 +1,11 @@
 import { useMemo, useRef } from "react";
 import type { OrderSummary } from "../../api/types";
 import { useComposer } from "../../app/composer";
-import { useMandate } from "../../app/queries";
 import { navigate } from "../../app/route";
 import { Button, Tier, eur } from "../../ui";
 import "./activity.css";
 import { formatDay } from "./format";
-import { fromAudit, fromStory } from "./model";
+import { fromStory } from "./model";
 import { useOrderList, useOrderStory } from "./queries";
 import { StoryTimeline } from "./StoryTimeline";
 
@@ -61,21 +60,10 @@ function OrderItem({ o, current, onOpen }: { o: OrderSummary; current: boolean; 
 
 function Story({ orderId, summary }: { orderId: string; summary?: OrderSummary }) {
   const story = useOrderStory(orderId);
-  const mandate = useMandate();
-  const model = useMemo(() => {
-    if (!story.data) return null;
-    return "story" in story.data ? fromStory(story.data.story, summary) : fromAudit(orderId, story.data.audit, summary);
-  }, [story.data, summary, orderId]);
-
-  const grants = mandate.data?.autonomy?.grants;
-  const rules = mandate.data?.mandatory_rules;
-  const grantLabel = (id: string) => grants?.find((g) => g.id === id)?.label ?? undefined;
-  const ruleLabel = (id: string) => rules?.find((r) => r.id === id)?.label ?? undefined;
+  const model = useMemo(() => (story.data ? fromStory(story.data, summary) : null), [story.data, summary]);
 
   if (story.isPending) return <p className="text-sm text-ink3">Loading order {orderId}…</p>;
   if (story.isError) return <p className="text-sm text-must">Could not load order {orderId}: {story.error.message}</p>;
   if (!model) return null;
-  return (
-    <StoryTimeline model={model} grantLabel={grantLabel} ruleLabel={ruleLabel} />
-  );
+  return <StoryTimeline model={model} />;
 }

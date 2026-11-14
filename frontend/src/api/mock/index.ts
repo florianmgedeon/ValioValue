@@ -36,7 +36,7 @@ export const orderStory = (orderId: string): OrderStory => ({
     ] },
     { kind: "decided", at: "2026-11-14T07:02:55Z", lines: [
       { item_id: "i1", outcome: "alone", grant: "g1", why: "No deviation, inside €600" },
-      { item_id: "i5", outcome: "blocked", rule: "m1", evidence: "Supplier label 9 Nov: MAY_CONTAIN tree nuts (GS1)" },
+      { item_id: "i5", outcome: "blocked", rule: "m1", why: "No nuts, not even 'may contain'", evidence: "Supplier label 9 Nov: MAY_CONTAIN tree nuts (GS1)" },
       { item_id: "i5", outcome: "you", by: "Anna Virtanen", why: "Replaced by Nut-free oat muesli (+€4.80)" },
     ] },
     { kind: "confirmed", at: "2026-11-14T07:03:10Z", verify_url: `/orders/${orderId}/verify` },

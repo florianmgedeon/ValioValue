@@ -17,32 +17,26 @@ function Step({ icon, node = "", title, children }: { icon: IconName; node?: str
   );
 }
 
-function OutcomeChip({ line, grantLabel }: { line: DecidedLine; grantLabel: (id: string) => string | undefined }) {
+function OutcomeChip({ line }: { line: DecidedLine }) {
   switch (line.outcome) {
-    case "alone": {
-      const label = line.grant ? grantLabel(line.grant) : undefined;
-      return <Chip kind="auto" icon="lock">Ordered alone{label ? ` · ${label}` : ""}</Chip>;
-    }
+    case "alone":
+      return <Chip kind="auto" icon="lock">Ordered alone</Chip>;
     case "you":
-      return <Chip kind="about" icon="hand">You decided</Chip>;
+      return <Chip kind="about" icon="hand">{line.by ? "You decided" : "Needs your OK"}</Chip>;
     case "blocked":
-      return <Chip kind="must" icon="ban">Blocked{line.rule ? ` · ${line.rule}` : ""}</Chip>;
+      return <Chip kind="must" icon="ban">Blocked</Chip>;
     default:
       return null;
   }
 }
 
-export function StoryTimeline({ model, grantLabel, ruleLabel }: {
-  model: StoryModel;
-  grantLabel: (id: string) => string | undefined;
-  ruleLabel: (id: string) => string | undefined;
-}) {
+export function StoryTimeline({ model }: { model: StoryModel }) {
   const c = counts(model);
   const meta = [
     `${c.lines} ${c.lines === 1 ? "line" : "lines"}`,
-    !model.reduced || c.alone ? `${c.alone} alone` : null,
-    !model.reduced || c.you ? `${c.you} by you` : null,
-    !model.reduced || c.blocked ? `${c.blocked} blocked` : null,
+    c.alone ? `${c.alone} alone` : null,
+    c.you ? `${c.you} by you` : null,
+    c.blocked ? `${c.blocked} blocked` : null,
   ].filter(Boolean);
   const anyBlocked = c.blocked > 0 || model.tier === "block";
   const u = model.understood;
@@ -87,7 +81,6 @@ export function StoryTimeline({ model, grantLabel, ruleLabel }: {
 
         {model.searched.length > 0 && (
           <Step icon="search" node="usual" title="I searched and picked">
-            <span className="act-muted">Products per line: catalog → after your musts → in stock → picked</span>
             {model.searched.map((l, i) => {
               // Red only while nothing replaced the blocked product.
               const mine = model.decided.filter((d) => d.itemId && d.itemId === l.itemId);
@@ -95,38 +88,30 @@ export function StoryTimeline({ model, grantLabel, ruleLabel }: {
               return (
                 <div key={l.itemId ?? i} className={`act-why${blocked ? " blocked" : ""}`}>
                   <span className="font-semibold">{l.name}</span>
-                  <span className="act-f">{l.funnel ?? ""}</span>
-                  <span className="act-w">{model.reduced ? l.why && <span>{l.why}.</span> : l.why}</span>
+                  <span className="act-f">{l.options !== undefined ? `out of ${l.options}` : ""}</span>
+                  <span className="act-w">{l.why}</span>
                 </div>
               );
             })}
           </Step>
         )}
 
-        {(model.decided.length > 0 || model.decidedNotes.length > 0) && (
+        {model.decided.length > 0 && (
           <Step icon="shield" node={anyBlocked ? "block" : c.you ? "you" : "ok"} title="Valio Aimo decided, line by line">
-            <span className="act-muted">
-              Checked against your rules
-            </span>
-            {!model.reduced && model.decided.map((l, i) => (
+            <span className="act-muted">Checked against your rules</span>
+            {model.decided.map((l, i) => (
               <div key={i} className={`act-why${l.outcome === "blocked" ? " blocked" : ""}`}>
                 <span>{l.name}</span>
-                <span><OutcomeChip line={l} grantLabel={grantLabel} /></span>
+                <span><OutcomeChip line={l} /></span>
                 {(l.why || l.by) && l.outcome !== "blocked" && (
                   <span className="act-w">{[l.why, l.outcome === "you" && l.by ? `by ${l.by}` : null].filter(Boolean).join(" · ")}</span>
                 )}
-                {l.outcome === "blocked" && (l.rule || l.evidence) && (
+                {l.outcome === "blocked" && (l.why || l.evidence) && (
                   <span className="act-w">
-                    {l.rule && ruleLabel(l.rule) && <span>{ruleLabel(l.rule)}.</span>}
-                    {l.evidence && <>Evidence: <Cond>{l.evidence}</Cond></>}
+                    {l.why && <span>Your rule: {l.why}.</span>}
+                    {l.evidence && <> Product label: <Cond>{l.evidence}</Cond></>}
                   </span>
                 )}
-              </div>
-            ))}
-            {model.reduced && model.decidedNotes.map((t, i) => (
-              <div key={i} className={`act-why${/block/i.test(t) ? " blocked" : ""}`}>
-                <span>{t}</span>
-                <span />
               </div>
             ))}
           </Step>

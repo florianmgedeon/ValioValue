@@ -168,6 +168,35 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/AuditEntry" }
 
+  /orders/{order_id}/story:
+    get:
+      summary: What happened to one order and why, in plain sentences (Activity tab, package 2c)
+      description: >
+        Built from the order, its intent and its audit trail. `why` sentences come from templates, never from an LLM,
+        and contain no hashes, rule ids or grant ids. Steps: asked, understood, searched, decided, confirmed.
+        `funnel` per searched item is catalog → after your musts → can deliver → picked (only recorded counts).
+      parameters:
+        - in: path
+          name: order_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: The story
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [order_id, label, tier, steps]
+                properties:
+                  order_id: { type: string }
+                  label: { type: string, example: "Ordered alone" }
+                  tier: { type: string, enum: [auto, ask, block] }
+                  total: { type: number }
+                  mandate: { type: object, properties: { version: { type: integer }, grants_used: { type: array, items: { type: string } } } }
+                  steps: { type: array, items: { type: object, required: [kind], properties: { kind: { type: string, enum: [asked, understood, searched, decided, confirmed, learned] }, at: { type: string } }, additionalProperties: true } }
+        "404": { description: Unknown order }
+
   /mandate:
     get:
       summary: The buyer's current mandate (Must, Prefer, Autonomy) as Valio Aimo enforces it

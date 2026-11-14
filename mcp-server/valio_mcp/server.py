@@ -265,7 +265,7 @@ async def search_products(
                   + (f", {len(excluded)} excluded by hard rules" if it else ""),
                   session=session, data={"filters": result["filters"], "product_ids": [p.id for p in hits],
                                          "intent_id": intent_id, "item_id": result["item_id"],
-                                         "excluded_count": len(excluded)})
+                                         "total_matches": total, "excluded_count": len(excluded)})
     return result
 
 
@@ -421,6 +421,7 @@ async def check_offer(
                   f"{n_full} can deliver {quantity:g} {quantity_unit} in full",
                   session=session,
                   data={"quotes": [o["quote_id"] for o in offers], "recommended": recommended, "skipped": skipped,
+                        "can_fulfil": n_full,
                         "intent_id": intent_id, "item_id": item["item_id"] if item else None})
     return {"intent_id": intent_id, "item_id": item["item_id"] if item else None,
             "product_query": item["product"]["query"] if item else None,

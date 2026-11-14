@@ -27,7 +27,7 @@ export function verifyOrder(orderId: string): Promise<Verification> {
   );
 }
 
-/** GET /orders/{id}/story (2c). Mocked with VITE_MOCK=1 until 2c is built. */
+/** GET /orders/{id}/story (2c). With VITE_MOCK=1 it answers from a fixture. */
 export function getOrderStory(orderId: string): Promise<OrderStory> {
   if (MOCK) return mock.delay(orderStory(orderId));
   return apiRequest<OrderStory>(`/orders/${encodeURIComponent(orderId)}/story`);

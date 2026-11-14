@@ -99,7 +99,7 @@ async def test_onboarding_end_to_end(client):
     pre = r.json()["detail"]["preview"]
     # a new buyer starts from the default mandate; its first own version is the next one
     assert r.json()["detail"]["needs_signature"] and pre["version"] >= 1
-    assert any(d.startswith("Add must: No peanuts or tree nuts") and "(from Allergy note)" in d for d in pre["diff"]), pre["diff"]
+    assert any(d.startswith("New must: No peanuts or tree nuts") and "(from Allergy note)" in d for d in pre["diff"]), pre["diff"]
     assert "forbid" in pre["cedar"]
     assert (await client.get("/kitchen", params={"buyer_id": buyer})).json()["version"] == before_k["version"]
 
