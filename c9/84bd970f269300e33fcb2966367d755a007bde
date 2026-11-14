@@ -1,0 +1,84 @@
+frontend/src/api/types.ts
+  s_ae66a622cb7c07::t_583b78dbbd5037 46-48
+backend/buyer_agent/routes_kitchen.py
+  s_ae66a622cb7c07::t_583b78dbbd5037 50-93
+backend/tests/test_photos.py
+  s_ae66a622cb7c07::t_583b78dbbd5037 73-91
+frontend/src/features/order/DriftCard.tsx
+  s_ae66a622cb7c07::t_583b78dbbd5037 1-98
+docs/work-packages/2e-drift-and-learned-section.md
+  s_ae66a622cb7c07::t_583b78dbbd5037 1-30
+frontend/src/features/kitchen/KitchenView.tsx
+  s_ae66a622cb7c07::t_583b78dbbd5037 11,17-19,29-30,38,63-64,265-266,274,284-286,289-290,292-294,296-319
+  s_ae66a622cb7c07::t_18029cf441a161 291
+frontend/src/app/Header.tsx
+  s_ae66a622cb7c07::t_583b78dbbd5037 57
+frontend/mockup/kitchen-tidy.html
+  s_ae66a622cb7c07::t_583b78dbbd5037 1-481
+frontend/src/features/kitchen/Learned.tsx
+  s_ae66a622cb7c07::t_7057a4c4be1a02 7,48,53,56,58-59,85,93,122,127,156
+  s_ae66a622cb7c07::t_583b78dbbd5037 1-6,8-47,49-52,54-55,57,60-84,86-92,94-121,123-126,128-155,157-160
+frontend/src/app/App.tsx
+  s_ae66a622cb7c07::t_583b78dbbd5037 25
+contracts/backend-api.yaml
+  s_ae66a622cb7c07::t_583b78dbbd5037 435-440,512-536,1250-1258,1264-1301
+frontend/src/features/order/blocks.tsx
+  s_ae66a622cb7c07::t_583b78dbbd5037 11,133-138,231,442
+frontend/src/features/camera/PhoneCameraModal.tsx
+  s_ae66a622cb7c07::t_583b78dbbd5037 4,21-22,29-31,37,41-42,47,50-51,57,66-71,73-76,89,91,94-104,111,121-126,143-167,169-173,178,184,189-190,196
+backend/tests/test_drift.py
+  s_ae66a622cb7c07::t_583b78dbbd5037 1-114
+frontend/src/api/generated.d.ts
+  s_ae66a622cb7c07::t_583b78dbbd5037 1042-1077,1287-1343,2513-2523,2537-2581
+frontend/src/features/kitchen/Profile.tsx
+  s_ae66a622cb7c07::t_583b78dbbd5037 1,4,82,84,86,88,91-94,96,100,102-103,105,115,163,178-180,183-184,186-214
+frontend/src/features/onboarding/OnboardingView.tsx
+  s_ae66a622cb7c07::t_583b78dbbd5037 156
+frontend/mockup/learned-from-orders.html
+  s_ae66a622cb7c07::t_583b78dbbd5037 1-378
+frontend/src/features/order/order.css
+  s_ae66a622cb7c07::t_583b78dbbd5037 162-179
+.claude/launch.json
+  s_ae66a622cb7c07::t_583b78dbbd5037 6-10,14-18,22-26
+  s_ae66a622cb7c07::t_394a3983ca61ba 1-5,11-13,19-21,27-29
+backend/buyer_agent/learning.py
+  s_ae66a622cb7c07::t_583b78dbbd5037 1,15,17,20,55,165,167-172,175,187-192,199-200,203,208-359
+backend/buyer_agent/static/phone.html
+  s_ae66a622cb7c07::t_583b78dbbd5037 98
+docs/work-packages/README.md
+  s_ae66a622cb7c07::t_583b78dbbd5037 24
+backend/buyer_agent/routes_uploads.py
+  s_ae66a622cb7c07::t_583b78dbbd5037 107-114,117,134,137-140
+frontend/src/features/kitchen/kitchen.css
+  s_ae66a622cb7c07::t_583b78dbbd5037 51,117-177
+  s_ae66a622cb7c07::t_85b3d42367a971 70-72,105-106
+  s_ae66a622cb7c07::t_0fcc03ce6d5d39 52-66
+frontend/src/features/order/OrderView.tsx
+  s_ae66a622cb7c07::t_583b78dbbd5037 1-3,7-8,10-11,40-44,61-71,73,75-79,115,117-138
+frontend/src/ui/Icon.tsx
+  s_ae66a622cb7c07::t_583b78dbbd5037 23
+frontend/src/features/kitchen/Substitutes.tsx
+  s_ae66a622cb7c07::t_469b3b85a6e34f 1-200
+contracts/fixtures/kitchen/school-kitchen-espoo.orders-history.json
+  s_ae66a622cb7c07::t_583b78dbbd5037 1-405
+frontend/src/api/kitchen.ts
+  s_ae66a622cb7c07::t_583b78dbbd5037 2,97-101,135-144
+frontend/src/app/PhoneCamera.tsx
+  s_ae66a622cb7c07::t_583b78dbbd5037 10-11,20-21,41-42,44,47-52,96
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c984bd970f269300e33fcb2966367d755a007bde",
+  "prompts": {},
+  "sessions": {
+    "s_ae66a622cb7c07": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "17c77e78-e3e9-4493-a5a6-ee29ba1d8552",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
