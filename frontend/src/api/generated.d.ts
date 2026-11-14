@@ -1934,8 +1934,11 @@ export interface components {
             key_id?: string;
         };
         DiffCheck: {
-            /** @enum {string} */
-            field?: "product" | "hard_rules" | "preference" | "quantity" | "delivery_date" | "budget" | "autonomy" | "quote_valid" | "quote_signature" | "order_cutoff" | "availability" | "binding";
+            /**
+             * @description usual (1c): the cart has another product than the buyer's usual one
+             * @enum {string}
+             */
+            field?: "product" | "hard_rules" | "preference" | "quantity" | "delivery_date" | "budget" | "autonomy" | "quote_valid" | "quote_signature" | "order_cutoff" | "availability" | "binding" | "usual";
             /** @description Line check for this item. Null = whole cart (budget, autonomy) */
             item_id?: string | null;
             /** @description preference checks: which preference */

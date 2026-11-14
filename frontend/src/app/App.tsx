@@ -8,6 +8,7 @@ import { queryClient, useKitchen } from "./queries";
 import { navigate, useHashRoute, type Route } from "./route";
 import { SignProvider } from "./signing";
 import { Placeholder } from "./Placeholder";
+import OrderView from "../features/order/OrderView";
 
 const UiGallery = import.meta.env.DEV ? lazy(() => import("./UiGallery")) : null;
 
@@ -15,7 +16,7 @@ const UiGallery = import.meta.env.DEV ? lazy(() => import("./UiGallery")) : null
 function Screen({ route }: { route: Route }): ReactNode {
   switch (route.tab) {
     case "order":
-      return <Placeholder pkg="F1" title="Order" />;
+      return <OrderView />;
     case "activity":
       return <Placeholder pkg="F4" title="Activity" note={route.param ? `Order ${route.param}` : undefined} />;
     case "kitchen":

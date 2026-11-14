@@ -1,0 +1,604 @@
+import { useState, type ReactNode } from "react";
+import { decideApproval } from "../../api/approvals";
+import { ApiError, apiUrl } from "../../api/client";
+import { confirmIntent } from "../../api/intents";
+import { acceptKitchenSuggestions, rejectKitchenSuggestion } from "../../api/kitchen";
+import { getCompiledMandate } from "../../api/mandate";
+import type { Approval, OrderIntent, Schema } from "../../api/types";
+import { SIGNER_NAME } from "../../app/queries";
+import { navigate } from "../../app/route";
+import { useSignedChange } from "../../app/signing";
+import { Button, Card, CardFooter, CardHeader, CedarBlock, Chip, Cond, HashRow, Icon, KindTag, Typing, eur, useToast, type Kind } from "../../ui";
+import { fmtDay, shortHash, unitLabel, useKitchenContext } from "./data";
+import { lineDeviations, mandateVersion, mergeFunnel, type Block, type ItemIssue, type LocalAction, type UsualExcluded } from "./orderReducer";
+
+type Check = ReturnType<typeof lineDeviations>[number];
+type BlockOf<K extends Block["kind"]> = Extract<Block, { kind: K }>;
+
+export interface BlockCtx {
+  local: (a: LocalAction) => void;
+  retry: () => void;
+  openTrust: (t: { mode: "intent"; intent: OrderIntent } | { mode: "receipt"; orderId: string }) => void;
+  /** Put text into the composer for the buyer to finish. */
+  prefill: (text: string) => void;
+  /** item_id -> why nothing could be ordered for it */
+  issues: Record<string, ItemIssue>;
+  /** The read-back of this order, for names and queries in later cards. */
+  intent: OrderIntent | null;
+  usualExcluded: UsualExcluded[];
+  mandateId: string | null;
+}
+
+function Agent({ children }: { children: ReactNode }) {
+  return (
+    <div className="agent">
+      <div className="agent-dot"><Icon name="spark" /></div>
+      <div className="agent-body">{children}</div>
+    </div>
+  );
+}
+
+/** Inline markdown: **bold** and `code`. */
+function Inline({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/(\*\*[^*]+\*\*|`[^`]+`)/).map((p, i) =>
+        p.startsWith("**") && p.endsWith("**") ? <b key={i}>{p.slice(2, -2)}</b>
+        : p.startsWith("`") && p.endsWith("`") && p.length > 1 ? <span key={i} className="font-mono text-[0.92em]">{p.slice(1, -1)}</span>
+        : p,
+      )}
+    </>
+  );
+}
+
+/** Agent text: paragraphs, "- " lists, bold, code. Enough for what the agent writes; no full markdown. */
+function Rich({ text }: { text: string }) {
+  const out: ReactNode[] = [];
+  let list: string[] = [];
+  const flush = () => {
+    if (list.length) out.push(<ul key={out.length} className="say-list">{list.map((l, i) => <li key={i}><Inline text={l} /></li>)}</ul>);
+    list = [];
+  };
+  for (const line of text.split("\n")) {
+    const item = /^\s*(?:[-*•]|\d+[.)])\s+(.*)$/.exec(line);
+    if (item) list.push(item[1]!);
+    else {
+      flush();
+      if (line.trim()) out.push(<p key={out.length}><Inline text={line} /></p>);
+    }
+  }
+  flush();
+  return <div className="say">{out}</div>;
+}
+
+/** The agent's recap after a receipt repeats the cards. Show its first sentence, the rest on request. */
+function Recap({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const first = /^[^\n]*?[.!?](?=\s|$)/.exec(text.replace(/\*\*/g, ""))?.[0] ?? text.split("\n")[0]!;
+  if (open || first.length >= text.replace(/\*\*/g, "").trim().length) return <Rich text={text} />;
+  return (
+    <div className="say">
+      <p className="text-ink2">{first} <button className="link text-[13px]" onClick={() => setOpen(true)}>Show my full answer</button></p>
+    </div>
+  );
+}
+
+function errText(e: unknown) {
+  if (e instanceof ApiError && typeof e.detail === "object" && e.detail && "error" in e.detail) return String((e.detail as { error: unknown }).error);
+  return (e as Error).message;
+}
+
+const queryOf = (intent: OrderIntent | null, itemId: string | null | undefined) =>
+  intent?.items.find((i) => i.item_id === itemId)?.product?.query ?? itemId ?? "this line";
+
+// ---------------------------------------------------------------- me, photo, say, typing
+
+function Me({ b }: { b: BlockOf<"me"> }) {
+  return <div className="msg-me rise"><div className="bubble">{b.text}</div></div>;
+}
+
+function Photo({ b }: { b: BlockOf<"photo"> }) {
+  return (
+    <div className="msg-me rise">
+      {b.attachments.map((a, i) => (
+        <div key={a.upload_id ?? i} className="photo-msg">
+          {a.media_type === "application/pdf" ? (
+            <div className="pdf"><Icon name="doc" />{a.filename ?? "PDF"}</div>
+          ) : (
+            <img src={apiUrl(a.url ?? `/uploads/${a.upload_id}`)} alt={a.filename ?? "Your photo"} />
+          )}
+        </div>
+      ))}
+      {b.text && <div className="bubble">{b.text}</div>}
+    </div>
+  );
+}
+
+export function TypingBlock() {
+  return <Agent><Typing /></Agent>;
+}
+
+// ---------------------------------------------------------------- read-back
+
+function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
+  const toast = useToast();
+  const k = useKitchenContext();
+  const [busy, setBusy] = useState(false);
+  const it = b.intent;
+  const mandateRules = it.hard_rules.filter((r) => r.source === "mandate" || /^m\d/.test(r.id ?? ""));
+  const requestRules = it.hard_rules.filter((r) => !mandateRules.includes(r));
+  const anyUsual = it.items.some((i) => i.usual?.name);
+  const questions = it.questions ?? [];
+
+  const sign = async () => {
+    if (!it.intent_hash) return;
+    setBusy(true);
+    try {
+      await confirmIntent(it.intent_id, { intent_hash: it.intent_hash, confirmed_by: SIGNER_NAME });
+      ctx.local({ type: "local/signed", intentId: it.intent_id });
+    } catch (e) {
+      toast(`Not signed: ${errText(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card className="rise">
+      <CardHeader title="Here's what I understood">
+        <span className="text-[13px] text-ink3">from your {it.items.some((i) => i.note === "from your photo") ? "photo" : "message"}</span>
+        <span className="flex-1" />
+        {it.intent_hash && (
+          <button className="link text-[13px]" onClick={() => ctx.openTrust({ mode: "intent", intent: it })}>
+            intent {shortHash(it.intent_hash)}
+          </button>
+        )}
+      </CardHeader>
+      {it.items.map((i) => (
+        <div key={i.item_id} className="order-item">
+          <div className="min-w-0">
+            <div className="ask">{i.quantity?.amount} {unitLabel(i.quantity?.unit)} {i.product?.query}</div>
+            <div className="nm">{i.usual?.name ?? "I search the catalog after you sign"}</div>
+            {i.quantity?.max_over_pct ? <div className="qty">rounding up to whole packs, at most +{i.quantity.max_over_pct} %</div> : null}
+          </div>
+          <div className="px" />
+          <div className="chips">
+            {i.usual?.name ? <Chip kind="usual" icon="usual">Your usual</Chip> : <Chip kind="about">New for you</Chip>}
+            {(i.hard_rules ?? []).map((r, n) => <Chip key={n} kind="must" icon="check">{r.label ?? `${r.attr} ${r.op} ${String(r.value)}`}</Chip>)}
+          </div>
+        </div>
+      ))}
+      {questions.length > 0 && (
+        <div className="questions">
+          <b>I need an answer before I can search:</b>
+          {questions.map((q) => <div key={q}>{q}</div>)}
+        </div>
+      )}
+      <div className="paramchips">
+        <span className="pchip">Deliver by <b>{fmtDay(it.deliver_by)}</b></span>
+        {it.preferences?.optimise && <span className="pchip">Then <b>{it.preferences.optimise === "price" ? "cheapest" : it.preferences.optimise === "co2" ? "lowest CO₂" : "most reliable"}</b></span>}
+        {requestRules.map((r, n) => <span key={n} className="pchip">Only <b>{r.label ?? r.attr}</b></span>)}
+      </div>
+      {(mandateRules.length > 0 || k.prefers.length > 0 || anyUsual) && (
+        <div className="applied">
+          Applied from your kitchen:
+          {mandateRules.map((r) => <Chip key={r.id ?? r.label} kind="must" icon="lock">{r.label ?? r.id}</Chip>)}
+          {k.prefers.map((p) => <Chip key={p.id ?? p.label} kind="prefer">{p.label ?? p.id}</Chip>)}
+          {anyUsual && <Chip kind="usual">Your usual products</Chip>}
+        </div>
+      )}
+      {(it.notes ?? []).length > 0 && <div className="applied">{it.notes!.join(" · ")}</div>}
+      <CardFooter>
+        <div className="fore">
+          {questions.length ? (
+            <><b>Answer below and I write it down again.</b> Nothing is sent before you sign.</>
+          ) : (
+            <><b>You sign exactly this.</b> Valio Aimo checks every line against your mandate{k.limit ? ` and orders alone up to ${eur(k.limit)}` : ""}. Anything else comes back to you.</>
+          )}
+        </div>
+        {b.signed ? (
+          <Chip kind="prefer" icon="check">Signed</Chip>
+        ) : questions.length ? null : (
+          <Button variant="primary" icon="lock" disabled={busy || !it.intent_hash} onClick={() => void sign()}>
+            {busy ? "Signing…" : "Sign & send to Valio Aimo"}
+          </Button>
+        )}
+      </CardFooter>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------- funnel
+
+function Funnel({ b }: { b: BlockOf<"funnel"> }) {
+  const rows = mergeFunnel(b.items);
+  const top = Math.max(1, rows[0]?.count ?? 1);
+  return (
+    <Card className="rise">
+      <CardHeader title="How I narrowed it down"><span className="text-[13px] text-ink3">Valio Aimo catalog · live price and stock</span></CardHeader>
+      <div className="funnel">
+        {rows.map((r) => (
+          <div key={r.key} className={`frow ${r.kind ? `f-${r.kind}` : ""}`}>
+            <div>
+              <div>{r.label} {r.why && <span className="why">· {r.why}</span>}</div>
+              <div className="bar"><i style={{ width: `${Math.max(2, Math.round((r.count / top) * 100))}%` }} /></div>
+            </div>
+            <div className="cnt">{r.count.toLocaleString("en-GB")}</div>
+          </div>
+        ))}
+      </div>
+      {b.usualExcluded.length > 0 && (
+        <div className="applied">
+          {b.usualExcluded.map((u) => (
+            <Chip key={u.item_id} kind="must" icon="flag">Your usual {u.query ?? ""} broke {u.rule_id ?? "a must"}</Chip>
+          ))}
+        </div>
+      )}
+      {b.checking && (
+        <CardFooter>
+          <div className="fore flex items-center gap-2"><Typing />Valio Aimo is checking every line against your mandate…</div>
+        </CardFooter>
+      )}
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------- decision and approve
+
+function useDecide(approval: Approval, local: BlockCtx["local"]) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const decide = async (decision: "approve" | "reject") => {
+    setBusy(true);
+    try {
+      await decideApproval(approval.approval_id, { decision, decided_by: SIGNER_NAME, cart_hash: decision === "approve" ? approval.cart_hash : undefined });
+      local({ type: "local/decided", approvalId: approval.approval_id, decision });
+    } catch (e) {
+      toast(`Not sent: ${errText(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { busy, decide };
+}
+
+function checkTitle(c: Check, ctx: BlockCtx): { title: string; text: string; usual?: UsualExcluded } {
+  const q = queryOf(ctx.intent, c.item_id);
+  const usual = ctx.usualExcluded.find((u) => u.item_id === c.item_id);
+  if ((c.field === "usual" || c.field === "product") && usual) {
+    return {
+      title: `Your usual ${q} is blocked by your rules.`,
+      text: `${usual.name ?? "It"}: ${usual.reason ?? "breaks a must"}. Valio Aimo would block it. I picked ${c.cart} instead. The other lines are fine.`,
+      usual,
+    };
+  }
+  if (c.field === "usual") return { title: `${cap(q)}: not your usual product.`, text: `Your usual is ${c.intended}. I found ${c.cart}.` };
+  return { title: `${cap(q)}: ${c.detail ?? c.field}.`, text: `You signed ${c.intended ?? "—"}. The cart has ${c.cart ?? "—"}.` };
+}
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+function Decision({ b, n, ctx }: { b: BlockOf<"decision">; n: number; ctx: BlockCtx }) {
+  const { busy, decide } = useDecide(b.approval, ctx.local);
+  const [pick, setPick] = useState<"approve" | "reject">("approve");
+  const first = b.checks[0]!;
+  const head = checkTitle(first, ctx);
+  const lines = b.approval.lines.filter((l) => b.checks.some((c) => c.item_id === l.item_id));
+  const done = b.decided;
+  const choice = done ?? pick;
+  const ruleId = head.usual?.rule_id;
+  const opts = [
+    {
+      v: "approve" as const,
+      title: lines.length ? lines.map((l) => `${l.name} × ${l.quantity}`).join(", ") : "Take what I found",
+      text: b.checks.length > 1 ? `Accept ${b.checks.length} changes and send the whole cart (${eur(b.approval.total_price)}).` : `Send the cart with this line (${eur(b.approval.total_price)} in total).`,
+      price: lines.reduce((s, l) => s + l.total_price, 0),
+      chips: lines.flatMap((l) => (l.usual ? [] : [["about", "New for you"] as [Kind, string]])),
+    },
+    { v: "reject" as const, title: "Not this time", text: "I order nothing. Tell me what to change and I start again.", price: null, chips: [] },
+  ];
+  return (
+    <Card variant="decision" className="rise">
+      <CardHeader title={<span className="flex items-center gap-2.5"><span className="dnum">{n}</span>A decision for you</span>}>
+        <span className="flex-1" />
+        {ruleId ? <Chip kind="must" icon="lock">Rule {ruleId}</Chip> : <Chip kind="auto" icon="lock">No grant accepts this</Chip>}
+      </CardHeader>
+      <div className="grid gap-1.5 px-5 pt-4">
+        <b className="text-base">{head.title}</b>
+        <p className="text-sm text-ink3">{head.text}</p>
+        {b.checks.slice(1).map((c, i) => <p key={i} className="text-sm text-ink3">Also: {checkTitle(c, ctx).title}</p>)}
+      </div>
+      <div className="opts" role="radiogroup" aria-label="What should I do?">
+        {opts.map((o) => (
+          <button key={o.v} type="button" className="opt" role="radio" aria-checked={choice === o.v} disabled={!!done} onClick={() => setPick(o.v)}>
+            <span className="radio" />
+            <span>
+              <b>{o.title}</b>
+              <span className="text-[13px] text-ink3">{o.text}</span>
+              {o.chips.length > 0 && <span className="mt-1.5 flex flex-wrap gap-1.5">{o.chips.map(([k, l], i) => <Chip key={i} kind={k}>{l}</Chip>)}</span>}
+            </span>
+            <span className="px">{o.price !== null ? eur(o.price) : "—"}</span>
+          </button>
+        ))}
+      </div>
+      <CardFooter>
+        <div className="fore">You sign this cart. Valio Aimo checks it again before it goes out.</div>
+        {done ? (
+          <Chip kind="prefer" icon="check">{done === "approve" ? "Decided" : "Rejected"}</Chip>
+        ) : (
+          <Button variant="primary" icon="lock" disabled={busy} onClick={() => void decide(pick)}>{busy ? "Sending…" : "Sign decision"}</Button>
+        )}
+      </CardFooter>
+    </Card>
+  );
+}
+
+function Approve({ b, n, ctx }: { b: BlockOf<"approve">; n: number; ctx: BlockCtx }) {
+  const { busy, decide } = useDecide(b.approval, ctx.local);
+  const k = useKitchenContext();
+  const total = b.approval.total_price;
+  const over = k.limit !== null ? total - k.limit : null;
+  return (
+    <Card variant="decision" className="rise">
+      <CardHeader title={<span className="flex items-center gap-2.5"><span className="dnum">{n}</span>Above your limit</span>}>
+        <span className="flex-1" />
+        {k.limit !== null && <Chip kind="auto" icon="lock">Grant g1 · up to {eur(k.limit)}</Chip>}
+      </CardHeader>
+      <div className="grid gap-1.5 px-5 py-4">
+        <b className="text-base">This cart is {eur(total)}{over !== null && over > 0 ? `, ${eur(over)} more than I may order alone` : ""}.</b>
+        <p className="text-sm text-ink3">Every line passes your rules. Only the total needs your signature. You sign exactly this cart; if anything changes, Valio Aimo asks again.</p>
+        {b.approval.cart_hash && <div className="mt-1.5"><HashRow label="Cart you sign" value={b.approval.cart_hash} /></div>}
+      </div>
+      <CardFooter>
+        <div className="fore">Want this to go through alone next time? Raise the limit in your kitchen profile.</div>
+        {b.decided ? (
+          <Chip kind="prefer" icon="check">{b.decided === "approve" ? "Signed" : "Rejected"}</Chip>
+        ) : (
+          <>
+            <Button small disabled={busy} onClick={() => void decide("reject")}>Reject</Button>
+            <Button variant="primary" icon="lock" disabled={busy} onClick={() => void decide("approve")}>{busy ? "Signing…" : `Sign cart ${eur(total)}`}</Button>
+          </>
+        )}
+      </CardFooter>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------- blocked
+
+/** The Cedar policy with this @id, cut out of the compiled mandate. */
+function policyFor(cedar: string, ruleId: string | undefined): string {
+  if (!ruleId) return cedar;
+  const chunks = cedar.split(/\n\s*\n/);
+  const hit = chunks.filter((c) => c.includes(`@id("${ruleId}")`));
+  return hit.length ? hit.join("\n\n") : cedar;
+}
+
+function Blocked({ b, ctx }: { b: BlockOf<"block">; ctx: BlockCtx }) {
+  const toast = useToast();
+  const k = useKitchenContext();
+  const [cedar, setCedar] = useState<string | null>(null);
+  const c = b.checks[0];
+  const ev = c?.evidence;
+  const ruleId = ev?.id;
+  const version = mandateVersion(ctx.mandateId) ?? k.mandateVersion;
+  const usual = ctx.usualExcluded.find((u) => u.item_id === c?.item_id);
+
+  const showPolicy = async () => {
+    try {
+      const res = (await getCompiledMandate()) as { cedar?: string };
+      if (!res.cedar) throw new Error("no policy text");
+      setCedar(policyFor(res.cedar, ruleId) + `\n\n// verdict for this line: ${ruleId ?? "rule"} = "${ev?.verdict ?? "excluded"}"  →  forbid wins over every permit`);
+    } catch (e) {
+      toast(`Could not load the policy: ${errText(e)}`);
+    }
+  };
+
+  return (
+    <Card variant="block" className="rise">
+      <CardHeader title={<span className="flex items-center gap-2"><Icon name="ban" />Blocked by Valio Aimo</span>}>
+        <span className="flex-1" />
+        {ruleId && <span className="font-mono text-xs">forbid · {ruleId}</span>}
+      </CardHeader>
+      <div className="evidence">
+        <p className="text-[15px]">I passed your request on, but I can't override this. Your rule is part of your signed mandate, and Valio Aimo checks it on every line, no matter what I'm told in chat.</p>
+        <dl>
+          {c && <><dt>Product</dt><dd>{usual?.name ?? productOf(b, c.item_id) ?? queryOf(ctx.intent, c.item_id)}</dd></>}
+          {c && <><dt>Rule</dt><dd><Chip kind="must" icon="lock">{[ruleId, ev?.rule ?? c.intended].filter(Boolean).join(" · ")}</Chip></dd></>}
+          {c && (
+            <>
+              <dt>Evidence</dt>
+              <dd className="flex flex-wrap gap-1.5">
+                {(ev?.signals ?? []).filter((s) => s.says !== "safe").map((s, i) => (
+                  <span key={i}>{s.source?.toUpperCase()} {s.field}: <Cond>{s.value}</Cond></span>
+                ))}
+                {!ev?.signals?.length && <span>{c.detail}</span>}
+              </dd>
+            </>
+          )}
+          {!c && b.message && <><dt>Why</dt><dd>{b.message}</dd></>}
+          <dt>Who decided</dt><dd>Valio Aimo{version ? `, mandate v${version}` : ""}{k.signedBy ? `, signed by ${k.signedBy}` : ""}</dd>
+          <dt>To change it</dt><dd>Edit the rule in your kitchen profile and sign a new mandate version. Not in chat.</dd>
+        </dl>
+        {cedar && <CedarBlock text={cedar} />}
+      </div>
+      <CardFooter>
+        <div className="fore">No autonomy level can turn a block into an order. That's a property of the policy language, not a promise from me.</div>
+        {!cedar && <Button small onClick={() => void showPolicy()}>Show the policy</Button>}
+        <Button small variant="primary" onClick={() => navigate("kitchen")}>Open kitchen profile</Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
+function productOf(b: BlockOf<"block">, itemId: string | null | undefined) {
+  return b.checks.find((x) => x.item_id === itemId && x.field === "product")?.cart;
+}
+
+// ---------------------------------------------------------------- receipt
+
+function Receipt({ b, ctx }: { b: BlockOf<"receipt">; ctx: BlockCtx }) {
+  const k = useKitchenContext();
+  const deviations = lineDeviations(b.diff);
+  const grants = b.receipt?.grants_used ?? [];
+  const version = mandateVersion(b.receipt?.mandate_id ?? ctx.mandateId) ?? k.mandateVersion;
+  const why = (itemId: string | undefined, usual: boolean | null | undefined): ReactNode => {
+    if (b.tier === "auto") {
+      return <><Chip kind="auto" icon="lock">Alone · {grants.join(", ") || "grant"}</Chip>{usual ? "your usual, " : ""}passed every must, no deviation</>;
+    }
+    const dev = deviations.find((d) => d.item_id === itemId);
+    if (dev) return <><Chip kind="about">You decided</Chip>{dev.detail ?? "a change you signed"}</>;
+    return <><Chip kind="about">You signed the cart</Chip>passed every must</>;
+  };
+  return (
+    <Card variant="receipt" className="rise">
+      <CardHeader title={<span className="flex items-center gap-2.5"><span className="check"><Icon name="check" /></span>Valio Aimo confirmed</span>}>
+        <span className="text-[13px] text-ink3">order {b.orderId} · prices locked{b.deliveryDate ? ` · ${fmtDay(b.deliveryDate)}` : ""}</span>
+      </CardHeader>
+      {b.lines.map((l, i) => (
+        <div key={l.quote_id ?? `${l.product_id}-${i}`} className="rline">
+          <span>{l.name} × {l.quantity}{l.sales_unit ? ` ${l.sales_unit.toLowerCase()}` : ""}</span>
+          <span className="px">{eur(l.total_price)}</span>
+          <span className="why">{why(l.item_id, l.usual)}</span>
+        </div>
+      ))}
+      <div className="rtotal"><span>Total</span><span className="num">{eur(b.total)}</span></div>
+      {b.openItems.length > 0 && <StillOpen ids={b.openItems} ctx={ctx} />}
+      <div className="proof">
+        <span className="ok"><Icon name="shield" />Signed by Valio Aimo</span>
+        {b.receipt?.fingerprint && <span className="font-mono">{b.receipt.fingerprint}</span>}
+        {version && <span>mandate v{version}</span>}
+        {k.profileVersion && <span>kitchen profile v{k.profileVersion}</span>}
+        <span className="flex-1" />
+        <button className="link" onClick={() => navigate("activity", b.orderId)}>Why, line by line</button>
+        <button className="link" onClick={() => ctx.openTrust({ mode: "receipt", orderId: b.orderId })}>Verify</button>
+      </div>
+    </Card>
+  );
+}
+
+/** Items of the intent that this order does not contain, with the reason and what the buyer can do next. */
+function StillOpen({ ids, ctx }: { ids: string[]; ctx: BlockCtx }) {
+  const rows = ids.map((id) => {
+    const item = ctx.intent?.items.find((i) => i.item_id === id);
+    const issue = ctx.issues[id] ?? { kind: "delivery" as const, reason: "Not ordered yet." };
+    const what = item ? `${item.quantity?.amount ?? ""} ${unitLabel(item.quantity?.unit)} ${item.product?.query ?? id}`.trim() : id;
+    return { id, query: item?.product?.query ?? id, what, issue };
+  });
+  const late = rows.filter((r) => r.issue.kind === "delivery");
+  const rules = rows.filter((r) => r.issue.kind !== "delivery");
+  return (
+    <div className="still-open">
+      <div className="still-h"><Icon name="flag" size={15} />Still open · {rows.length} item{rows.length === 1 ? "" : "s"} not in this order</div>
+      {rows.map((r) => (
+        <div key={r.id} className="open-row">
+          <div className="min-w-0">
+            <div className="font-semibold">{r.what}</div>
+            <div className="text-[13px] text-ink3">{cap(r.issue.reason)}</div>
+          </div>
+          {r.issue.kind === "rules" ? <Chip kind="must" icon="lock">Breaks a must</Chip> : r.issue.kind === "missing" ? <Chip>Not found</Chip> : <Chip kind="auto">Not in time</Chip>}
+        </div>
+      ))}
+      <div className="open-acts">
+        {late.length > 0 && (
+          <Button small onClick={() => ctx.prefill(`Order ${late.map((r) => r.what).join(", ")} for the next possible delivery date`)}>
+            Deliver {late.length === 1 ? late[0]!.query : `${late.length} items`} later
+          </Button>
+        )}
+        {rules.length > 0 && (
+          <Button small onClick={() => ctx.prefill(`Find another ${rules.map((r) => r.query).join(" and ")} that passes my rules`)}>
+            Find another {rules.length === 1 ? rules[0]!.query : "product"}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- learn (2a)
+
+const KIND_OF: Record<string, Kind> = { about: "about", usual: "usual", must: "must", prefer: "prefer", autonomy: "auto" };
+
+function Learn({ b, ctx }: { b: BlockOf<"learn">; ctx: BlockCtx }) {
+  const toast = useToast();
+  const sign = useSignedChange();
+  const [busy, setBusy] = useState(false);
+  const s = b.suggestion as Schema["Suggestion"];
+  if (b.done) {
+    return (
+      <div className="learn done rise">
+        <div className="bulb"><Icon name="check" /></div>
+        <div><b>{b.done === "remembered" ? `Remembered: ${s.title}` : "Only this time. I won't remember it."}</b></div>
+      </div>
+    );
+  }
+  const remember = async () => {
+    setBusy(true);
+    try {
+      const out = await sign({ title: s.title ?? "Remember", call: (mandate_hash) => acceptKitchenSuggestions({ ids: [s.id], by: SIGNER_NAME, mandate_hash }) });
+      if (out !== null) ctx.local({ type: "local/learned", suggestionId: s.id!, done: "remembered" });
+    } catch (e) {
+      toast(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const once = async () => {
+    setBusy(true);
+    try {
+      await rejectKitchenSuggestion(s.id!, { by: SIGNER_NAME });
+      ctx.local({ type: "local/learned", suggestionId: s.id!, done: "once" });
+    } catch (e) {
+      toast(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="learn rise">
+      <div className="bulb"><Icon name="bulb" /></div>
+      <div className="grid gap-1">
+        <span className="flex items-center gap-2"><KindTag kind={KIND_OF[s.kind ?? "about"] ?? "about"} /><b>{s.title}</b></span>
+        {s.quote && <p>“{s.quote}”</p>}
+      </div>
+      <div className="acts">
+        <Button small variant="primary" disabled={busy} onClick={() => void remember()}>Remember</Button>
+        <Button small disabled={busy} onClick={() => void once()}>Just this time</Button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- error
+
+function ErrorCard({ b, ctx }: { b: BlockOf<"error">; ctx: BlockCtx }) {
+  return (
+    <Card variant="block" className="rise">
+      <CardHeader title={<span className="flex items-center gap-2"><Icon name="flag" />Something went wrong</span>} />
+      <p className="px-5 py-4 text-sm text-ink2">{b.message}</p>
+      {b.recoverable && (
+        <CardFooter>
+          <div className="fore">Nothing was ordered. You can send your last message again.</div>
+          <Button small onClick={ctx.retry}>Try again</Button>
+        </CardFooter>
+      )}
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------- dispatcher
+
+export function BlockView({ b, n, ctx }: { b: Block; n: number; ctx: BlockCtx }) {
+  switch (b.kind) {
+    case "me": return <Me b={b} />;
+    case "photo": return <Photo b={b} />;
+    case "say": return <Agent>{b.recap ? <Recap text={b.text} /> : <Rich text={b.text} />}</Agent>;
+    case "readback": return <Agent><Readback b={b} ctx={ctx} /></Agent>;
+    case "funnel": return <Agent><Funnel b={b} /></Agent>;
+    case "decision": return <Agent><Decision b={b} n={n} ctx={ctx} /></Agent>;
+    case "approve": return <Agent><Approve b={b} n={n} ctx={ctx} /></Agent>;
+    case "block": return <Agent><Blocked b={b} ctx={ctx} /></Agent>;
+    case "receipt": return <Agent><Receipt b={b} ctx={ctx} /></Agent>;
+    case "learn": return <Agent><Learn b={b} ctx={ctx} /></Agent>;
+    case "error": return <Agent><ErrorCard b={b} ctx={ctx} /></Agent>;
+  }
+}
