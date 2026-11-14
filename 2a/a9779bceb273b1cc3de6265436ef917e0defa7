@@ -1,0 +1,91 @@
+backend/buyer_agent/app.py
+  s_d15e285ed9ec1c::t_549964ec39aa0b 189,193-233
+  s_d15e285ed9ec1c::t_1cc0eb3b19488d 234-235
+contracts/backend-api.yaml
+  s_d15e285ed9ec1c::t_cb83f807772ca5 161-163,170-218,324,326,372-382,384-436,438,440-445,524-527,537,539,547-549,566-568,570,573-585
+docs/policy-v3-plan.md
+  s_d15e285ed9ec1c::t_dd04040040960d 121,123-126,128,130,133,136,138,141-144,147,151-153,159-184
+  s_d15e285ed9ec1c::t_008e2293f47a4e 186,188,190-200
+  s_d15e285ed9ec1c::t_7bb452e56bb749 3,15,34,36-40,45,48-52,56-57,62-67,72-76,80-83,87-89,91,93,95,97-106
+  s_d15e285ed9ec1c::t_351b4dd3f3c747 108-120,122,127,129,131-132,134-135,137,139-140,145-146,148
+  s_d15e285ed9ec1c::t_87fc0802144fc3 1-2,4-14,16-33,35,41-44,46-47,53-55,58-61,68-71,77-79,84-86,90,92,94,96,107,149-150,154-158,185
+  s_d15e285ed9ec1c::t_2296886f93beab 187,189
+contracts/fixtures/approvals.json
+  s_d15e285ed9ec1c::t_98d5ecf1f7fd8c 9,11
+docs/ux-concept.md
+  s_d15e285ed9ec1c::t_b8eaf684cb0b07 1-178
+mcp-server/valio_mcp/store.py
+  s_d15e285ed9ec1c::t_58d3a4090669f0 26-28,88-103
+  s_d15e285ed9ec1c::t_6934674e225f56 104
+mcp-server/valio_mcp/policy.py
+  s_d15e285ed9ec1c::t_12fb7e753e657c 216-229,231-233
+  s_d15e285ed9ec1c::t_93b75fa0cb407d 86,88-91,155,180,183,272
+  s_d15e285ed9ec1c::t_ebf2487a5f2c39 242-243,247-250
+  s_d15e285ed9ec1c::t_bad9637f9895d8 1,3-11,16-22,24,27-29,33-49,51-85,87,92-149,154,156-179,181-182,184-215,230,234-241,244-246,251-271,276
+  s_d15e285ed9ec1c::t_2d515966a7b8e6 150-153
+mcp-server/valio_mcp/rules.py
+  s_d15e285ed9ec1c::t_3c607eeac517e7 1-151
+mcp-server/tests/conftest.py
+  s_d15e285ed9ec1c::t_aab37c0420f100 20
+  s_d15e285ed9ec1c::t_d0b325ac8c06cf 68-77
+mcp-server/tests/test_flow.py
+  s_d15e285ed9ec1c::t_a6af72f87850fc 90-92
+backend/buyer_agent/static/console.html
+  s_d15e285ed9ec1c::t_306f134d9c14bd 202,209,212-227,231,492
+contracts/fixtures/scenario-milk-approval.json
+  s_d15e285ed9ec1c::t_98d5ecf1f7fd8c 192,194
+mcp-server/tests/test_guarantee.py
+  s_d15e285ed9ec1c::t_0350647a6abed0 10,42-49,55,68-69,82-83,102,106-143
+mcp-server/valio_mcp/intent.py
+  s_d15e285ed9ec1c::t_f7e3e505d0d6e9 20,25-27,32-34,75-80,95,97-99,101-116,119-122,140,148-149,162-164,168-169,229-232
+  s_d15e285ed9ec1c::t_c50e558b28ef04 81-91,94,100,332-334
+mcp-server/policies.json
+  s_d15e285ed9ec1c::t_c5bbcda85ebd56 2
+mcp-server/README.md
+  s_d15e285ed9ec1c::t_c5bbcda85ebd56 48,51,53,65-69,74,76-78
+backend/buyer_agent/agent.py
+  s_d15e285ed9ec1c::t_d3fd055f0215c5 148-150,154
+  s_d15e285ed9ec1c::t_549964ec39aa0b 133-146,188
+docs/architecture.md
+  s_d15e285ed9ec1c::t_c5bbcda85ebd56 32
+mcp-server/valio_mcp/diff.py
+  s_d15e285ed9ec1c::t_3facaa6c37c93b 43-45,73-75,78,81-91,116-117,172
+backend/buyer_agent/static/app.html
+  s_d15e285ed9ec1c::t_306f134d9c14bd 207,277,416,438,576-590,595
+mcp-server/requirements.txt
+  s_d15e285ed9ec1c::t_dedb0c723e2727 9
+mcp-server/valio_mcp/mandate.py
+  s_d15e285ed9ec1c::t_a6a152aaa9e6d6 1-197
+README.md
+  s_d15e285ed9ec1c::t_c5bbcda85ebd56 9-10
+  s_d15e285ed9ec1c::t_c807f8f993f342 7-8
+  s_d15e285ed9ec1c::t_8c6fdbd68d19a6 51
+docs/product-vision.md
+  s_d15e285ed9ec1c::t_dbc69133b02a78 1-50
+mcp-server/valio_mcp/constraints.py
+  s_d15e285ed9ec1c::t_d4a015e0ebbbe2 146-150,153-187,189-218,222-249
+mcp-server/valio_mcp/server.py
+  s_d15e285ed9ec1c::t_ce58891e1524b1 14-19,118-119,214,226,267-269,365-366,368-372,375,380
+  s_d15e285ed9ec1c::t_b52118fd0196ee 39,742-817,881
+  s_d15e285ed9ec1c::t_fa552cf91af91a 515-516
+  s_d15e285ed9ec1c::t_fc0672a646b3ad 460-467,471-474,484-487,494-497,519-521,567,569-571,872-880,882-883,885
+mcp-server/tests/test_mandate.py
+  s_d15e285ed9ec1c::t_cd419dd7114555 1-57,59-176,178-207
+  s_d15e285ed9ec1c::t_12ab58c7491650 58,177
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2aa9779bceb273b1cc3de6265436ef917e0defa7",
+  "prompts": {},
+  "sessions": {
+    "s_d15e285ed9ec1c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "86060bbb-a009-4ebb-ade4-30451b57cd3d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
