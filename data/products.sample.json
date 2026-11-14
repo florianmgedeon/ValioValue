@@ -1,72 +1,780 @@
 [
-  {
-    "id": "DEMO-1001", "allowedLotSize": 12, "baseUnit": "PAK", "salesUnit": "PAK", "category": "DEV-DAIRY",
-    "countryOfOrigin": "fi", "deleted": false, "deposits": [], "substitutions": [{"product": "DEMO-1001", "substituteProduct": "DEMO-1003"}],
-    "units": [{"unitId": "PAK", "sizeInBaseUnits": 1}], "vendorName": "DEV SAMPLE DAIRY",
-    "synkkaData": {
-      "brand": "Sample", "names": [
-        {"language": "fi", "value": "Laktoositon kevytmaitojuoma 1,5 % 1 l (DEV SAMPLE)"},
-        {"language": "en", "value": "Lactose-free semi-skimmed milk drink 1.5% 1 l (DEV SAMPLE)"}],
-      "classifications": [
-        {"name": "allergen", "type": "ENUM", "values": [{"id": "1", "synkkaId": "AM", "unit": "CONTAINS"}, {"id": "2", "synkkaId": "ML", "unit": "FREE_FROM"}]},
-        {"name": "packagingMarkedLabel", "type": "ENUM", "values": [{"id": "3", "synkkaId": "HYVAA_SUOMESTA"}]}],
-      "keyIngredients": [], "marketingTexts": [], "materialAdditionalDescriptions": [], "medias": [], "nutritionalContent": []
+ {
+  "id": "DEMO-1001",
+  "allowedLotSize": 12,
+  "baseUnit": "PAK",
+  "salesUnit": "PAK",
+  "category": "DEV-DAIRY",
+  "countryOfOrigin": "fi",
+  "deleted": false,
+  "deposits": [],
+  "substitutions": [
+   {
+    "product": "DEMO-1001",
+    "substituteProduct": "DEMO-1003"
+   }
+  ],
+  "units": [
+   {
+    "unitId": "PAK",
+    "sizeInBaseUnits": 1
+   }
+  ],
+  "vendorName": "DEV SAMPLE DAIRY",
+  "synkkaData": {
+   "brand": "Sample",
+   "names": [
+    {
+     "language": "fi",
+     "value": "Laktoositon kevytmaitojuoma 1,5 % 1 l (DEV SAMPLE)"
+    },
+    {
+     "language": "en",
+     "value": "Lactose-free semi-skimmed milk drink 1.5% 1 l (DEV SAMPLE)"
     }
-  },
-  {
-    "id": "DEMO-1002", "allowedLotSize": 1, "baseUnit": "PAK", "salesUnit": "PAK", "category": "DEV-DAIRY",
-    "countryOfOrigin": "fi", "deleted": false, "deposits": [], "substitutions": [],
-    "units": [{"unitId": "PAK", "sizeInBaseUnits": 1}], "vendorName": "DEV SAMPLE DAIRY",
-    "synkkaData": {
-      "brand": "Sample", "names": [
-        {"language": "fi", "value": "Laktoositon rasvaton maitojuoma 10 l hanapakkaus (DEV SAMPLE)"},
-        {"language": "en", "value": "Lactose-free skimmed milk drink 10 l bag-in-box (DEV SAMPLE)"}],
-      "classifications": [
-        {"name": "allergen", "type": "ENUM", "values": [{"id": "1", "synkkaId": "AM", "unit": "CONTAINS"}, {"id": "2", "synkkaId": "ML", "unit": "FREE_FROM"}]}],
-      "keyIngredients": [], "marketingTexts": [], "materialAdditionalDescriptions": [], "medias": [], "nutritionalContent": []
+   ],
+   "classifications": [
+    {
+     "name": "allergen",
+     "type": "ENUM",
+     "values": [
+      {
+       "id": "1",
+       "synkkaId": "AM",
+       "unit": "CONTAINS"
+      },
+      {
+       "id": "2",
+       "synkkaId": "ML",
+       "unit": "FREE_FROM"
+      }
+     ]
+    },
+    {
+     "name": "packagingMarkedLabel",
+     "type": "ENUM",
+     "values": [
+      {
+       "id": "3",
+       "synkkaId": "HYVAA_SUOMESTA"
+      }
+     ]
     }
-  },
-  {
-    "id": "DEMO-1003", "allowedLotSize": 6, "baseUnit": "PAK", "salesUnit": "PAK", "category": "DEV-DAIRY",
-    "countryOfOrigin": "fi", "deleted": false, "deposits": [], "substitutions": [],
-    "units": [{"unitId": "PAK", "sizeInBaseUnits": 1}], "vendorName": "DEV SAMPLE SUPPLIER",
-    "synkkaData": {
-      "brand": "Sample", "names": [
-        {"language": "fi", "value": "Laktoositon täysmaitojuoma 3,5 % 1 l (DEV SAMPLE)"},
-        {"language": "en", "value": "Lactose-free whole milk drink 3.5% 1 l (DEV SAMPLE)"}],
-      "classifications": [
-        {"name": "allergen", "type": "ENUM", "values": [{"id": "1", "synkkaId": "AM", "unit": "CONTAINS"}]}],
-      "keyIngredients": [], "marketingTexts": [], "materialAdditionalDescriptions": [], "medias": [], "nutritionalContent": []
-    }
-  },
-  {
-    "id": "DEMO-1004", "allowedLotSize": 12, "baseUnit": "PAK", "salesUnit": "PAK", "category": "DEV-DAIRY",
-    "countryOfOrigin": "fi", "deleted": false, "deposits": [], "substitutions": [],
-    "units": [{"unitId": "PAK", "sizeInBaseUnits": 1}], "vendorName": "DEV SAMPLE DAIRY",
-    "synkkaData": {
-      "brand": "Sample", "names": [{"language": "fi", "value": "Kevytmaito 1 l (DEV SAMPLE)"}],
-      "classifications": [{"name": "allergen", "type": "ENUM", "values": [{"id": "1", "synkkaId": "AM", "unit": "CONTAINS"}]}],
-      "keyIngredients": [], "marketingTexts": [], "materialAdditionalDescriptions": [], "medias": [], "nutritionalContent": []
-    }
-  },
-  {
-    "id": "DEMO-1005", "allowedLotSize": 6, "baseUnit": "PAK", "salesUnit": "PAK", "category": "DEV-PLANT",
-    "countryOfOrigin": "se", "deleted": false, "deposits": [], "substitutions": [],
-    "units": [{"unitId": "PAK", "sizeInBaseUnits": 1}], "vendorName": "DEV SAMPLE OATS",
-    "synkkaData": {
-      "brand": "Sample", "names": [{"language": "fi", "value": "Kaurajuoma 1 l (DEV SAMPLE)"}],
-      "classifications": [{"name": "allergen", "type": "ENUM", "values": [{"id": "1", "synkkaId": "GO", "unit": "CONTAINS"}]}],
-      "keyIngredients": [], "marketingTexts": [], "materialAdditionalDescriptions": [], "medias": [], "nutritionalContent": []
-    }
-  },
-  {
-    "id": "DEMO-1006", "allowedLotSize": 20, "baseUnit": "KPL", "salesUnit": "KPL", "category": "DEV-SWEETS",
-    "countryOfOrigin": "fi", "deleted": false, "deposits": [], "substitutions": [],
-    "units": [{"unitId": "KPL", "sizeInBaseUnits": 1}], "vendorName": "DEV SAMPLE SWEETS",
-    "synkkaData": {
-      "brand": "Sample", "names": [{"language": "fi", "value": "Maitosuklaa 200 g (DEV SAMPLE)"}],
-      "classifications": [{"name": "allergen", "type": "ENUM", "values": [{"id": "1", "synkkaId": "AM", "unit": "CONTAINS"}]}],
-      "keyIngredients": [], "marketingTexts": [], "materialAdditionalDescriptions": [], "medias": [], "nutritionalContent": []
-    }
+   ],
+   "keyIngredients": [],
+   "marketingTexts": [],
+   "materialAdditionalDescriptions": [],
+   "medias": [],
+   "nutritionalContent": []
   }
+ },
+ {
+  "id": "DEMO-1002",
+  "allowedLotSize": 1,
+  "baseUnit": "PAK",
+  "salesUnit": "PAK",
+  "category": "DEV-DAIRY",
+  "countryOfOrigin": "fi",
+  "deleted": false,
+  "deposits": [],
+  "substitutions": [],
+  "units": [
+   {
+    "unitId": "PAK",
+    "sizeInBaseUnits": 1
+   }
+  ],
+  "vendorName": "DEV SAMPLE DAIRY",
+  "synkkaData": {
+   "brand": "Sample",
+   "names": [
+    {
+     "language": "fi",
+     "value": "Laktoositon rasvaton maitojuoma 10 l hanapakkaus (DEV SAMPLE)"
+    },
+    {
+     "language": "en",
+     "value": "Lactose-free skimmed milk drink 10 l bag-in-box (DEV SAMPLE)"
+    }
+   ],
+   "classifications": [
+    {
+     "name": "allergen",
+     "type": "ENUM",
+     "values": [
+      {
+       "id": "1",
+       "synkkaId": "AM",
+       "unit": "CONTAINS"
+      },
+      {
+       "id": "2",
+       "synkkaId": "ML",
+       "unit": "FREE_FROM"
+      }
+     ]
+    }
+   ],
+   "keyIngredients": [],
+   "marketingTexts": [],
+   "materialAdditionalDescriptions": [],
+   "medias": [],
+   "nutritionalContent": []
+  }
+ },
+ {
+  "id": "DEMO-1003",
+  "allowedLotSize": 6,
+  "baseUnit": "PAK",
+  "salesUnit": "PAK",
+  "category": "DEV-DAIRY",
+  "countryOfOrigin": "fi",
+  "deleted": false,
+  "deposits": [],
+  "substitutions": [],
+  "units": [
+   {
+    "unitId": "PAK",
+    "sizeInBaseUnits": 1
+   }
+  ],
+  "vendorName": "DEV SAMPLE SUPPLIER",
+  "synkkaData": {
+   "brand": "Sample",
+   "names": [
+    {
+     "language": "fi",
+     "value": "Laktoositon täysmaitojuoma 3,5 % 1 l (DEV SAMPLE)"
+    },
+    {
+     "language": "en",
+     "value": "Lactose-free whole milk drink 3.5% 1 l (DEV SAMPLE)"
+    }
+   ],
+   "classifications": [
+    {
+     "name": "allergen",
+     "type": "ENUM",
+     "values": [
+      {
+       "id": "1",
+       "synkkaId": "AM",
+       "unit": "CONTAINS"
+      }
+     ]
+    }
+   ],
+   "keyIngredients": [],
+   "marketingTexts": [],
+   "materialAdditionalDescriptions": [],
+   "medias": [],
+   "nutritionalContent": []
+  }
+ },
+ {
+  "id": "DEMO-1004",
+  "allowedLotSize": 12,
+  "baseUnit": "PAK",
+  "salesUnit": "PAK",
+  "category": "DEV-DAIRY",
+  "countryOfOrigin": "fi",
+  "deleted": false,
+  "deposits": [],
+  "substitutions": [],
+  "units": [
+   {
+    "unitId": "PAK",
+    "sizeInBaseUnits": 1
+   }
+  ],
+  "vendorName": "DEV SAMPLE DAIRY",
+  "synkkaData": {
+   "brand": "Sample",
+   "names": [
+    {
+     "language": "fi",
+     "value": "Kevytmaito 1 l (DEV SAMPLE)"
+    }
+   ],
+   "classifications": [
+    {
+     "name": "allergen",
+     "type": "ENUM",
+     "values": [
+      {
+       "id": "1",
+       "synkkaId": "AM",
+       "unit": "CONTAINS"
+      }
+     ]
+    }
+   ],
+   "keyIngredients": [],
+   "marketingTexts": [],
+   "materialAdditionalDescriptions": [],
+   "medias": [],
+   "nutritionalContent": []
+  }
+ },
+ {
+  "id": "DEMO-1005",
+  "allowedLotSize": 6,
+  "baseUnit": "PAK",
+  "salesUnit": "PAK",
+  "category": "DEV-PLANT",
+  "countryOfOrigin": "se",
+  "deleted": false,
+  "deposits": [],
+  "substitutions": [],
+  "units": [
+   {
+    "unitId": "PAK",
+    "sizeInBaseUnits": 1
+   }
+  ],
+  "vendorName": "DEV SAMPLE OATS",
+  "synkkaData": {
+   "brand": "Sample",
+   "names": [
+    {
+     "language": "fi",
+     "value": "Kaurajuoma 1 l (DEV SAMPLE)"
+    }
+   ],
+   "classifications": [
+    {
+     "name": "allergen",
+     "type": "ENUM",
+     "values": [
+      {
+       "id": "1",
+       "synkkaId": "GO",
+       "unit": "CONTAINS"
+      }
+     ]
+    }
+   ],
+   "keyIngredients": [],
+   "marketingTexts": [],
+   "materialAdditionalDescriptions": [],
+   "medias": [],
+   "nutritionalContent": []
+  }
+ },
+ {
+  "id": "DEMO-1006",
+  "allowedLotSize": 20,
+  "baseUnit": "KPL",
+  "salesUnit": "KPL",
+  "category": "DEV-SWEETS",
+  "countryOfOrigin": "fi",
+  "deleted": false,
+  "deposits": [],
+  "substitutions": [],
+  "units": [
+   {
+    "unitId": "KPL",
+    "sizeInBaseUnits": 1
+   }
+  ],
+  "vendorName": "DEV SAMPLE SWEETS",
+  "synkkaData": {
+   "brand": "Sample",
+   "names": [
+    {
+     "language": "fi",
+     "value": "Maitosuklaa 200 g (DEV SAMPLE)"
+    }
+   ],
+   "classifications": [
+    {
+     "name": "allergen",
+     "type": "ENUM",
+     "values": [
+      {
+       "id": "1",
+       "synkkaId": "AM",
+       "unit": "CONTAINS"
+      }
+     ]
+    }
+   ],
+   "keyIngredients": [],
+   "marketingTexts": [],
+   "materialAdditionalDescriptions": [],
+   "medias": [],
+   "nutritionalContent": []
+  }
+ },
+ {
+  "id": "DEMO-2001",
+  "allowedLotSize": 1,
+  "baseUnit": "PAK",
+  "salesUnit": "PAK",
+  "category": "DEV-DRY",
+  "countryOfOrigin": "fi",
+  "deleted": false,
+  "deposits": [],
+  "substitutions": [],
+  "units": [
+   {
+    "unitId": "PAK",
+    "sizeInBaseUnits": 1
+   }
+  ],
+  "vendorName": "DEV SAMPLE FOODS",
+  "synkkaData": {
+   "brand": "Sample",
+   "names": [
+    {
+     "language": "fi",
+     "value": "Arborio risottoriisi 5 kg (DEV SAMPLE)"
+    },
+    {
+     "language": "en",
+     "value": "Arborio risotto rice 5 kg (DEV SAMPLE)"
+    }
+   ],
+   "classifications": [
+    {
+     "name": "allergen",
+     "type": "ENUM",
+     "values": [
+      {
+       "id": "1",
+       "synkkaId": "AW",
+       "unit": "FREE_FROM"
+      }
+     ]
+    }
+   ],
+   "keyIngredients": [],
+   "marketingTexts": [],
+   "materialAdditionalDescriptions": [],
+   "medias": [],
+   "nutritionalContent": []
+  }
+ },
+ {
+  "id": "DEMO-2002",
+  "allowedLotSize": 1,
+  "baseUnit": "PAK",
+  "salesUnit": "PAK",
+  "category": "DEV-DRY",
+  "countryOfOrigin": "fi",
+  "deleted": false,
+  "deposits": [],
+  "substitutions": [],
+  "units": [
+   {
+    "unitId": "PAK",
+    "sizeInBaseUnits": 1
+   }
+  ],
+  "vendorName": "DEV SAMPLE FOODS",
+  "synkkaData": {
+   "brand": "Sample",
+   "names": [
+    {
+     "language": "fi",
+     "value": "Kasvisliemi 10 l (DEV SAMPLE)"
+    },
+    {
+     "language": "en",
+     "value": "Vegetable stock 10 l (DEV SAMPLE)"
+    }
+   ],
+   "classifications": [
+    {
+     "name": "allergen",
+     "type": "ENUM",
+     "values": [
+      {
+       "id": "1",
+       "synkkaId": "BC",
+       "unit": "CONTAINS"
+      }
+     ]
+    }
+   ],
+   "keyIngredients": [],
+   "marketingTexts": [],
+   "materialAdditionalDescriptions": [],
+   "medias": [],
+   "nutritionalContent": []
+  }
+ },
+ {
+  "id": "DEMO-2003",
+  "allowedLotSize": 1,
+  "baseUnit": "PAK",
+  "salesUnit": "PAK",
+  "category": "DEV-DAIRY",
+  "countryOfOrigin": "fi",
+  "deleted": false,
+  "deposits": [],
+  "substitutions": [],
+  "units": [
+   {
+    "unitId": "PAK",
+    "sizeInBaseUnits": 1
+   }
+  ],
+  "vendorName": "DEV SAMPLE FOODS",
+  "synkkaData": {
+   "brand": "Sample",
+   "names": [
+    {
+     "language": "fi",
+     "value": "Voi suolaton 500 g (DEV SAMPLE)"
+    },
+    {
+     "language": "en",
+     "value": "Butter unsalted 500 g (DEV SAMPLE)"
+    }
+   ],
+   "classifications": [
+    {
+     "name": "allergen",
+     "type": "ENUM",
+     "values": [
+      {
+       "id": "1",
+       "synkkaId": "AM",
+       "unit": "CONTAINS"
+      }
+     ]
+    },
+    {
+     "name": "packagingMarkedLabel",
+     "type": "ENUM",
+     "values": [
+      {
+       "id": "9",
+       "synkkaId": "HYVAA_SUOMESTA"
+      }
+     ]
+    }
+   ],
+   "keyIngredients": [],
+   "marketingTexts": [],
+   "materialAdditionalDescriptions": [],
+   "medias": [],
+   "nutritionalContent": []
+  }
+ },
+ {
+  "id": "DEMO-2004",
+  "allowedLotSize": 1,
+  "baseUnit": "PAK",
+  "salesUnit": "PAK",
+  "category": "DEV-DAIRY",
+  "countryOfOrigin": "fi",
+  "deleted": false,
+  "deposits": [],
+  "substitutions": [],
+  "units": [
+   {
+    "unitId": "PAK",
+    "sizeInBaseUnits": 1
+   }
+  ],
+  "vendorName": "DEV SAMPLE FOODS",
+  "synkkaData": {
+   "brand": "Sample",
+   "names": [
+    {
+     "language": "fi",
+     "value": "Ruokakerma 15 % 1 l (DEV SAMPLE)"
+    },
+    {
+     "language": "en",
+     "value": "Cooking cream 15% 1 l (DEV SAMPLE)"
+    }
+   ],
+   "classifications": [
+    {
+     "name": "allergen",
+     "type": "ENUM",
+     "values": [
+      {
+       "id": "1",
+       "synkkaId": "AM",
+       "unit": "CONTAINS"
+      }
+     ]
+    }
+   ],
+   "keyIngredients": [],
+   "marketingTexts": [],
+   "materialAdditionalDescriptions": [],
+   "medias": [],
+   "nutritionalContent": []
+  }
+ },
+ {
+  "id": "DEMO-2005",
+  "allowedLotSize": 1,
+  "baseUnit": "PAK",
+  "salesUnit": "PAK",
+  "category": "DEV-DAIRY",
+  "countryOfOrigin": "fi",
+  "deleted": false,
+  "deposits": [],
+  "substitutions": [],
+  "units": [
+   {
+    "unitId": "PAK",
+    "sizeInBaseUnits": 1
+   }
+  ],
+  "vendorName": "DEV SAMPLE FOODS",
+  "synkkaData": {
+   "brand": "Sample",
+   "names": [
+    {
+     "language": "fi",
+     "value": "Laktoositon ruokakerma 15 % 2 l (DEV SAMPLE)"
+    },
+    {
+     "language": "en",
+     "value": "Lactose-free cooking cream 15% 2 l (DEV SAMPLE)"
+    }
+   ],
+   "classifications": [
+    {
+     "name": "allergen",
+     "type": "ENUM",
+     "values": [
+      {
+       "id": "1",
+       "synkkaId": "AM",
+       "unit": "CONTAINS"
+      },
+      {
+       "id": "2",
+       "synkkaId": "ML",
+       "unit": "FREE_FROM"
+      }
+     ]
+    }
+   ],
+   "keyIngredients": [],
+   "marketingTexts": [],
+   "materialAdditionalDescriptions": [],
+   "medias": [],
+   "nutritionalContent": []
+  }
+ },
+ {
+  "id": "DEMO-2006",
+  "allowedLotSize": 1,
+  "baseUnit": "PAK",
+  "salesUnit": "PAK",
+  "category": "DEV-DAIRY",
+  "countryOfOrigin": "fi",
+  "deleted": false,
+  "deposits": [],
+  "substitutions": [],
+  "units": [
+   {
+    "unitId": "PAK",
+    "sizeInBaseUnits": 1
+   }
+  ],
+  "vendorName": "DEV SAMPLE FOODS",
+  "synkkaData": {
+   "brand": "Sample",
+   "names": [
+    {
+     "language": "fi",
+     "value": "Parmesaanijuusto raaste 1 kg (DEV SAMPLE)"
+    },
+    {
+     "language": "en",
+     "value": "Parmesan cheese grated 1 kg (DEV SAMPLE)"
+    }
+   ],
+   "classifications": [
+    {
+     "name": "allergen",
+     "type": "ENUM",
+     "values": [
+      {
+       "id": "1",
+       "synkkaId": "AM",
+       "unit": "CONTAINS"
+      }
+     ]
+    }
+   ],
+   "keyIngredients": [],
+   "marketingTexts": [],
+   "materialAdditionalDescriptions": [],
+   "medias": [],
+   "nutritionalContent": []
+  }
+ },
+ {
+  "id": "DEMO-2007",
+  "allowedLotSize": 6,
+  "baseUnit": "PAK",
+  "salesUnit": "PAK",
+  "category": "DEV-PLANT",
+  "countryOfOrigin": "fi",
+  "deleted": false,
+  "deposits": [],
+  "substitutions": [],
+  "units": [
+   {
+    "unitId": "PAK",
+    "sizeInBaseUnits": 1
+   }
+  ],
+  "vendorName": "DEV SAMPLE FOODS",
+  "synkkaData": {
+   "brand": "Sample",
+   "names": [
+    {
+     "language": "fi",
+     "value": "Kaurajuoma barista 1 l (DEV SAMPLE)"
+    },
+    {
+     "language": "en",
+     "value": "Oat drink barista 1 l (DEV SAMPLE)"
+    }
+   ],
+   "classifications": [
+    {
+     "name": "allergen",
+     "type": "ENUM",
+     "values": [
+      {
+       "id": "1",
+       "synkkaId": "GO",
+       "unit": "CONTAINS"
+      },
+      {
+       "id": "2",
+       "synkkaId": "AM",
+       "unit": "FREE_FROM"
+      }
+     ]
+    }
+   ],
+   "keyIngredients": [],
+   "marketingTexts": [],
+   "materialAdditionalDescriptions": [],
+   "medias": [],
+   "nutritionalContent": []
+  }
+ },
+ {
+  "id": "DEMO-2008",
+  "allowedLotSize": 1,
+  "baseUnit": "PAK",
+  "salesUnit": "PAK",
+  "category": "DEV-SWEET",
+  "countryOfOrigin": "fi",
+  "deleted": false,
+  "deposits": [],
+  "substitutions": [],
+  "units": [
+   {
+    "unitId": "PAK",
+    "sizeInBaseUnits": 1
+   }
+  ],
+  "vendorName": "DEV SAMPLE FOODS",
+  "synkkaData": {
+   "brand": "Sample",
+   "names": [
+    {
+     "language": "fi",
+     "value": "Tumma suklaa 70 % 1 kg (DEV SAMPLE)"
+    },
+    {
+     "language": "en",
+     "value": "Dark chocolate 70% 1 kg (DEV SAMPLE)"
+    }
+   ],
+   "classifications": [
+    {
+     "name": "allergen",
+     "type": "ENUM",
+     "values": [
+      {
+       "id": "1",
+       "synkkaId": "AM",
+       "unit": "MAY_CONTAIN"
+      },
+      {
+       "id": "2",
+       "synkkaId": "AY",
+       "unit": "CONTAINS"
+      }
+     ]
+    }
+   ],
+   "keyIngredients": [],
+   "marketingTexts": [],
+   "materialAdditionalDescriptions": [],
+   "medias": [],
+   "nutritionalContent": []
+  }
+ },
+ {
+  "id": "DEMO-2009",
+  "allowedLotSize": 1,
+  "baseUnit": "PAK",
+  "salesUnit": "PAK",
+  "category": "DEV-PLANT",
+  "countryOfOrigin": "fi",
+  "deleted": false,
+  "deposits": [],
+  "substitutions": [],
+  "units": [
+   {
+    "unitId": "PAK",
+    "sizeInBaseUnits": 1
+   }
+  ],
+  "vendorName": "DEV SAMPLE FOODS",
+  "synkkaData": {
+   "brand": "Sample",
+   "names": [
+    {
+     "language": "fi",
+     "value": "Kaura ruoanvalmistus 1 l (DEV SAMPLE)"
+    },
+    {
+     "language": "en",
+     "value": "Oat cooking cream 1 l plant-based (DEV SAMPLE)"
+    }
+   ],
+   "classifications": [
+    {
+     "name": "allergen",
+     "type": "ENUM",
+     "values": [
+      {
+       "id": "1",
+       "synkkaId": "GO",
+       "unit": "CONTAINS"
+      },
+      {
+       "id": "2",
+       "synkkaId": "AM",
+       "unit": "FREE_FROM"
+      }
+     ]
+    }
+   ],
+   "keyIngredients": [],
+   "marketingTexts": [],
+   "materialAdditionalDescriptions": [],
+   "medias": [],
+   "nutritionalContent": []
+  }
+ }
 ]

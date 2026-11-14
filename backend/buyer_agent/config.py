@@ -23,7 +23,7 @@ LLM_PROVIDER = (os.getenv("LLM_PROVIDER") or "").strip().lower()
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 LLM_MODEL = os.getenv("LLM_MODEL", "")
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "")
-LLM_MAX_STEPS = int(os.getenv("LLM_MAX_STEPS", "8"))
+LLM_MAX_STEPS = int(os.getenv("LLM_MAX_STEPS", "40"))  # recipes need 2 steps per ingredient
 # Anthropic only: show the model's (summarized) reasoning. Effort: low | medium | high
 LLM_THINKING = os.getenv("LLM_THINKING", "on").lower() not in ("0", "off", "false", "no")
 LLM_EFFORT = os.getenv("LLM_EFFORT", "medium")

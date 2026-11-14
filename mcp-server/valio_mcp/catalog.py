@@ -67,6 +67,12 @@ MODIFIERS = {"chocolate", "cocoa", "coffee", "latte", "cappuccino", "powder", "q
              "portion", "sour", "buttermilk", "fermented", "kefir", "vanilla", "strawberry", "flavoured", "drink mix", "protein", "baby", "infant"}
 
 
+# Words that change what a product IS ("cooking cream" vs "oat cooking cream"). A product carrying one of
+# them only matches when the buyer asked for it. Otherwise it would be a silent substitution.
+KIND_WORDS = ("oat", "soy", "soya", "plant", "plant-based", "vegan", "almond", "coconut", "rice", "pea", "kaura",
+              "soija", "kasvi")
+
+
 @dataclass
 class Product:
     id: str
@@ -271,6 +277,10 @@ class Catalog:
             if country_of_origin and (p.country or "").lower() != country_of_origin.lower():
                 continue
             if exclude and exclude & set(p.allergens_contains):
+                continue
+            ql = query.lower()
+            kinds = [w for w in KIND_WORDS if re.search(rf"\b{w}\b", p.name_en)]
+            if kinds and not any(re.search(rf"\b{w}", ql) for w in kinds):
                 continue
             hay = f"{p.names_all} {(p.brand or '').lower()}"
             # "milk free", "maidoton", "no milk" mean the opposite of a match

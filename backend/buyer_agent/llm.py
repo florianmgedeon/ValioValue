@@ -220,9 +220,48 @@ def parse_request(text: str, today: date) -> dict:
     return {"query": what.strip(), "quantity": qty, "unit": unit, "date": when.isoformat()}
 
 
+UNIT_MAP = {"l": ("L", 1), "litre": ("L", 1), "litres": ("L", 1), "liter": ("L", 1), "liters": ("L", 1),
+            "dl": ("L", 0.1), "cl": ("L", 0.01), "ml": ("L", 0.001), "kg": ("KG", 1), "kilo": ("KG", 1),
+            "kilos": ("KG", 1), "g": ("KG", 0.001), "grams": ("KG", 0.001), "gram": ("KG", 0.001),
+            "pcs": ("SALES_UNIT", 1), "pieces": ("SALES_UNIT", 1), "kpl": ("SALES_UNIT", 1), "packs": ("SALES_UNIT", 1),
+            "pack": ("SALES_UNIT", 1)}
+ITEM_RE = re.compile(r"(\d[\d,.\s]*?)\s*(litres|liters|litre|liter|kilos|kilo|grams|gram|pieces|packs|pack|pcs|kpl|kg|dl|cl|ml|l|g)\b\.?\s*(?:of\s+)?([^,;\n]+)",
+                     re.I)
+
+
+def parse_items(text: str) -> tuple[list[dict], float]:
+    """Recipe or list -> items. 'serves 4' ... 'for 40 portions' scales. Good enough for the offline demo,
+    a real LLM does this far better."""
+    t = text.lower()
+    base = re.search(r"serves\s+(\d+)|recipe for\s+(\d+)|for\s+(\d+)\s+(?:people|persons|servings)", t)
+    target = re.search(r"(?:need|cook|make|for)\s+(\d+)\s+(?:portions|guests|covers|pax)", t)
+    factor = 1.0
+    if base and target:
+        factor = float(target.group(1)) / float(next(g for g in base.groups() if g))
+    items = []
+    for chunk in re.split(r"\n|;|,(?![\d])|\band\b", text):
+        m = ITEM_RE.search(chunk)
+        if not m:
+            continue
+        raw = re.sub(r"\s", "", m.group(1))
+        raw = raw.replace(",", "") if re.fullmatch(r"\d{1,3}(,\d{3})+", raw) else raw.replace(",", ".")
+        try:
+            qty = float(raw)
+        except ValueError:
+            continue
+        unit, mult = UNIT_MAP[m.group(2).lower()]
+        name = re.split(r"\s+(?:by|before|until|delivered|for)\b", m.group(3).strip(" .-*"))[0].strip()
+        if not name:
+            continue
+        amount = round(qty * mult * factor, 3)
+        items.append({"product_query": name, "quantity": amount, "quantity_unit": unit,
+                      **({"note": f"{qty:g} {m.group(2)} x {factor:g}"} if factor != 1 else {})})
+    return items, factor
+
+
 class ScriptedProvider:
     """Deterministic planner without an LLM key:
-    new request -> propose_intent and stop. Confirmed intent -> search -> check_offer -> place_order."""
+    new request -> propose_intent and stop. Confirmed intent -> per item search + check_offer -> one place_order."""
 
     name = "scripted"
 
@@ -233,45 +272,55 @@ class ScriptedProvider:
         users = [m for m in history if m["role"] == "user"]
         text = users[-1]["text"] if users else ""
         last_user = max(i for i, m in enumerate(history) if m["role"] == "user")
-        results = {m["name"]: json.loads(m["content"]) for m in history[last_user:] if m["role"] == "tool"}
+        tool_msgs = [(m["name"], json.loads(m["content"])) for m in history[last_user:] if m["role"] == "tool"]
         cid = f"call_{uuid.uuid4().hex[:8]}"
         confirmed = re.search(r"signed intent (int_\w+)", text)
 
         if not confirmed:
-            if "propose_intent" in results:
+            if any(n == "propose_intent" for n, _ in tool_msgs):
                 return AssistantTurn(None)
             req = parse_request(text, self.today)
+            items, _ = parse_items(text)
+            if len(items) <= 1:
+                items = [{"product_query": req["query"], "quantity": req["quantity"], "quantity_unit": req["unit"]}]
             t = text.lower()
             rules = []
             if re.search(r"(milk|dairy) allerg|allergic to (milk|dairy)", t):
-                rules.append({"rule": "exclude_allergen", "allergen": "milk",
-                              "strictness": "contains_or_may_contain"})
+                rules.append({"rule": "exclude_allergen", "allergen": "milk", "strictness": "contains_or_may_contain"})
+            if re.search(r"(nut|peanut) allerg", t):
+                rules.append({"rule": "exclude_allergen", "allergen": "peanuts", "strictness": "contains_or_may_contain"})
             return AssistantTurn(None, [ToolCall(cid, "propose_intent", {
-                "original_request": text, "product_query": req["query"], "quantity": req["quantity"],
-                "quantity_unit": req["unit"], "deliver_by": req["date"], "hard_rules": rules})])
+                "original_request": text, "items": items, "deliver_by": req["date"], "hard_rules": rules})])
 
         intent_id = confirmed.group(1)
-        m = re.search(r"Product: (.+?)\. Go ahead", text)
-        query = m.group(1) if m else "products"
-        if "search_products" not in results:
-            return AssistantTurn(f"Searching for **{query}** against your confirmed intent.",
-                                 [ToolCall(cid, "search_products", {"query": query, "intent_id": intent_id, "limit": 12})])
-        if "check_offer" not in results:
-            ids = [p["product_id"] for p in results["search_products"].get("products", [])][:10]
-            if not ids:
-                return AssistantTurn(f"Nothing in the Valio Aimo catalog for '{query}' meets every rule of your intent.")
-            return AssistantTurn(None, [ToolCall(cid, "check_offer", {"product_ids": ids, "intent_id": intent_id})])
-        if "place_order" not in results:
-            offers = results["check_offer"].get("offers", [])
-            best = next((o for o in offers if o.get("can_fulfil")), None)
-            if not best:
-                return AssistantTurn("None of the matching products can deliver the full quantity on time. "
-                                     "Tell me whether a later date or a partial delivery works.")
-            reason = (f"Cheapest offer that meets every rule and delivers the full {best['quantity']:g} "
-                      f"{best['sales_unit']} by {best['requested_date']}"
-                      + (f", delivery reliability {best['delivery_reliability']:.0%}" if best.get("delivery_reliability") else ""))
-            return AssistantTurn(None, [ToolCall(cid, "place_order", {"quote_id": best["quote_id"],
-                                                                      "intent_id": intent_id, "reason": reason})])
+        m = re.search(r"Items: (.+?)\. Go ahead", text)
+        items = [tuple(x.split("=", 1)) for x in (m.group(1).split("; ") if m else []) if "=" in x]
+        searched = {r.get("item_id"): r for n, r in tool_msgs if n == "search_products"}
+        offered = {r.get("item_id"): r for n, r in tool_msgs if n == "check_offer"}
+        for iid, query in items:
+            if iid not in searched:
+                return AssistantTurn(f"Searching for **{query}**." if len(items) > 1 else
+                                     f"Searching for **{query}** against your confirmed intent.",
+                                     [ToolCall(cid, "search_products", {"query": query, "intent_id": intent_id,
+                                                                        "item_id": iid, "limit": 10})])
+            if iid not in offered:
+                ids = [p["product_id"] for p in searched[iid].get("products", [])][:10]
+                if ids:
+                    return AssistantTurn(None, [ToolCall(cid, "check_offer", {"product_ids": ids, "intent_id": intent_id,
+                                                                               "item_id": iid})])
+                offered[iid] = {"offers": []}
+        if not any(n == "place_order" for n, _ in tool_msgs):
+            lines, missing = [], []
+            for iid, query in items:
+                best = next((o for o in offered.get(iid, {}).get("offers", []) if o.get("can_fulfil")), None)
+                (lines.append({"item_id": iid, "quote_id": best["quote_id"]}) if best else missing.append(query))
+            if not lines:
+                return AssistantTurn("Nothing that meets every rule can deliver the full quantity on time: "
+                                     + ", ".join(missing) + ". Tell me whether a later date or a partial delivery works.")
+            reason = ("Cheapest offer per item that meets every rule and delivers in full on time"
+                      + (f". No offer yet for: {', '.join(missing)}" if missing else ""))
+            return AssistantTurn(None, [ToolCall(cid, "place_order", {"intent_id": intent_id, "lines": lines,
+                                                                      "reason": reason})])
         return AssistantTurn("Done.")
 
 

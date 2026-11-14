@@ -91,3 +91,11 @@ def test_allergen_property(contains, may, free, data, target, strict):
     if ev["verdict"] == "safe":
         assert not (related & contains)
         assert any(s["says"] == "safe" for s in ev["signals"])
+
+
+def test_kind_changing_products_do_not_match():
+    from valio_mcp.catalog import catalog
+    ids = catalog().matching_ids("cooking cream")
+    assert "DEMO-2004" in ids and "DEMO-2009" not in ids  # oat cooking cream is a different product
+    assert "DEMO-2009" in catalog().matching_ids("oat cooking cream")
+    assert "DEMO-2001" in catalog().matching_ids("arborio rice")
