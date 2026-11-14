@@ -19,6 +19,8 @@ export interface BlockCtx {
   retry: () => void;
   /** Put text into the composer for the buyer to finish. */
   prefill: (text: string) => void;
+  /** Send a message on the buyer's behalf (a one-click answer to a question the agent asked). */
+  send: (text: string) => void;
   /** item_id -> why nothing could be ordered for it */
   issues: Record<string, ItemIssue>;
   /** The read-back of this order, for names and queries in later cards. */
@@ -126,7 +128,15 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
   const mandateRules = it.hard_rules.filter((r) => r.source === "mandate" || /^m\d/.test(r.id ?? ""));
   const requestRules = it.hard_rules.filter((r) => !mandateRules.includes(r));
   const anyUsual = it.items.some((i) => i.usual?.name);
+  const anyNew = it.items.some((i) => !i.usual?.name);
   const questions = it.questions ?? [];
+  // Said once for the whole list, not on every line.
+  const slacks = it.items.map((i) => i.quantity?.max_over_pct ?? 0);
+  const sameSlack = slacks.every((x) => x === slacks[0]) ? slacks[0] ?? 0 : null;
+  const hint = [
+    anyNew ? (anyUsual ? "New items: I search the catalog after you confirm." : "I search the catalog after you confirm.") : "",
+    sameSlack ? `Rounding up to whole packs, at most +${sameSlack} %.` : "",
+  ].filter(Boolean).join(" ");
 
   const sign = async () => {
     if (!it.intent_hash) return;
@@ -141,7 +151,29 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
     }
   };
 
+  /**
+   * Open questions block a plain confirm (Valio answers 409). "Confirm as is" is the buyer's answer: revise the
+   * intent unchanged (that drops the agent's own questions, Valio's own checks stay), then sign the new hash.
+   * If Valio still has a question, the new read-back shows it and nothing is signed.
+   */
+  const confirmAsIs = async () => {
+    if (!it.intent_hash) return;
+    setBusy(true);
+    try {
+      const next = await confirmIntent(it.intent_id, { intent_hash: it.intent_hash, edits: { preferences: {} } });
+      if ((next.questions ?? []).length || !next.intent_hash) return;
+      await confirmIntent(next.intent_id, { intent_hash: next.intent_hash, confirmed_by: SIGNER_NAME });
+      ctx.local({ type: "local/signed", intentId: it.intent_id });
+      ctx.local({ type: "local/signed", intentId: next.intent_id });
+    } catch (e) {
+      toast(`Not sent: ${errText(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
+    <>
     <Card className="rise">
       <CardHeader title="Here's what I understood">
         <span className="text-[13px] text-ink3">from your {it.items.some((i) => i.note === "from your photo") ? "photo" : "message"}</span>
@@ -149,23 +181,21 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
       {it.items.map((i) => (
         <div key={i.item_id} className="order-item">
           <div className="min-w-0">
-            <div className="ask">{i.quantity?.amount} {unitLabel(i.quantity?.unit)} {i.product?.query}</div>
-            <div className="nm">{i.usual?.name ?? "I search the catalog after you confirm"}</div>
-            {i.quantity?.max_over_pct ? <div className="qty">rounding up to whole packs, at most +{i.quantity.max_over_pct} %</div> : null}
+            <div className="ask">
+              <span className="q">{i.quantity?.amount} {unitLabel(i.quantity?.unit)}</span>
+              <span className="n">{i.product?.query}</span>
+            </div>
+            {i.usual?.name && <div className="nm">Your usual: {i.usual.name}</div>}
+            {sameSlack === null && i.quantity?.max_over_pct ? <div className="nm">Rounding up to whole packs, at most +{i.quantity.max_over_pct} %</div> : null}
           </div>
-          <div className="px" />
-          <div className="chips">
-            {i.usual?.name ? <Chip kind="usual" icon="usual">Your usual</Chip> : <Chip kind="about">New for you</Chip>}
-            {(i.hard_rules ?? []).map((r, n) => <Chip key={n} kind="must" icon="check">{r.label ?? `${r.attr} ${r.op} ${String(r.value)}`}</Chip>)}
-          </div>
+          {(i.hard_rules ?? []).length > 0 && (
+            <div className="chips">
+              {(i.hard_rules ?? []).map((r, n) => <Chip key={n} kind="must" icon="check">{r.label ?? `${r.attr} ${r.op} ${String(r.value)}`}</Chip>)}
+            </div>
+          )}
         </div>
       ))}
-      {questions.length > 0 && (
-        <div className="questions">
-          <b>I need an answer before I can search:</b>
-          {questions.map((q) => <div key={q}>{q}</div>)}
-        </div>
-      )}
+      {hint && <div className="items-hint">{hint}</div>}
       <div className="paramchips">
         <span className="pchip">Deliver by <b>{fmtDay(it.deliver_by)}</b></span>
         {it.preferences?.optimise && <span className="pchip">Then <b>{it.preferences.optimise === "price" ? "cheapest" : it.preferences.optimise === "co2" ? "lowest CO₂" : "most reliable"}</b></span>}
@@ -183,20 +213,22 @@ function Readback({ b, ctx }: { b: BlockOf<"readback">; ctx: BlockCtx }) {
       <CardFooter>
         <div className="fore">
           {questions.length ? (
-            <><b>Answer below and I write it down again.</b> Nothing is sent before you confirm.</>
+            <>Answer my question in the chat, or confirm as it is.</>
           ) : (
-            <><b>This is what I order.</b> Valio Aimo checks every line against your rules{k.limit ? ` and orders alone up to ${eur(k.limit)}` : ""}. Anything else comes back to you.</>
+            <>Valio Aimo checks every line against your rules. Anything outside them comes back to you.</>
           )}
         </div>
         {b.signed ? (
           <Chip kind="prefer" icon="check">Sent</Chip>
-        ) : questions.length ? null : (
-          <Button variant="primary" icon="lock" disabled={busy || !it.intent_hash} onClick={() => void sign()}>
+        ) : (
+          <Button variant="primary" icon="lock" disabled={busy || !it.intent_hash} onClick={() => void (questions.length ? confirmAsIs() : sign())}>
             {busy ? "Sending…" : "Confirm & send to Valio Aimo"}
           </Button>
         )}
       </CardFooter>
     </Card>
+    {/* The question itself follows as the agent's chat message, so it reads as "answer me in the chat". */}
+    </>
   );
 }
 
@@ -401,31 +433,42 @@ function productOf(b: BlockOf<"block">, itemId: string | null | undefined) {
 // ---------------------------------------------------------------- receipt
 
 function Receipt({ b, ctx }: { b: BlockOf<"receipt">; ctx: BlockCtx }) {
+  const k = useKitchenContext();
   const deviations = lineDeviations(b.diff);
-  const why = (itemId: string | undefined, usual: boolean | null | undefined): ReactNode => {
-    if (b.tier === "auto") {
-      return <><Chip kind="auto" icon="lock">Ordered alone</Chip>{usual ? "your usual, " : ""}passed every must, no deviation</>;
-    }
-    const dev = deviations.find((d) => d.item_id === itemId);
-    if (dev) return <><Chip kind="about">You decided</Chip>{dev.detail ?? "a change you approved"}</>;
-    return <><Chip kind="about">You approved the cart</Chip>passed every must</>;
-  };
+  const n = b.lines.length;
+  const asked = n + b.openItems.length;
+  const items = b.openItems.length ? `${n} of ${asked} items` : `${n} item${n === 1 ? "" : "s"}`;
+  // What it did, in one line, and why it was allowed to. Per line only what differs from that.
+  const why =
+    b.tier === "auto"
+      ? `I ordered this on my own: every line passed your rules${k.limit ? ` and the total is inside your ${eur(k.limit)} limit` : ""}.`
+      : deviations.length
+        ? "Ordered after you decided on the changes below."
+        : "Ordered after you approved the cart. Every line passed your rules.";
   return (
     <Card variant="receipt" className="rise">
-      <CardHeader title={<span className="flex items-center gap-2.5"><span className="check"><Icon name="check" /></span>Valio Aimo confirmed</span>}>
-        <span className="text-[13px] text-ink3">order {b.orderId} · prices locked{b.deliveryDate ? ` · ${fmtDay(b.deliveryDate)}` : ""}</span>
-      </CardHeader>
-      {b.lines.map((l, i) => (
-        <div key={l.quote_id ?? `${l.product_id}-${i}`} className="rline">
-          <span>{l.name} × {l.quantity}{l.sales_unit ? ` ${l.sales_unit.toLowerCase()}` : ""}</span>
-          <span className="px">{eur(l.total_price)}</span>
-          <span className="why">{why(l.item_id, l.usual)}</span>
+      <div className="receipt-h">
+        <span className="check"><Icon name="check" /></span>
+        <div className="min-w-0">
+          <h3>Ordered · {eur(b.total)}</h3>
+          <div className="sub">{items}{b.deliveryDate ? ` · delivery ${fmtDay(b.deliveryDate)}` : ""}</div>
         </div>
-      ))}
+      </div>
+      <p className="receipt-why">{why}</p>
+      {b.lines.map((l, i) => {
+        const dev = b.tier === "auto" ? undefined : deviations.find((d) => d.item_id === l.item_id);
+        return (
+          <div key={l.quote_id ?? `${l.product_id}-${i}`} className="rline">
+            <span className="nm">{l.name} × {l.quantity}{l.sales_unit ? ` ${l.sales_unit.toLowerCase()}` : ""}</span>
+            <span className="px">{eur(l.total_price)}</span>
+            {dev && <span className="why">You decided: {dev.detail ?? "a change you approved"}</span>}
+          </div>
+        );
+      })}
       <div className="rtotal"><span>Total</span><span className="num">{eur(b.total)}</span></div>
       {b.openItems.length > 0 && <StillOpen ids={b.openItems} ctx={ctx} />}
       <div className="proof">
-        <span className="ok"><Icon name="shield" />Confirmed by Valio Aimo</span>
+        <span>Order {b.orderId} · prices locked by Valio Aimo</span>
         <span className="flex-1" />
         <button className="link" onClick={() => navigate("activity", b.orderId)}>Why, line by line</button>
       </div>
@@ -433,8 +476,9 @@ function Receipt({ b, ctx }: { b: BlockOf<"receipt">; ctx: BlockCtx }) {
   );
 }
 
-/** Items of the intent that this order does not contain, with the reason and what the buyer can do next. */
+/** Items of the intent that this order does not contain: one plain question, one button per answer. */
 function StillOpen({ ids, ctx }: { ids: string[]; ctx: BlockCtx }) {
+  const [asked, setAsked] = useState(false);
   const rows = ids.map((id) => {
     const item = ctx.intent?.items.find((i) => i.item_id === id);
     const issue = ctx.issues[id] ?? { kind: "delivery" as const, reason: "Not ordered yet." };
@@ -443,29 +487,36 @@ function StillOpen({ ids, ctx }: { ids: string[]; ctx: BlockCtx }) {
   });
   const late = rows.filter((r) => r.issue.kind === "delivery");
   const rules = rows.filter((r) => r.issue.kind !== "delivery");
+  const answer = (text: string) => {
+    setAsked(true);
+    ctx.send(text);
+  };
+  const question =
+    rules.length && late.length ? "What should I do?"
+    : rules.length ? `Should I look for another ${rules.length === 1 ? rules[0]!.query : "product"} that passes your rules?`
+    : `Should I order ${late.length === 1 ? "it" : "them"} for the next possible delivery date?`;
   return (
     <div className="still-open">
-      <div className="still-h"><Icon name="flag" size={15} />Still open · {rows.length} item{rows.length === 1 ? "" : "s"} not in this order</div>
+      <div className="still-h"><Icon name="flag" size={15} />Not ordered yet</div>
       {rows.map((r) => (
         <div key={r.id} className="open-row">
-          <div className="min-w-0">
-            <div className="font-semibold">{r.what}</div>
-            <div className="text-[13px] text-ink3">{cap(r.issue.reason)}</div>
-          </div>
-          {r.issue.kind === "rules" ? <Chip kind="must" icon="lock">Breaks a must</Chip> : r.issue.kind === "missing" ? <Chip>Not found</Chip> : <Chip kind="auto">Not in time</Chip>}
+          <b>{cap(r.what)}</b>
+          <span className="text-ink3"> · {cap(r.issue.reason)}</span>
         </div>
       ))}
+      <div className="still-q">{question}</div>
       <div className="open-acts">
-        {late.length > 0 && (
-          <Button small onClick={() => ctx.prefill(`Order ${late.map((r) => r.what).join(", ")} for the next possible delivery date`)}>
-            Deliver {late.length === 1 ? late[0]!.query : `${late.length} items`} later
-          </Button>
-        )}
         {rules.length > 0 && (
-          <Button small onClick={() => ctx.prefill(`Find another ${rules.map((r) => r.query).join(" and ")} that passes my rules`)}>
-            Find another {rules.length === 1 ? rules[0]!.query : "product"}
+          <Button small variant="primary" disabled={asked} onClick={() => answer(`Find another ${rules.map((r) => r.query).join(" and ")} that passes my rules`)}>
+            {late.length ? `Find another ${rules.length === 1 ? rules[0]!.query : "product"}` : "Yes, find another"}
           </Button>
         )}
+        {late.length > 0 && (
+          <Button small variant={rules.length ? undefined : "primary"} disabled={asked} onClick={() => answer(`Order ${late.map((r) => r.what).join(", ")} for the next possible delivery date`)}>
+            {rules.length ? `Deliver ${late.length === 1 ? late[0]!.query : `${late.length} items`} later` : "Yes, deliver later"}
+          </Button>
+        )}
+        <Button small disabled={asked} onClick={() => setAsked(true)}>No, leave it</Button>
       </div>
     </div>
   );
