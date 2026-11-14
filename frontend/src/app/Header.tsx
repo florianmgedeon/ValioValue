@@ -1,6 +1,7 @@
 import { Icon } from "../ui";
 import { useAutonomy, useMandate } from "./queries";
 import { navigate, type Tab } from "./route";
+import { startTour } from "../features/tour/Tour";
 
 const TABS: { tab: Tab; label: string }[] = [
   { tab: "order", label: "Order" },
@@ -40,6 +41,7 @@ export function Header({ tab, showTabs }: { tab: Tab; showTabs: boolean }) {
               <button
                 key={t.tab}
                 role="tab"
+                data-tour={`tab-${t.tab}`}
                 aria-selected={tab === t.tab}
                 className={`h-8 rounded-full px-2.5 text-sm font-semibold sm:px-4 ${tab === t.tab ? "bg-bg text-ink shadow-[0_1px_3px_rgba(0,0,0,.12)]" : "text-ink2"}`}
                 onClick={() => navigate(t.tab)}
@@ -54,6 +56,7 @@ export function Header({ tab, showTabs }: { tab: Tab; showTabs: boolean }) {
           <button
             className="flex h-9 items-center gap-2.5 rounded-full bg-auto-soft pr-3 pl-2.5 text-[13px] font-semibold whitespace-nowrap text-auto"
             title="What I may order without you"
+            data-tour="autonomy"
             onClick={() => {
               navigate("kitchen");
               window.setTimeout(() => document.getElementById("autonomy")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
@@ -62,6 +65,11 @@ export function Header({ tab, showTabs }: { tab: Tab; showTabs: boolean }) {
             <Icon name="hand" className="hidden sm:block" />
             <span className="hidden md:inline">{long}</span>
             <span className="md:hidden">{short}</span>
+          </button>
+        )}
+        {showTabs && (
+          <button type="button" className="grid size-9 place-items-center rounded-full text-[15px] font-bold text-ink3 hover:bg-surface" title="Show me around" aria-label="Show me around" onClick={startTour}>
+            ?
           </button>
         )}
         <div className="flex h-9 items-center gap-2 rounded-full border-line text-[13px] font-semibold whitespace-nowrap sm:border sm:pr-1 sm:pl-3">

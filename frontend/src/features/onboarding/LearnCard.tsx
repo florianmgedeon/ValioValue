@@ -1,5 +1,15 @@
 import type { Suggestion } from "../../api/types";
-import { KindTag, SignedTag, SIGNED_KINDS, YesNo, type Kind } from "../../ui";
+import { InfoTip, KindTag, SignedTag, SIGNED_KINDS, YesNo, type Kind } from "../../ui";
+
+/** One sentence per kind, for the (i) on the tag. */
+export const KIND_HELP: Record<Kind, { title: string; text: string }> = {
+  must: { title: "A fixed rule", text: "Valio Aimo checks it on every order. A product that breaks it is never ordered, and I can't change the rule myself." },
+  prefer: { title: "A preference", text: "When there's a choice, I pick what matches. It never blocks an order on its own." },
+  usual: { title: "A usual product", text: "Something you order regularly. When you just say \"milk\", I take this one in about this amount." },
+  about: { title: "About your kitchen", text: "A fact like size, opening days or delivery times. Helps me plan quantities and dates." },
+  auto: { title: "Order alone", text: "How much I may order without asking you. You set the limit and can take it back any time." },
+};
+const SIGNED_HELP = "This goes into your signed rules. Only you can change it, with your signature. I can't edit it, not even by mistake.";
 
 /** Backend suggestion kinds → UI kinds (`autonomy` is `auto` in the UI). */
 export function suggestionKind(s: Suggestion): Kind {
@@ -57,7 +67,9 @@ export function LearnCard({ s, from, decision, onDecide, onHover, focused = fals
       onFocus={() => onHover?.(true)}
       onBlur={() => onHover?.(false)}
     >
-      <KindTag kind={kind} />
+      <InfoTip title={KIND_HELP[kind].title} text={KIND_HELP[kind].text}>
+        <KindTag kind={kind} />
+      </InfoTip>
       <div className="min-w-0">
         <div className={`text-[15px] font-semibold ${rejected ? "line-through" : ""}`}>{s.title}</div>
         {s.quote && (
@@ -71,7 +83,9 @@ export function LearnCard({ s, from, decision, onDecide, onHover, focused = fals
           {SIGNED_KINDS.has(kind) && (
             <>
               {" · "}
-              <SignedTag />
+              <InfoTip text={SIGNED_HELP}>
+                <SignedTag />
+              </InfoTip>
             </>
           )}
         </div>

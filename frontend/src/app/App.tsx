@@ -11,6 +11,7 @@ import { ActivityView } from "../features/activity/ActivityView";
 import { DemoMenu, OnboardingView } from "../features/onboarding";
 import OrderView from "../features/order/OrderView";
 import KitchenView from "../features/kitchen/KitchenView";
+import { Tour } from "../features/tour/Tour";
 
 const UiGallery = import.meta.env.DEV ? lazy(() => import("./UiGallery")) : null;
 
@@ -47,6 +48,7 @@ function Shell() {
       <Screen route={route} />
       <Composer />
       {showTabs && <DemoMenu />}
+      {showTabs && <Tour />}
     </>
   );
 }

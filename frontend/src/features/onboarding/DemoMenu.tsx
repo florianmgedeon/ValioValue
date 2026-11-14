@@ -1,4 +1,5 @@
 import { navigate } from "../../app/route";
+import { startTour } from "../tour/Tour";
 
 /** Dev / demo only: go back to onboarding. The kitchen profile stays; onboarding adds to it. */
 export function DemoMenu() {
@@ -8,6 +9,10 @@ export function DemoMenu() {
       Demo ·{" "}
       <button type="button" className="link" onClick={() => navigate("onboard")}>
         restart onboarding
+      </button>
+      {" · "}
+      <button type="button" className="link" onClick={startTour}>
+        show tour
       </button>
     </div>
   );

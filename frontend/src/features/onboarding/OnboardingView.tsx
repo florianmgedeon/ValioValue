@@ -6,6 +6,7 @@ import { usePhoneCamera } from "../../app/PhoneCamera";
 import { keys, queryClient, SIGNER_NAME } from "../../app/queries";
 import { navigate } from "../../app/route";
 import { useSignedChange } from "../../app/signing";
+import { queueTour } from "../tour/Tour";
 import { Button, Icon, Mark, Paper, useToast } from "../../ui";
 import { EXAMPLE_DOCS, exampleFile } from "./fixtures";
 import { LearnCard, suggestionKind } from "./LearnCard";
@@ -213,6 +214,7 @@ export function OnboardingView() {
       for (const l of drop) await rejectKitchenSuggestion(l.s.id ?? "", { by: SIGNER_NAME }).catch(() => undefined);
       await queryClient.invalidateQueries({ queryKey: keys.kitchen });
       if (!needsMandate && keep.length) toast(`Saved. I remember ${keep.length} thing${keep.length === 1 ? "" : "s"} about your kitchen.`);
+      queueTour();
       navigate("order");
     } catch (e) {
       toast(`Could not save: ${(e as Error).message}`);
@@ -232,6 +234,7 @@ export function OnboardingView() {
           Don't type rules. Show me what you already have: menus, notes on the fridge, old invoices. I'll read them and suggest what to
           remember. Nothing here places an order. You decide what applies.
         </p>
+        <Steps current={stage === "drop" ? 0 : stage === "reading" || busyReading ? 1 : 2} />
       </div>
 
       <div className="mt-10 grid grid-cols-1 items-start gap-[18px] min-[560px]:grid-cols-2 min-[1000px]:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,0.7fr)]">
@@ -336,6 +339,7 @@ export function OnboardingView() {
                     : "Nothing here needs your OK."}
               </>
             )}
+            <span className="mt-1 block text-[13px] opacity-70">Next: a quick look at the three tabs, then your first order by photo or chat.</span>
           </p>
           <Button variant="inverse" iconAfter="arrow" disabled={adopting} onClick={() => void adopt()}>
             {adopting ? "Saving…" : learned.length === 0 ? "Start ordering" : needsMandate ? "Confirm & start ordering" : "Save & start ordering"}
@@ -343,6 +347,31 @@ export function OnboardingView() {
         </div>
       )}
     </main>
+  );
+}
+
+const STEP_TEXT = [
+  { title: "Show me", text: "Photos or PDFs of menus, fridge notes, invoices. Or one sentence." },
+  { title: "I read", text: "I find rules, preferences and usual products, and show you where I read each one." },
+  { title: "You decide", text: "Keep or drop each card. Fixed rules need your signature." },
+];
+
+/** Prototype: where you are in onboarding, with what each step means. */
+function Steps({ current }: { current: number }) {
+  return (
+    <ol className="mx-auto mt-4 grid max-w-[720px] grid-cols-1 gap-2 text-left min-[640px]:grid-cols-3">
+      {STEP_TEXT.map((s, i) => (
+        <li key={s.title} className={`flex gap-2.5 rounded-2xl p-3 transition-colors ${i === current ? "bg-accent-soft" : "bg-surface"} ${i > current ? "opacity-60" : ""}`}>
+          <span className={`grid size-6 shrink-0 place-items-center rounded-full text-xs font-bold ${i < current ? "bg-prefer text-bg" : i === current ? "bg-accent text-bg" : "bg-line text-ink3"}`}>
+            {i < current ? "✓" : i + 1}
+          </span>
+          <span className="min-w-0">
+            <b className="block text-sm">{s.title}</b>
+            <span className="block text-[12.5px] leading-snug text-ink2">{s.text}</span>
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }
 

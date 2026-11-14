@@ -5,6 +5,7 @@ export { Chip, KindTag, SignedTag, Cond, Tier, KIND_LABEL, SIGNED_KINDS, type Ki
 export { Card, CardHeader, CardFooter, type CardVariant } from "./Card";
 export { Toggle, Segmented, Weight, YesNo, Typing } from "./controls";
 export { Modal, Drawer } from "./Overlay";
+export { InfoTip } from "./InfoTip";
 export { ToastProvider, useToast } from "./Toast";
 export { HashRow, CedarBlock, DiffList, type DiffKind } from "./Trust";
 export { Paper, Mark } from "./Paper";
