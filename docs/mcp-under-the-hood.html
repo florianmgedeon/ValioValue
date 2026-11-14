@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ValioValue MCP under the hood</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Layout idea: one reading column. Diagram first, then one card per tool, then rules and endpoints. Blue = buyer side, teal = Valio side. */
+  :root {
+    --bg: #f5f7fa;
+    --card: #ffffff;
+    --ink: #172033;
+    --muted: #5d6779;
+    --line: #dde2ea;
+    --buyer: #2453c7;
+    --buyer-soft: #e9effc;
+    --valio: #0b7a6f;
+    --valio-soft: #e3f4f1;
+    --warn: #a35a00;
+    --warn-soft: #fff3df;
+    --bad: #b42318;
+    --code-bg: #f0f2f6;
+    --font-body: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10141c; --card: #171d28; --ink: #e6eaf2; --muted: #9aa4b6; --line: #2a3242;
+      --buyer: #7ea2ff; --buyer-soft: #1b2744; --valio: #4cc5b6; --valio-soft: #13302d;
+      --warn: #f0b35a; --warn-soft: #33270f; --bad: #ff8a80; --code-bg: #1f2633;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #10141c; --card: #171d28; --ink: #e6eaf2; --muted: #9aa4b6; --line: #2a3242;
+    --buyer: #7ea2ff; --buyer-soft: #1b2744; --valio: #4cc5b6; --valio-soft: #13302d;
+    --warn: #f0b35a; --warn-soft: #33270f; --bad: #ff8a80; --code-bg: #1f2633;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--font-body); }
+  main { max-width: 1040px; margin: 0 auto; padding: 40px 20px 72px; display: flex; flex-direction: column; gap: 28px; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0; text-wrap: balance; }
+  h2 { font-size: 20px; margin: 0 0 4px; text-wrap: balance; }
+  h3 { margin: 0; font-size: 18px; }
+  p { margin: 0; max-width: 70ch; }
+  .lead { color: var(--muted); font-size: 16px; margin-top: 8px; }
+  code, .mono { font-family: var(--font-mono); font-size: 13px; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px; }
+  .section-head { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+  .section-head p { color: var(--muted); }
+  figure { margin: 0; }
+  .diagram { overflow-x: auto; }
+  .diagram svg { display: block; width: 100%; min-width: 760px; height: auto; color: var(--ink); }
+  figcaption { color: var(--muted); font-size: 13px; margin-top: 10px; max-width: 80ch; }
+  .tools { display: flex; flex-direction: column; gap: 18px; }
+  .tool { border-left: 4px solid var(--valio); }
+  .tool-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 14px; }
+  .tool-name { font-family: var(--font-mono); font-size: 18px; font-weight: 500; color: var(--valio); }
+  .tool-plain { color: var(--muted); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 16px; }
+  .label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  blockquote { margin: 0; padding: 10px 12px; background: var(--code-bg); border-radius: 8px; font-family: var(--font-mono); font-size: 12.5px; white-space: pre-wrap; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .table-wrap { overflow-x: auto; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 12.5px; padding: 3px 9px; border-radius: 99px; border: 1px solid var(--line); white-space: nowrap; }
+  .chip.api { background: var(--valio-soft); border-color: transparent; color: var(--valio); font-weight: 600; }
+  .chip.local { background: var(--code-bg); border-color: transparent; }
+  .chip.none { color: var(--muted); border-style: dashed; }
+  ol.steps { margin: 6px 0 0; padding-left: 20px; }
+  ol.steps li { margin: 3px 0; }
+  .req { color: var(--bad); font-weight: 700; }
+  .pill { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+  .pill.reject { background: #fde8e6; color: var(--bad); }
+  .pill.human { background: var(--warn-soft); color: var(--warn); }
+  :root[data-theme="dark"] .pill.reject { background: #3a1714; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pill.reject { background: #3a1714; } }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .side { border-radius: 10px; padding: 14px 16px; }
+  .side.v { background: var(--valio-soft); }
+  .side.b { background: var(--buyer-soft); }
+  .side ul { margin: 6px 0 0; padding-left: 18px; }
+  .side h3 { font-size: 15px; }
+  a { color: var(--buyer); }
+  :focus-visible { outline: 2px solid var(--buyer); outline-offset: 2px; }
+  @media (max-width: 760px) { .grid2, .two { grid-template-columns: 1fr; } h1 { font-size: 25px; } }
+</style>
+</head>
+<body>
+<main>
+
+  <header>
+    <h1>ValioValue MCP under the hood</h1>
+    <p class="lead">What the purchasing agent can call, what each call does, and which Valio Aimo API sits behind it. State of branch <code>feat/mcp-server-backend</code>, 14 Nov 2026.</p>
+  </header>
+
+  <section class="card">
+    <div class="section-head">
+      <h2>The big picture</h2>
+      <p>Two sides. The buyer side runs the AI agent. The Valio side decides what the agent may see and do.</p>
+    </div>
+    <figure class="diagram">
+      <svg viewBox="0 0 960 470" role="img" aria-label="The console talks to the buyer backend. The backend asks Claude Haiku what to do and calls the Valio MCP server's tools. Only check_offer reaches the Valio mock API. Approvals go through separate human-only endpoints.">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+
+        <!-- buyer side -->
+        <rect x="16" y="16" width="236" height="438" rx="14" fill="none" stroke="#2453c7" stroke-opacity=".45" stroke-dasharray="6 5"/>
+        <text x="34" y="42" font-size="11" font-weight="700" fill="#2453c7" letter-spacing="1">BUYER SIDE</text>
+
+        <rect x="36" y="60" width="196" height="62" rx="10" fill="#2453c7" fill-opacity=".1" stroke="#2453c7" stroke-opacity=".5"/>
+        <text x="134" y="86" text-anchor="middle" font-size="14" font-weight="600" fill="currentColor">Agent console</text>
+        <text x="134" y="106" text-anchor="middle" font-size="11.5" fill="currentColor" opacity=".7">your browser</text>
+
+        <rect x="36" y="200" width="196" height="70" rx="10" fill="#2453c7" fill-opacity=".1" stroke="#2453c7" stroke-opacity=".5"/>
+        <text x="134" y="228" text-anchor="middle" font-size="14" font-weight="600" fill="currentColor">Buyer backend :8000</text>
+        <text x="134" y="248" text-anchor="middle" font-size="11.5" fill="currentColor" opacity=".7">runs the agent loop</text>
+
+        <rect x="36" y="364" width="196" height="62" rx="10" fill="#2453c7" fill-opacity=".1" stroke="#2453c7" stroke-opacity=".5"/>
+        <text x="134" y="390" text-anchor="middle" font-size="14" font-weight="600" fill="currentColor">Claude Haiku</text>
+        <text x="134" y="410" text-anchor="middle" font-size="11.5" fill="currentColor" opacity=".7">Anthropic API</text>
+
+        <line x1="134" y1="124" x2="134" y2="196" stroke="currentColor" stroke-width="1.4" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+        <text x="144" y="156" font-size="11.5" fill="currentColor">your request</text>
+        <text x="144" y="171" font-size="11.5" fill="currentColor">live steps back</text>
+
+        <line x1="134" y1="272" x2="134" y2="360" stroke="currentColor" stroke-width="1.4" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+        <text x="144" y="306" font-size="11.5" fill="currentColor">tool docs + history</text>
+        <text x="144" y="321" font-size="11.5" fill="currentColor">tool choice + reasoning</text>
+
+        <!-- valio side -->
+        <rect x="314" y="16" width="400" height="438" rx="14" fill="none" stroke="#0b7a6f" stroke-opacity=".5" stroke-dasharray="6 5"/>
+        <text x="332" y="42" font-size="11" font-weight="700" fill="#0b7a6f" letter-spacing="1">VALIO AIMO SIDE · MCP SERVER :8001</text>
+
+        <rect x="334" y="60" width="360" height="88" rx="10" fill="#0b7a6f" fill-opacity=".12" stroke="#0b7a6f" stroke-opacity=".6"/>
+        <text x="514" y="86" text-anchor="middle" font-size="14" font-weight="600" fill="currentColor">MCP tools at /mcp</text>
+        <text x="514" y="108" text-anchor="middle" font-size="12" font-family="IBM Plex Mono, monospace" fill="currentColor">search_products · check_offer</text>
+        <text x="514" y="127" text-anchor="middle" font-size="12" font-family="IBM Plex Mono, monospace" fill="currentColor">place_order · get_order_status</text>
+
+        <rect x="334" y="196" width="360" height="62" rx="10" fill="#a35a00" fill-opacity=".1" stroke="#a35a00" stroke-opacity=".55"/>
+        <text x="514" y="222" text-anchor="middle" font-size="14" font-weight="600" fill="currentColor">Human-only endpoints /internal</text>
+        <text x="514" y="242" text-anchor="middle" font-size="11.5" fill="currentColor" opacity=".75">approve, reject, audit. Needs a token the agent never sees</text>
+
+        <rect x="334" y="300" width="172" height="62" rx="10" fill="none" stroke="currentColor" stroke-opacity=".35"/>
+        <text x="420" y="326" text-anchor="middle" font-size="13.5" font-weight="600" fill="currentColor">Policy engine</text>
+        <text x="420" y="346" text-anchor="middle" font-size="11.5" fill="currentColor" opacity=".7">policies.json</text>
+
+        <rect x="522" y="300" width="172" height="62" rx="10" fill="none" stroke="currentColor" stroke-opacity=".35"/>
+        <text x="608" y="326" text-anchor="middle" font-size="13.5" font-weight="600" fill="currentColor">SQLite</text>
+        <text x="608" y="346" text-anchor="middle" font-size="11.5" fill="currentColor" opacity=".7">quotes, orders, audit log</text>
+
+        <rect x="334" y="378" width="360" height="56" rx="10" fill="none" stroke="currentColor" stroke-opacity=".35"/>
+        <text x="514" y="402" text-anchor="middle" font-size="13.5" font-weight="600" fill="currentColor">Static data files</text>
+        <text x="514" y="421" text-anchor="middle" font-size="11.5" fill="currentColor" opacity=".7">17,546 products · delivery reliability · CO₂ per category</text>
+
+        <text x="336" y="290" font-size="11" font-weight="600" fill="currentColor" opacity=".65">Used by the tools</text>
+
+        <!-- backend to MCP -->
+        <path d="M232 222 H282 V104 H330" fill="none" stroke="currentColor" stroke-width="1.6" marker-end="url(#arrow)"/>
+        <text x="262" y="96" font-size="11.5" font-weight="600" fill="currentColor" text-anchor="middle">tool calls</text>
+        <path d="M232 250 H296 V227 H330" fill="none" stroke="#a35a00" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+        <text x="282" y="268" font-size="11" fill="#a35a00" text-anchor="middle">your click</text>
+
+        <!-- valio api -->
+        <rect x="760" y="60" width="184" height="150" rx="10" fill="#0b7a6f" fill-opacity=".06" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="852" y="88" text-anchor="middle" font-size="14" font-weight="600" fill="currentColor">Valio mock API</text>
+        <text x="852" y="107" text-anchor="middle" font-size="11" fill="currentColor" opacity=".7">junction26.valioaimo.fi</text>
+        <rect x="770" y="122" width="164" height="28" rx="6" fill="#0b7a6f" fill-opacity=".15"/>
+        <text x="852" y="141" text-anchor="middle" font-size="12" font-family="IBM Plex Mono, monospace" fill="currentColor">POST /api/price</text>
+        <rect x="770" y="158" width="164" height="28" rx="6" fill="#0b7a6f" fill-opacity=".15"/>
+        <text x="852" y="177" text-anchor="middle" font-size="12" font-family="IBM Plex Mono, monospace" fill="currentColor">POST /api/availability</text>
+        <text x="852" y="232" text-anchor="middle" font-size="11.5" fill="currentColor" opacity=".7">no search, no orders</text>
+
+        <line x1="696" y1="104" x2="756" y2="104" stroke="currentColor" stroke-width="1.6" marker-end="url(#arrow)"/>
+        <text x="726" y="92" font-size="11" fill="currentColor" text-anchor="middle">check_offer</text>
+        <text x="726" y="122" font-size="11" fill="currentColor" text-anchor="middle" opacity=".7">only</text>
+      </svg>
+      <figcaption>Haiku never talks to Valio directly. It only picks a tool and its input. The backend runs the call against the MCP server. Of the four tools, only <code>check_offer</code> reaches the Valio API. Approving an order is not a tool at all: it is a separate endpoint the backend calls when you click Approve.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>The four tools</h2>
+      <p>The grey box is the exact description Haiku reads before deciding. <span class="req">*</span> marks required inputs.</p>
+    </div>
+    <div class="tools">
+
+      <article class="card tool">
+        <div class="tool-head"><span class="tool-name">search_products</span><span class="tool-plain">Find candidate products. No prices yet.</span></div>
+        <div class="grid2">
+          <div>
+            <div class="label">Description Haiku reads</div>
+            <blockquote>Search Valio Aimo's static product catalog. Returns candidate products with labels, allergens,
+historic delivery reliability and category CO2 estimate. No prices here: use check_offer.</blockquote>
+            <div class="label" style="margin-top:14px">Inputs</div>
+            <div class="table-wrap"><table>
+              <tr><th>Name</th><th>Type</th><th>Meaning</th></tr>
+              <tr><td><code>query</code><span class="req">*</span></td><td>text</td><td>What the buyer needs, English or Finnish</td></tr>
+              <tr><td><code>filters.lactose_free</code></td><td>yes/no</td><td>Only lactose-free products</td></tr>
+              <tr><td><code>filters.exclude_allergens</code></td><td>list</td><td>Drop products containing these, e.g. gluten</td></tr>
+              <tr><td><code>filters.category</code></td><td>text</td><td>Valio category code</td></tr>
+              <tr><td><code>filters.country_of_origin</code></td><td>text</td><td>e.g. <code>fi</code></td></tr>
+              <tr><td><code>limit</code></td><td>1 to 25</td><td>How many results, default 10</td></tr>
+            </table></div>
+          </div>
+          <div>
+            <div class="label">Calls</div>
+            <div class="chips"><span class="chip local">products.json</span><span class="chip local">delivery_reliability.csv</span><span class="chip local">carbon_footprint.csv</span><span class="chip none">no Valio API call</span></div>
+            <div class="label" style="margin-top:14px">How it works</div>
+            <ol class="steps">
+              <li>Translates the query into Finnish and Swedish too (milk → maito, mjölk).</li>
+              <li>Ranks by name match plus a category signal learned from the catalog, so "milk" finds real milk first.</li>
+              <li>Ignores negations like "milk free" and pushes down chocolate milk, coffee drinks and quark unless asked for.</li>
+            </ol>
+            <div class="label" style="margin-top:14px">Returns</div>
+            <p>Product id, name, brand, category, sales unit, lactose-free flag, allergens, labels, delivery reliability, CO₂ per kg.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="card tool">
+        <div class="tool-head"><span class="tool-name">check_offer</span><span class="tool-plain">Get live prices and stock for a shortlist. Creates fixed-price quotes.</span></div>
+        <div class="grid2">
+          <div>
+            <div class="label">Description Haiku reads</div>
+            <blockquote>Get binding quotes: live price and availability from Valio Aimo for each product on the date.
+Each offer has a quote_id that fixes the price until quote_expires_at. Offers are sorted best first.</blockquote>
+            <div class="label" style="margin-top:14px">Inputs</div>
+            <div class="table-wrap"><table>
+              <tr><th>Name</th><th>Type</th><th>Meaning</th></tr>
+              <tr><td><code>product_ids</code><span class="req">*</span></td><td>list, 1 to 25</td><td>Ids from search_products</td></tr>
+              <tr><td><code>requested_date</code><span class="req">*</span></td><td>YYYY-MM-DD</td><td>Desired delivery date</td></tr>
+              <tr><td><code>quantity</code><span class="req">*</span></td><td>number</td><td>Amount the buyer needs</td></tr>
+              <tr><td><code>quantity_unit</code></td><td>L, KG, SALES_UNIT</td><td>Litres and kilos are converted per product</td></tr>
+            </table></div>
+          </div>
+          <div>
+            <div class="label">Calls</div>
+            <div class="chips"><span class="chip api">POST /api/price</span><span class="chip api">POST /api/availability</span><span class="chip local">SQLite: saves quotes</span></div>
+            <div class="label" style="margin-top:14px">How it works</div>
+            <ol class="steps">
+              <li>One price request and one availability request for the whole shortlist.</li>
+              <li>Litres per pack = price per pack ÷ price per litre. 1,000 L of 5 L cases becomes 200 cases, rounded up to whole packs.</li>
+              <li>Can deliver only if not blocked, enough stock, on time and before the order cut-off.</li>
+              <li>Sorts by can-deliver, then total price, then reliability. Top three get best, better, good.</li>
+              <li>Each offer becomes a quote, valid until the cut-off or 30 minutes, whichever is first.</li>
+            </ol>
+            <div class="label" style="margin-top:14px">Returns</div>
+            <p>Per product: quantity in packs, price per pack and per litre, total, delivery date, stock, cut-off, reliability, CO₂, reasons it cannot deliver, <code>quote_id</code>. Plus the recommended product.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="card tool">
+        <div class="tool-head"><span class="tool-name">place_order</span><span class="tool-plain">Commit to one quote. Valio's rules decide the outcome.</span></div>
+        <div class="grid2">
+          <div>
+            <div class="label">Description Haiku reads</div>
+            <blockquote>Commit to a quote. Valio Aimo enforces the buyer's mandate (spend limit, availability, quote validity).
+Returns status 'confirmed', 'pending_approval' (wait for a human, you cannot approve) or 'rejected'.</blockquote>
+            <div class="label" style="margin-top:14px">Inputs</div>
+            <div class="table-wrap"><table>
+              <tr><th>Name</th><th>Type</th><th>Meaning</th></tr>
+              <tr><td><code>quote_id</code><span class="req">*</span></td><td>text</td><td>From check_offer</td></tr>
+              <tr><td><code>reason</code><span class="req">*</span></td><td>text</td><td>Why this offer. Shown to the approver and in the audit log</td></tr>
+            </table></div>
+          </div>
+          <div>
+            <div class="label">Calls</div>
+            <div class="chips"><span class="chip local">SQLite: quote, order</span><span class="chip local">Policy engine</span><span class="chip none">no Valio API call</span></div>
+            <div class="label" style="margin-top:14px">How it works</div>
+            <ol class="steps">
+              <li>Looks up the quote, so the price is exactly what check_offer returned.</li>
+              <li>Runs the four policy rules below for the buyer.</li>
+              <li>All pass: order confirmed. A soft rule fails: an approval request is created. A hard rule fails: rejected.</li>
+            </ol>
+            <p class="tool-plain" style="margin-top:8px">The mock API has no order endpoint, so orders live in our database.</p>
+            <div class="label" style="margin-top:14px">Returns</div>
+            <p>Status, order id, every rule with pass or fail and why, total, delivery date, and the approval request if one was created.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="card tool">
+        <div class="tool-head"><span class="tool-name">get_order_status</span><span class="tool-plain">Check where an order stands.</span></div>
+        <div class="grid2">
+          <div>
+            <div class="label">Description Haiku reads</div>
+            <blockquote>Current status of an order and its approval.</blockquote>
+            <div class="label" style="margin-top:14px">Inputs</div>
+            <div class="table-wrap"><table>
+              <tr><th>Name</th><th>Type</th><th>Meaning</th></tr>
+              <tr><td><code>order_id</code><span class="req">*</span></td><td>text</td><td>From place_order</td></tr>
+            </table></div>
+          </div>
+          <div>
+            <div class="label">Calls</div>
+            <div class="chips"><span class="chip local">SQLite</span><span class="chip none">no Valio API call</span></div>
+            <div class="label" style="margin-top:14px">Returns</div>
+            <p>The order and, if any, its approval with who decided and when.</p>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="section-head">
+      <h2>The rules place_order checks</h2>
+      <p>Enforced on the Valio side for every order. The agent cannot skip them, whatever its prompt says.</p>
+    </div>
+    <div class="table-wrap"><table>
+      <tr><th>Rule</th><th>Checks</th><th>If it fails</th></tr>
+      <tr><td>Quote still valid</td><td>The quote has not expired</td><td><span class="pill reject">rejected</span></td></tr>
+      <tr><td>Ordered before the cut-off</td><td>Valio's <code>closingTime</code> for that delivery date is still ahead</td><td><span class="pill reject">rejected</span></td></tr>
+      <tr><td>Full quantity on time</td><td>Enough stock, delivery on or before the requested date, not sales-blocked</td><td><span class="pill human">human approval</span></td></tr>
+      <tr><td>Spend limit</td><td>Net total ≤ the buyer's limit in <code>policies.json</code>, currently 500 EUR</td><td><span class="pill human">human approval</span></td></tr>
+    </table></div>
+  </section>
+
+  <section class="card">
+    <div class="section-head">
+      <h2>Human-only endpoints</h2>
+      <p>Plain web endpoints on the MCP server, protected by a token. The backend calls them when you click Approve or open the audit trail. They are not in Haiku's tool list.</p>
+    </div>
+    <div class="table-wrap"><table>
+      <tr><th>Endpoint</th><th>Does</th></tr>
+      <tr><td><code>GET /internal/approvals</code></td><td>Lists approval requests, filter by pending, approved or rejected</td></tr>
+      <tr><td><code>POST /internal/approvals/{id}</code></td><td>Approve or reject. Approved orders are confirmed if the quote is still valid</td></tr>
+      <tr><td><code>GET /internal/orders/{id}</code></td><td>One order</td></tr>
+      <tr><td><code>GET /internal/orders/{id}/audit</code></td><td>Every step for that order: agent, Valio, policy engine, human</td></tr>
+    </table></div>
+    <p class="tool-plain" style="margin-top:12px">How Valio knows who is calling: the backend sends <code>X-Buyer-Id</code> (which mandate applies) and <code>X-Agent-Session</code> (groups the audit log) with every tool call.</p>
+  </section>
+
+  <section class="card">
+    <div class="section-head">
+      <h2>What comes from Valio, what we added</h2>
+    </div>
+    <div class="two">
+      <div class="side v">
+        <h3>From Valio Aimo</h3>
+        <ul>
+          <li>Product catalog, 17,546 products</li>
+          <li>Live prices, incl. customer-specific net prices</li>
+          <li>Stock, delivery dates, order cut-offs</li>
+          <li>Delivery reliability and CO₂ per category</li>
+        </ul>
+      </div>
+      <div class="side b">
+        <h3>Added by us</h3>
+        <ul>
+          <li>Search over the catalog</li>
+          <li>Unit conversion and pack rounding</li>
+          <li>Quotes with fixed price and expiry</li>
+          <li>Orders, approvals, policy rules, audit log</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>
