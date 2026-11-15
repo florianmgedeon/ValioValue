@@ -1,0 +1,23 @@
+frontend/src/app/composer.tsx
+  s_16ebac9b14069e::t_1f77830448530a 1
+  s_16ebac9b14069e::t_5a2d8ed562c1e7 173
+  s_16ebac9b14069e::t_cd229ffba77eee 187-188,191-192
+  s_16ebac9b14069e::t_57c14a081bb95c 76-111
+  s_16ebac9b14069e::t_f8888076a9daea 69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d4696d59f1eee61a3b1211adcf81c7ff71808516",
+  "prompts": {},
+  "sessions": {
+    "s_16ebac9b14069e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "52248458-745c-4583-82f1-abb283b960b4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Moritz Kraus <moritz.kraus@gmx.net>"
+    }
+  }
+}
