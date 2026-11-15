@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Icon } from "../ui";
 import { usePhoneCamera, type CameraTarget } from "./PhoneCamera";
 
@@ -66,11 +66,47 @@ export function useComposerText() {
   return (t: string) => {
     setText(t);
     window.setTimeout(() => {
-      const el = document.getElementById("composer-input") as HTMLInputElement | null;
+      const el = document.getElementById("composer-input") as HTMLTextAreaElement | null;
       el?.focus();
       el?.setSelectionRange(t.length, t.length);
     }, 0);
   };
+}
+
+/** Textarea that grows with its content (up to 40% of the viewport, then scrolls). Enter sends, Shift+Enter adds a line. */
+function AutoGrowInput({ big, placeholder, value, onChange, onEnter }: {
+  big: boolean;
+  placeholder: string;
+  value: string;
+  onChange: (t: string) => void;
+  onEnter: () => void;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value, big]);
+  return (
+    <textarea
+      ref={ref}
+      id="composer-input"
+      rows={1}
+      className={`min-w-0 flex-1 resize-none self-center overflow-y-auto bg-transparent px-1.5 outline-none max-h-[40vh] ${big ? "min-h-12 py-3 text-lg leading-6" : "min-h-10 py-2 text-base leading-6"}`}
+      autoComplete="off"
+      aria-label="Message"
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+          e.preventDefault();
+          onEnter();
+        }
+      }}
+    />
+  );
 }
 
 type SpeechCtor = new () => {
@@ -134,7 +170,7 @@ export function Composer() {
         </div>
       )}
       <form
-        className={`mx-auto flex max-w-[880px] items-center gap-1.5 border bg-bg shadow-float ${big ? "rounded-[30px] border-2 border-ink p-2.5" : "rounded-[26px] border-line p-2"}`}
+        className={`mx-auto flex max-w-[880px] items-end gap-1.5 border bg-bg shadow-float ${big ? "rounded-[30px] border-2 border-ink p-2.5" : "rounded-[26px] border-line p-2"}`}
         onSubmit={(e) => {
           e.preventDefault();
           send(text);
@@ -148,14 +184,12 @@ export function Composer() {
         <button type="button" className="grid size-10 flex-none place-items-center rounded-full text-ink2 hover:bg-surface" aria-label="Attach a file" onClick={() => camera.upload(config.camera ?? "order")}>
           <Icon name="clip" />
         </button>
-        <input
-          id="composer-input"
-          className={`min-w-0 flex-1 bg-transparent px-1.5 outline-none ${big ? "h-12 text-lg" : "h-10 text-base"}`}
-          autoComplete="off"
-          aria-label="Message"
+        <AutoGrowInput
+          big={big}
           placeholder={listening ? "Listening…" : config.placeholder ?? "What do you need?"}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={setText}
+          onEnter={() => send(text)}
         />
         {Speech && (
           <button type="button" className={`grid ${btn} flex-none place-items-center rounded-full ${listening ? "animate-pulse-soft bg-must text-white" : "text-ink2 hover:bg-surface"}`} aria-label="Speak" onClick={listen}>
